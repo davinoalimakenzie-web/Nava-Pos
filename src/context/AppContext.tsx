@@ -1,0 +1,157 @@
+import React, { createContext, useContext, useState, useEffect } from 'react';
+import { db } from '../firebase';
+import { doc, setDoc, onSnapshot } from 'firebase/firestore';
+import { 
+  initialInventory, 
+  initialCustomers, 
+  initialTransactions, 
+  initialExpenses, 
+  initialPiutang, 
+  initialOrderData,
+  initialEmployees,
+  initialAttendances,
+  defaultDate,
+  initialUsers
+} from '../data';
+
+const AppContext = createContext<any>(null);
+
+function useSyncState<T>(key: string, initial: T, syncEnabled: boolean) {
+  const [state, setState] = useState<T>(initial);
+
+  useEffect(() => {
+    if (!syncEnabled) return;
+    const unsub = onSnapshot(doc(db, 'system', key), (docSnap) => {
+      if (docSnap.exists()) {
+        setState(docSnap.data().value as T);
+      }
+    });
+    return () => unsub();
+  }, [key, syncEnabled]);
+
+  const setSyncedState = (updater: any) => {
+    setState((prev) => {
+      const next = typeof updater === 'function' ? updater(prev) : updater;
+      if (syncEnabled) {
+        setDoc(doc(db, 'system', key), { value: next }, { merge: true }).catch(console.error);
+      }
+      return next;
+    });
+  }
+
+  return [state, setSyncedState] as const;
+}
+
+export const AppProvider = ({ children }: { children: React.ReactNode }) => {
+  const [user, setUser] = useState<any>(null);
+  const [activeTab, setActiveTab] = useState('pos');
+  
+  // System Settings
+  const [storeSettings, setStoreSettings] = useState(() => {
+    const saved = localStorage.getItem('POS_storeSettings');
+    return saved ? JSON.parse(saved) : {
+      storeName: 'NAVA POS',
+      storeAddress: 'Jl. Pahlawan No 123, Surabaya',
+      storePhone: '0812-3456-7890',
+      footerText: 'Terima Kasih Telah Berbelanja',
+      printerDriver: 'Generic / Text Only',
+      scannerPrefix: '',
+      scannerSuffix: 'Enter',
+      syncEnabled: false,
+      branches: ['Pusat'],
+      activeBranch: 'Pusat',
+      margins: { UMUM: { level1: 75, level2: 15 } }
+    };
+  });
+
+  useEffect(() => {
+    localStorage.setItem('POS_storeSettings', JSON.stringify(storeSettings));
+  }, [storeSettings]);
+
+  const [appUsers, setAppUsers] = useSyncState<any[]>('appUsers', initialUsers, storeSettings.syncEnabled);
+  const [inventory, setInventory] = useSyncState<any[]>('inventory', initialInventory, storeSettings.syncEnabled);
+  const [customers, setCustomers] = useSyncState<any[]>('customers', initialCustomers, storeSettings.syncEnabled);
+  const [employees, setEmployees] = useSyncState<any[]>('employees', initialEmployees, storeSettings.syncEnabled);
+  const [attendances, setAttendances] = useSyncState<any[]>('attendances', initialAttendances, storeSettings.syncEnabled);
+  const [leaveRequests, setLeaveRequests] = useSyncState<any[]>('leaveRequests', [], storeSettings.syncEnabled);
+  const [transactions, setTransactions] = useSyncState<any[]>('transactions', initialTransactions, storeSettings.syncEnabled);
+  const [expenses, setExpenses] = useSyncState<any[]>('expenses', initialExpenses, storeSettings.syncEnabled);
+  const [piutangData, setPiutangData] = useSyncState<any[]>('piutang', initialPiutang, storeSettings.syncEnabled);
+  const [orderData, setOrderData] = useSyncState<any[]>('order', initialOrderData, storeSettings.syncEnabled);
+
+  const [suppliers, setSuppliers] = useSyncState<any[]>('suppliers', [
+    { id: 1, name: 'PT Surya Gemilang', contact: '08123456789', address: 'Jl. Rungkut 1' }
+  ], storeSettings.syncEnabled);
+  const [supplierReturns, setSupplierReturns] = useSyncState<any[]>('supplierReturns', [], storeSettings.syncEnabled);
+
+  const [botMemory, setBotMemory] = useSyncState<string>('botMemory', 'Saya adalah AI bot asisten cerdas untuk Nava POS.', storeSettings.syncEnabled);
+
+  // Cross-cutting states
+  const [pendingTransactions, setPendingTransactions] = useState<any[]>([]);
+
+  // POS specific global states
+  const [cart, setCart] = useState<any[]>([]);
+  const [amountPaid, setAmountPaid] = useState('');
+  const [activeReturTrx, setActiveReturTrx] = useState<any>(null);
+  const [selectedCustomerId, setSelectedCustomerId] = useState('');
+  const [transactionDate, setTransactionDate] = useState(defaultDate);
+  const [paymentMethod, setPaymentMethod] = useState('TUNAI');
+
+  // Modals state
+  const [showPendingModal, setShowPendingModal] = useState(false);
+  const [showPiutangModal, setShowPiutangModal] = useState(false);
+  const [showPrintOptionsModal, setShowPrintOptionsModal] = useState(false);
+  const [showExpenseModal, setShowExpenseModal] = useState(false);
+  const [showAddCustomerModal, setShowAddCustomerModal] = useState(false);
+  const [showAddEmpModal, setShowAddEmpModal] = useState(false);
+  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
+  
+  // Auth state for switch user
+  const [showAuthModal, setShowAuthModal] = useState(false);
+  const [pendingUser, setPendingUser] = useState<any>(null);
+
+  // Tab states
+  const [masterDataTab, setMasterDataTab] = useState('stock');
+
+  return (
+    <AppContext.Provider value={{
+      user, setUser,
+      activeTab, setActiveTab,
+      appUsers, setAppUsers,
+      inventory, setInventory,
+      customers, setCustomers,
+      employees, setEmployees,
+      attendances, setAttendances,
+      leaveRequests, setLeaveRequests,
+      transactions, setTransactions,
+      expenses, setExpenses,
+      piutangData, setPiutangData,
+      orderData, setOrderData,
+      pendingTransactions, setPendingTransactions,
+      cart, setCart,
+      amountPaid, setAmountPaid,
+      activeReturTrx, setActiveReturTrx,
+      selectedCustomerId, setSelectedCustomerId,
+      transactionDate, setTransactionDate,
+      paymentMethod, setPaymentMethod,
+      showPendingModal, setShowPendingModal,
+      showPiutangModal, setShowPiutangModal,
+      showPrintOptionsModal, setShowPrintOptionsModal,
+      showExpenseModal, setShowExpenseModal,
+      showAddCustomerModal, setShowAddCustomerModal,
+      showAddEmpModal, setShowAddEmpModal,
+      showLogoutConfirm, setShowLogoutConfirm,
+      showAuthModal, setShowAuthModal,
+      pendingUser, setPendingUser,
+      masterDataTab, setMasterDataTab,
+      suppliers, setSuppliers,
+      supplierReturns, setSupplierReturns,
+      botMemory, setBotMemory,
+      storeSettings, setStoreSettings
+    }}>
+      {children}
+    </AppContext.Provider>
+  );
+};
+
+export const useAppContext = () => useContext(AppContext);

@@ -1,0 +1,9 @@
+{
+  "name": "Nava POS App",
+  "short_name": "NavaPOS",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#2563eb",
+  "icons": []
+}

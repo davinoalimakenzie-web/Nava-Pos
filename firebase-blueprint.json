@@ -1,0 +1,111 @@
+{
+  "entities": {
+    "InventoryItem": {
+      "title": "Inventory Item",
+      "description": "Stock of goods in the POS",
+      "type": "object",
+      "properties": {
+        "code": { "type": "string" },
+        "name": { "type": "string" },
+        "category": { "type": "string" },
+        "price1": { "type": "number" },
+        "price2": { "type": "number" },
+        "stock": { "type": "number" }
+      },
+      "required": ["code", "name", "price1", "price2", "stock"]
+    },
+    "Customer": {
+      "title": "Customer",
+      "description": "Registered customer",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "level": { "type": "number" }
+      },
+      "required": ["name", "level"]
+    },
+    "Supplier": {
+      "title": "Supplier",
+      "description": "Supplier for inventory",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "contact": { "type": "string" },
+        "address": { "type": "string" }
+      },
+      "required": ["name"]
+    },
+    "Transaction": {
+      "title": "Transaction",
+      "description": "Completed POS checkout",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "date": { "type": "string" },
+        "isoDate": { "type": "string" },
+        "total": { "type": "number" },
+        "method": { "type": "string" },
+        "idPelanggan": { "type": "number", "description": "Customer ID if any" },
+        "items": {
+          "type": "array",
+          "items": { "type": "object" }
+        }
+      },
+      "required": ["date", "total", "method", "items"]
+    },
+    "Expense": {
+      "title": "Expense",
+      "description": "Store operational expense",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string" },
+        "amount": { "type": "number" },
+        "date": { "type": "string" },
+        "isoDate": { "type": "string" },
+        "type": { "type": "string" }
+      },
+      "required": ["title", "amount", "date", "type"]
+    },
+    "Attendance": {
+      "title": "Attendance",
+      "description": "Employee attendance logs",
+      "type": "object",
+      "properties": {
+        "date": { "type": "string" },
+        "isoDate": { "type": "string" },
+        "user": { "type": "string" },
+        "timeIn": { "type": "string" },
+        "timeOut": { "type": "string" },
+        "status": { "type": "string" },
+        "lateMins": { "type": "number" }
+      },
+      "required": ["date", "user", "status"]
+    }
+  },
+  "firestore": {
+    "/inventory/{itemId}": {
+      "schema": { "$ref": "#/entities/InventoryItem" },
+      "description": "Stores all items available for sale."
+    },
+    "/customers/{customerId}": {
+      "schema": { "$ref": "#/entities/Customer" },
+      "description": "Stores user customers."
+    },
+    "/suppliers/{supplierId}": {
+      "schema": { "$ref": "#/entities/Supplier" },
+      "description": "Stores item suppliers."
+    },
+    "/transactions/{transactionId}": {
+      "schema": { "$ref": "#/entities/Transaction" },
+      "description": "Completed checkout transactions."
+    },
+    "/expenses/{expenseId}": {
+      "schema": { "$ref": "#/entities/Expense" },
+      "description": "Operational expenses."
+    },
+    "/attendances/{attendanceId}": {
+      "schema": { "$ref": "#/entities/Attendance" },
+      "description": "Attendance clock-ins/outs."
+    }
+  }
+}
