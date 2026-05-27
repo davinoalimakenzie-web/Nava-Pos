@@ -33,7 +33,11 @@ export const Login = () => {
     const foundUser = appUsers?.find((u: any) => u.username === username && u.password === password);
     if (foundUser) {
       setUser(foundUser);
-      setActiveTab('pos');
+      if (foundUser.role === 'admin' || foundUser.role === 'owner') {
+          setActiveTab('dashboard');
+      } else {
+          setActiveTab('pos');
+      }
       setErrorMsg('');
     } else {
       setErrorMsg('Username atau Password salah!');

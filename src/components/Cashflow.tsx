@@ -5,7 +5,7 @@ import { LegacyWindowHeader } from './LegacyWindowHeader';
 import { formatRp, formatDateDisplay, calculateJatuhTempo } from '../utils';
 
 export const Cashflow = ({ currentTime }: { currentTime: Date }) => {
-  const { transactions, expenses, storeSettings } = useAppContext();
+  const { transactions, expenses, setExpenses, storeSettings } = useAppContext();
   
   const [cashflowTab, setCashflowTab] = useState('harian');
   const [cashflowHarianSubTab, setCashflowHarianSubTab] = useState('laporan');
@@ -120,6 +120,46 @@ export const Cashflow = ({ currentTime }: { currentTime: Date }) => {
                   <input type="date" value={filterEndDate} onChange={e => setFilterEndDate(e.target.value)} disabled={!filterUseEnd} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer disabled:cursor-not-allowed" />
                 </div>
               </div>
+            </div>
+            <div className="flex flex-col gap-1">
+                <button onClick={() => {
+                    const rows = [
+                        ['Tanggal', 'Pelanggan', 'Metode', 'Total', 'Kasir', 'Cabang'],
+                        ...filteredTransactions.map((t: any) => [t.date, t.customer, t.method, t.total, t.cashier, t.branch])
+                    ];
+                    const csvContent = "data:text/csv;charset=utf-8," + rows.map(e => e.join(",")).join("\n");
+                    const encodedUri = encodeURI(csvContent);
+                    const link = document.createElement("a");
+                    link.setAttribute("href", encodedUri);
+                    link.setAttribute("download", `laporan_cashflow_${new Date().getTime()}.csv`);
+                    document.body.appendChild(link);
+                    link.click();
+                    document.body.removeChild(link);
+                }} className="bg-green-600 hover:bg-green-700 text-white font-bold h-[26px] px-4 text-xs">
+                    Export CSV
+                </button>
+            </div>
+            <div className="flex flex-col gap-1">
+                <button onClick={() => {
+                    const amountStr = prompt("Masukkan jumlah Modal Awal (Shift Kasir):");
+                    if (!amountStr) return;
+                    const amount = parseInt(amountStr.replace(/[^0-9]/g, ''), 10);
+                    if (isNaN(amount) || amount <= 0) return alert("Jumlah tidak valid");
+                    
+                    const newExpense = {
+                        id: 'MOD-' + Date.now(),
+                        date: `${new Date().toLocaleDateString('id-ID')} ${new Date().toLocaleTimeString('id-ID')}`,
+                        isoDate: new Date().toISOString(),
+                        name: `Setor Modal Awal / Shift`,
+                        amount: -Math.abs(amount), // negative expense = income cash
+                        cashier: storeSettings.activeBranch || 'Pusat',
+                        branch: storeSettings.activeBranch || 'Pusat'
+                    };
+                    setExpenses([newExpense, ...expenses]);
+                    alert("Modal awal berhasil ditambahkan ke dompet kasir!");
+                }} className="bg-blue-600 hover:bg-blue-700 text-white font-bold h-[26px] px-4 text-xs border border-blue-400">
+                    + Setor Modal
+                </button>
             </div>
             <div className="ml-auto text-right text-white mr-4">
               <p className="text-[10px] text-blue-200">TOTAL DANA LACI (CASH FISIK)</p>

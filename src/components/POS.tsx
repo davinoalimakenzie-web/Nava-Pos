@@ -1,5 +1,5 @@
-import React, { useState, useRef } from 'react';
-import { Calendar } from 'lucide-react';
+import React, { useState, useRef, useEffect } from 'react';
+import { Calendar, Sparkles, Loader2, ShoppingCart } from 'lucide-react';
 import { useAppContext } from '../context/AppContext';
 import { defaultDate } from '../data';
 import { formatRp, formatDateDisplay } from '../utils';
@@ -33,18 +33,67 @@ export const POS = ({ currentTime }: { currentTime: Date }) => {
   const [qtyInput, setQtyInput] = useState('1');
   const [suggestions, setSuggestions] = useState<any[]>([]); 
   const [stagedItem, setStagedItem] = useState<any>(null); 
+  const [transactionNote, setTransactionNote] = useState('');
   const [showInputMenu, setShowInputMenu] = useState(false);
   const [isDirectPrint, setIsDirectPrint] = useState(true);
 
   const [isInputStockMode, setIsInputStockMode] = useState(false);
+  const [isBarcodeMode, setIsBarcodeMode] = useState(true);
   const [stockSupplierId, setStockSupplierId] = useState('');
   const [stockDiscount, setStockDiscount] = useState(0);
+  const [globalDiscount, setGlobalDiscount] = useState(0);
   const [newStock, setNewStock] = useState({code: '', name: '', category: 'UMUM', supplierPrice: 0, price1: 0, price2: 0, stock: 1});
   const [stockSuggestions, setStockSuggestions] = useState<any[]>([]);
   const [showNewCategory, setShowNewCategory] = useState(false);
 
+  const [aiSuggestions, setAiSuggestions] = useState<any[]>([]);
+  const [isAiLoading, setIsAiLoading] = useState(false);
+
   const codeInputRef = useRef<HTMLInputElement>(null);
   const qtyInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (cart.length === 0 || isInputStockMode) {
+      setAiSuggestions([]);
+      return;
+    }
+    
+    // Debounce to avoid spamming the API
+    const timeout = setTimeout(async () => {
+      setIsAiLoading(true);
+      try {
+        const cartItems = cart.map(c => typeof c.name === 'string' ? c.name.replace('(Retur) ', '') : c.name).join(', ');
+        const prompt = `Based on these items in the cart: ${cartItems}, suggest exactly 3 frequent add-on items a user might buy. 
+        Only suggest items from this inventory list: ${inventory.map((i:any) => i.name).join(', ')}.
+        Return ONLY a JSON array of the top 3 item names. Example: ["Item A", "Item B", "Item C"]. No markdown, no comments.`;
+        
+        const response = await fetch('/api/gemini', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ prompt }),
+        });
+        const data = await response.json();
+        if (data.text) {
+          try {
+            const arr = JSON.parse(data.text) as string[];
+            if (Array.isArray(arr)) {
+              const matchedItems = arr
+                .map(name => inventory.find((i:any) => i.name.toLowerCase() === name.toLowerCase()))
+                .filter(Boolean);
+              setAiSuggestions(matchedItems.slice(0, 3));
+            }
+          } catch(e) {
+            console.error("AI JSON parse error", e);
+          }
+        }
+      } catch (err) {
+        console.error("Failed to fetch AI suggestions", err);
+      }
+      setIsAiLoading(false);
+    }, 1500);
+
+    return () => clearTimeout(timeout);
+  }, [cart, isInputStockMode, inventory]);
 
   // --- AUTO ORDER LOGIC (AI TRIGGER) ---
   const triggerAutoOrder = (currentInv: any[]) => {
@@ -122,11 +171,17 @@ export const POS = ({ currentTime }: { currentTime: Date }) => {
       
       const found = inventory.find((i: any) => i.code.toLowerCase() === codeInput.toLowerCase());
       if (found) {
-        setStagedItem(found);
-        setCodeInput(found.code);
-        setQtyInput('1');
-        setSuggestions([]);
-        setTimeout(() => qtyInputRef.current?.focus(), 50);
+        if (isBarcodeMode) {
+            addToCart(found, 1);
+            setCodeInput('');
+            setSuggestions([]);
+        } else {
+            setStagedItem(found);
+            setCodeInput(found.code);
+            setQtyInput('1');
+            setSuggestions([]);
+            setTimeout(() => qtyInputRef.current?.focus(), 50);
+        }
       } else alert('Barang tidak ditemukan!');
     }
   };
@@ -158,7 +213,7 @@ export const POS = ({ currentTime }: { currentTime: Date }) => {
   const totalBelanjaBaru = cart.filter(c => !c.isReturn).reduce((total, item) => total + (item.price * item.qty), 0);
   const totalNilaiRetur = cart.filter(c => c.isReturn).reduce((total, item) => total + (item.price * item.qty), 0);
   
-  const totalBelanja = totalBelanjaBaru - totalNilaiRetur;
+  const totalBelanja = (totalBelanjaBaru - totalNilaiRetur) - globalDiscount;
   const kembalian = amountPaid ? parseInt(amountPaid) - totalBelanja : (totalBelanja < 0 ? Math.abs(totalBelanja) : 0);
 
   const updateStockAndSave = (newTransaction: any) => {
@@ -252,7 +307,8 @@ export const POS = ({ currentTime }: { currentTime: Date }) => {
           method: paymentMethod,
           sisa: 0,
           returTotal: 0,
-          branch: storeSettings.activeBranch || 'Pusat'
+          branch: storeSettings.activeBranch || 'Pusat',
+          note: transactionNote
        };
 
        if (stockDiscount < 100 && finalTotalCost > 0) {
@@ -301,14 +357,20 @@ export const POS = ({ currentTime }: { currentTime: Date }) => {
       method: paymentMethod,
       sisa: finalType === 'PIUTANG' ? (sisaTagihan > 0 ? sisaTagihan : totalBelanja) : 0,
       returTotal: 0,
-      branch: storeSettings.activeBranch || 'Pusat'
+      globalDiscount: globalDiscount,
+      branch: storeSettings.activeBranch || 'Pusat',
+      note: transactionNote
     };
 
     if (finalType === 'PIUTANG') {
       setPiutangData([newTransaction, ...piutangData]);
-      if (shouldPrint) alert(`Transaksi Piutang Berhasil Disimpan & Dicetak! (Faktur: ${noFaktur})`);
+      if (shouldPrint) {
+          setTimeout(() => window.print(), 200);
+      }
     } else {
-      if (shouldPrint) alert(`Transaksi Berhasil Disimpan & Dicetak! (Faktur: ${noFaktur})`);
+      if (shouldPrint) {
+          setTimeout(() => window.print(), 200);
+      }
     }
 
     updateStockAndSave(newTransaction);
@@ -350,12 +412,14 @@ export const POS = ({ currentTime }: { currentTime: Date }) => {
   const resetKasirState = () => {
     setCart([]);
     setAmountPaid('');
+    setTransactionNote('');
     setSelectedCustomerId('');
     setPaymentMethod('TUNAI');
     setSuggestions([]);
     setStagedItem(null);
     setActiveReturTrx(null);
     setIsInputStockMode(false);
+    setGlobalDiscount(0);
   };
 
   const processItemRetur = (item: any) => {
@@ -636,7 +700,13 @@ export const POS = ({ currentTime }: { currentTime: Date }) => {
         ) : (
         <div className="flex items-end gap-1 w-full relative z-20 mt-1">
           <div className="flex flex-col w-[250px] shrink-0 relative">
-            <label className="text-blue-800 mb-0.5">Kode Barang (F1)</label>
+            <div className="flex justify-between items-center mb-0.5 mt-2">
+                <label className="text-blue-800">Kode Barang (F1)</label>
+                <label className="flex items-center gap-1 text-[10px] text-gray-700 font-bold bg-white px-1.5 py-0.5 border border-gray-300 shadow-sm cursor-pointer hover:bg-gray-100">
+                    <input type="checkbox" checked={isBarcodeMode} onChange={e => setIsBarcodeMode(e.target.checked)} className="w-3 h-3" />
+                    Auto-Scan
+                </label>
+            </div>
             <input ref={codeInputRef} type="text" value={codeInput} onChange={handleCodeChange} onKeyDown={handleCodeSubmit} className="border border-gray-400 px-2 py-1.5 w-full outline-none focus:border-blue-600 shadow-inner" placeholder="Ketik Kode/Nama Barang..." />
             
             {suggestions.length > 0 && (
@@ -736,14 +806,30 @@ export const POS = ({ currentTime }: { currentTime: Date }) => {
                    <input type="number" value={stockDiscount} onChange={e => setStockDiscount(parseInt(e.target.value)||0)} className="border border-gray-400 bg-white px-1 py-0.5 text-right flex-1 outline-none font-bold text-green-800 text-sm shadow-inner" />
                  </div>
              ) : (
+                 <>
                  <div className="flex items-center">
                    <span className="w-16 font-semibold text-green-800 shrink-0 text-[10px] leading-tight">Potongan Retur</span>
                    <input type="text" readOnly value={formatRp(totalNilaiRetur)} className="border border-gray-400 bg-[#8fb4d9] px-1 py-0.5 text-right flex-1 outline-none font-bold text-green-800 text-sm" />
                  </div>
+                 <div className="flex items-center">
+                   <span className="w-16 font-semibold text-orange-800 shrink-0 text-[10px] leading-tight">Diskon (Rp)</span>
+                   <input type="number" value={globalDiscount || ''} onChange={e => setGlobalDiscount(parseInt(e.target.value)||0)} className="border border-gray-400 bg-white px-1 py-0.5 text-right flex-1 outline-none font-bold text-orange-800 text-sm shadow-inner" placeholder="0" />
+                 </div>
+                 </>
              )}
              
              {!isInputStockMode && (
                  <>
+                 <div className="flex items-center">
+                   <span className="w-16 font-semibold text-gray-700 shrink-0 text-xs mt-1">Catatan</span>
+                   <input 
+                      type="text" 
+                      value={transactionNote} 
+                      onChange={(e) => setTransactionNote(e.target.value)} 
+                      className="border border-gray-400 bg-white px-1 py-0.5 mt-1 text-left flex-1 font-medium outline-none text-xs shadow-inner" 
+                      placeholder="Cth: Wait for pickup" 
+                   />
+                 </div>
                  <div className="flex items-center">
                    <span className="w-16 font-semibold text-blue-900 shrink-0 text-xs mt-1">Tunai</span>
                    <input 
@@ -773,7 +859,40 @@ export const POS = ({ currentTime }: { currentTime: Date }) => {
              )}
           </div>
 
-          <div className="flex-1"></div>
+          <div className="flex-1 flex flex-col p-1.5 min-w-[200px] overflow-hidden ml-1 border border-gray-400 bg-[#ece9d8]">
+            <div className="flex items-center gap-1 font-bold text-blue-900 border-b border-gray-400 pb-1 mb-1 shadow-sm">
+                <Sparkles className="w-3 h-3 text-purple-600" />
+                <span className="text-[10px] uppercase">AI Quick Restock</span>
+            </div>
+            <div className="flex-1 overflow-y-auto pr-1">
+                {isAiLoading ? (
+                    <div className="flex items-center justify-center h-full text-xs text-gray-500 font-bold gap-1 mt-2">
+                        <Loader2 className="w-3 h-3 animate-spin"/> Menganalisis...
+                    </div>
+                ) : aiSuggestions.length > 0 ? (
+                    <div className="flex flex-col gap-1">
+                        {aiSuggestions.map((item, idx) => (
+                           <div key={idx} className="bg-white border border-green-300 p-1 flex justify-between items-center shadow-sm hover:border-green-500 transition-colors">
+                               <div className="flex flex-col overflow-hidden max-w-[130px]">
+                                   <span className="text-[10px] font-bold text-blue-900 truncate">{item.name}</span>
+                                   <span className="text-[9px] text-green-700">{formatRp(selectedCustomer?.level === 2 ? item.price2 : item.price1)}</span>
+                               </div>
+                               <button 
+                                   onClick={() => addToCart(item, 1)}
+                                   className="bg-green-100 hover:bg-green-200 border border-green-300 text-green-800 p-1 rounded-sm shadow-sm"
+                               >
+                                   <ShoppingCart className="w-3 h-3" />
+                               </button>
+                           </div>
+                        ))}
+                    </div>
+                ) : (
+                    <div className="text-[10px] text-gray-500 italic mt-2 text-center">
+                        {cart.length > 0 ? "Tidak ada saran." : "Tambahkan item untuk memunculkan saran AI."}
+                    </div>
+                )}
+            </div>
+          </div>
 
           {/* Right Action Buttons */}
           <div className="flex items-end justify-end pb-0.5 pr-0.5 gap-1.5 shrink-0 p-1">

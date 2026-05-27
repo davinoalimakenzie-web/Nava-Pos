@@ -8,6 +8,7 @@ import { MasterData } from './components/MasterData';
 import { Absensi } from './components/Absensi';
 import { AIAssistant } from './components/AIAssistant';
 import { SettingsPanel } from './components/SettingsPanel';
+import { Dashboard } from './components/Dashboard';
 import { GlobalModals } from './components/GlobalModals';
 import { ErrorBoundary } from './components/ErrorBoundary';
 
@@ -32,6 +33,7 @@ const AppContent = () => {
         <ErrorBoundary>
           {activeTab === 'pos' && <POS currentTime={currentTime} />}
           {activeTab === 'absensi' && <Absensi currentTime={currentTime} />}
+          {activeTab === 'dashboard' && (user.role === 'admin' || user.role === 'owner') && <Dashboard currentTime={currentTime} />}
           {activeTab === 'cashflow' && (user.role === 'admin' || user.role === 'owner') && <Cashflow currentTime={currentTime} />}
           {activeTab === 'masterdata' && (user.role === 'admin' || user.role === 'owner') && <MasterData currentTime={currentTime} />}
           {activeTab === 'ai' && (user.role === 'admin' || user.role === 'owner') && <AIAssistant currentTime={currentTime} />}

@@ -22,6 +22,11 @@ export const Sidebar = () => {
       </div>
 
       <nav className="flex-1 px-3 py-4 flex flex-col gap-1.5 text-xs font-medium overflow-y-auto pb-20">
+        {(user?.role === 'admin' || user?.role === 'owner') && (
+            <button onClick={() => setActiveTab('dashboard')} className={`flex items-center gap-3 w-full p-2.5 rounded transition-all ${activeTab === 'dashboard' ? 'bg-blue-600 text-white shadow-md' : 'text-slate-300 hover:bg-slate-800'}`}>
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-layout-dashboard"><rect width="7" height="9" x="3" y="3" rx="1"/><rect width="7" height="5" x="14" y="3" rx="1"/><rect width="7" height="9" x="14" y="12" rx="1"/><rect width="7" height="5" x="3" y="16" rx="1"/></svg> Dashboard
+            </button>
+        )}
         <button onClick={() => setActiveTab('pos')} className={`flex items-center gap-3 w-full p-2.5 rounded transition-all ${activeTab === 'pos' ? 'bg-blue-600 text-white shadow-md' : 'text-slate-300 hover:bg-slate-800'}`}>
           <ShoppingCart className="w-4 h-4" /> POS (Transaksi)
         </button>
