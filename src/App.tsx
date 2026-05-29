@@ -26,7 +26,7 @@ const AppContent = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 flex flex-col md:flex-row relative font-sans text-xs">
+    <div className="min-h-screen bg-gray-50 flex flex-row relative font-sans text-xs">
       <GlobalModals />
       <Sidebar />
       <main className="flex-1 flex flex-col h-screen overflow-hidden text-black text-[11px] sm:text-xs">

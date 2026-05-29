@@ -1,0 +1,12 @@
+5:import { formatRp, formatDateDisplay } from '../utils';
+495:              <span className="text-4xl tracking-tighter drop-shadow-sm leading-none">{formatRp(totalBelanja).replace('Rp', '').trim()}</span>
+622:                        <td className="px-2 py-1.5 border-r border-gray-300 font-mono text-gray-500">{item.code}</td><td className="px-2 py-1.5 border-r border-gray-300 font-bold">{item.name}</td><td className="px-2 py-1.5 text-right border-r border-gray-300 text-blue-800">{formatRp(item.price1)}</td><td className={`px-2 py-1.5 text-right font-bold ${item.stock <= 2 ? 'text-red-600' : 'text-black'}`}>{item.stock}</td>
+689:                    ) : formatRp(item.price)}
+691:                  {isInputStockMode && <td className="border-r border-gray-300 px-2 py-1.5 text-right font-medium text-blue-800">{formatRp(item.price1)}</td>}
+692:                  {isInputStockMode && <td className="border-r border-gray-300 px-2 py-1.5 text-right font-medium text-purple-800">{formatRp(item.price2)}</td>}
+694:                    <span className={item.isReturn ? "text-green-600" : ""}>{item.isReturn ? '[KREDIT] ' : ''}{formatRp(item.price * item.qty)}</span>
+726:               <input type="text" readOnly value={formatRp(totalBelanjaBaru)} className="border border-gray-400 bg-white px-1 py-0.5 text-right flex-1 min-w-0 outline-none font-bold text-sm shadow-inner" />
+737:                   <input type="text" readOnly value={formatRp(totalNilaiRetur)} className="border border-gray-400 bg-white px-1 py-0.5 text-right flex-1 min-w-0 outline-none font-bold text-sm shadow-inner" />
+764:                   <input type="text" readOnly value={formatRp(kembalian > 0 ? kembalian : 0)} className="border border-gray-400 bg-white px-1 py-0.5 text-right flex-1 min-w-0 outline-none font-bold text-sm shadow-inner" />
+771:                   <input type="text" readOnly value={formatRp(totalBelanjaBaru - (totalBelanjaBaru * stockDiscount / 100))} className="border border-gray-400 bg-white px-1 py-0.5 text-right flex-1 min-w-0 outline-none font-bold text-sm shadow-inner" />
+849:                                      <td className="p-2 border-r border-gray-400 font-medium text-right text-blue-900">{formatRp(t.total)}</td>

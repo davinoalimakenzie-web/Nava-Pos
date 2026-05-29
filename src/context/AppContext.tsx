@@ -17,13 +17,29 @@ import {
 const AppContext = createContext<any>(null);
 
 function useSyncState<T>(key: string, initial: T, syncEnabled: boolean) {
-  const [state, setState] = useState<T>(initial);
+  const [state, setState] = useState<T>(() => {
+    const saved = localStorage.getItem(`POS_${key}`);
+    if (saved) {
+      try {
+        return JSON.parse(saved) as T;
+      } catch (e) {
+        console.error("Error loading localStorage key: " + key, e);
+      }
+    }
+    return initial;
+  });
+
+  useEffect(() => {
+    localStorage.setItem(`POS_${key}`, JSON.stringify(state));
+  }, [key, state]);
 
   useEffect(() => {
     if (!syncEnabled) return;
     const unsub = onSnapshot(doc(db, 'system', key), (docSnap) => {
       if (docSnap.exists()) {
-        setState(docSnap.data().value as T);
+        const val = docSnap.data().value as T;
+        setState(val);
+        localStorage.setItem(`POS_${key}`, JSON.stringify(val));
       }
     });
     return () => unsub();
@@ -32,6 +48,7 @@ function useSyncState<T>(key: string, initial: T, syncEnabled: boolean) {
   const setSyncedState = (updater: any) => {
     setState((prev) => {
       const next = typeof updater === 'function' ? updater(prev) : updater;
+      localStorage.setItem(`POS_${key}`, JSON.stringify(next));
       if (syncEnabled) {
         setDoc(doc(db, 'system', key), { value: next }, { merge: true }).catch(console.error);
       }
@@ -85,6 +102,17 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
   const [supplierReturns, setSupplierReturns] = useSyncState<any[]>('supplierReturns', [], storeSettings.syncEnabled);
 
   const [botMemory, setBotMemory] = useSyncState<string>('botMemory', 'Saya adalah AI bot asisten cerdas untuk Nava POS.', storeSettings.syncEnabled);
+
+  const [appLogs, setAppLogs] = useSyncState<any[]>('appLogs', [], false);
+
+  const addLog = (type: string, desc: string) => {
+    const time = new Date().getTime();
+    setAppLogs(prev => {
+      const today = new Date().toDateString();
+      const filtered = prev.filter(p => new Date(p.time).toDateString() === today);
+      return [{type, desc, time}, ...filtered].slice(0, 100);
+    });
+  };
 
   // Cross-cutting states
   const [pendingTransactions, setPendingTransactions] = useState<any[]>([]);
@@ -147,7 +175,8 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
       suppliers, setSuppliers,
       supplierReturns, setSupplierReturns,
       botMemory, setBotMemory,
-      storeSettings, setStoreSettings
+      storeSettings, setStoreSettings,
+      appLogs, addLog
     }}>
       {children}
     </AppContext.Provider>

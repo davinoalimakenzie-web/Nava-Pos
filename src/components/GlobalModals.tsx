@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useAppContext } from '../context/AppContext';
 import { formatRp } from '../utils';
 import { DownloadCloud } from 'lucide-react';
+import { initialInventory, initialCustomers, initialTransactions, initialPiutang, initialExpenses, initialOrderData } from '../data';
 
 export const GlobalModals = () => {
     const {
@@ -15,7 +16,10 @@ export const GlobalModals = () => {
         showAddEmpModal, setShowAddEmpModal, employees, setEmployees,
         showAuthModal, setShowAuthModal, pendingUser, setPendingUser, setUser, setActiveTab,
         showLogoutConfirm, setShowLogoutConfirm,
-        inventory, suppliers, orderData, supplierReturns, transactions
+        inventory, suppliers, orderData, supplierReturns, transactions,
+        appUsers, attendances, leaveRequests,
+        setInventory, setTransactions, setOrderData,
+        appLogs, addLog
     } = useAppContext();
 
     const [newExpenseName, setNewExpenseName] = useState('');
@@ -52,6 +56,7 @@ export const GlobalModals = () => {
             branch: storeSettings.activeBranch || 'Pusat'
         };
         setExpenses([expense, ...expenses]);
+        addLog('PENGELUARAN', `Rp ${expense.amount.toLocaleString('id-ID')} untuk ${expense.name}`);
         setNewExpenseName('');
         setNewExpenseAmount('');
         setShowExpenseModal(false);
@@ -68,14 +73,28 @@ export const GlobalModals = () => {
             level: parseInt(newCustomerLevel)
         };
         setCustomers([...customers, newCust]);
+        addLog('DATA_PELANGGAN', `Pelanggan baru ditambahkan: ${newCustomerName}`);
         setSelectedCustomerId(newCust.id.toString());
         setShowAddCustomerModal(false);
         setNewCustomerName(''); setNewCustomerAddress(''); setNewCustomerPhone(''); setNewCustomerLevel('1');
     };
 
+    const handleLoadDummy = () => {
+        if (!window.confirm("Bermuat Data Dummy? Data lama akan ditimpa!")) return;
+        setInventory(initialInventory);
+        setCustomers(initialCustomers);
+        setTransactions(initialTransactions);
+        setPiutangData(initialPiutang);
+        setExpenses(initialExpenses);
+        setOrderData(initialOrderData);
+        alert('Data dummy berhasil dimuat! Silahkan refresh atau cek tab Dashboard.');
+        setShowExpenseModal(false);
+    };
+
     const handleAddEmployee = (e: React.FormEvent) => {
         e.preventDefault();
         setEmployees([...employees, { id: Date.now(), name: newEmpName, position: newEmpPos }]);
+        addLog('KARYAWAN', `Karyawan baru ditambahkan: ${newEmpName}`);
         setNewEmpName(''); setNewEmpPos(''); setShowAddEmpModal(false);
         alert('Karyawan baru berhasil ditambahkan!');
     };
@@ -229,6 +248,12 @@ export const GlobalModals = () => {
                         <button type="submit" className="px-4 py-1.5 border-2 border-gray-500 bg-gray-200 hover:bg-gray-300 font-bold text-red-600">Catat Pengeluaran</button>
                         </div>
                     </form>
+                    
+                    <div className="mt-4 pt-4 border-t border-gray-400 text-center">
+                        <button type="button" onClick={handleLoadDummy} className="text-[10px] text-blue-800 hover:text-blue-950 underline font-bold">
+                        Buat Data Dummy (Untuk Praktek)
+                        </button>
+                    </div>
                     </div>
                 </div>
                 </div>
@@ -371,7 +396,11 @@ export const GlobalModals = () => {
                         <p className="text-sm font-medium">Banyak data pada mode lokal ini yang tidak tersinkronisasi. Sebelum Anda Logout, <b>SISIHKAN 1 MENIT UNTUK BACKUP DATA ANDA TERLEBIH DAHULU</b> agar tidak hilang bila cache terhapus.</p>
                         <div className="flex flex-col gap-2 mt-2 border-y border-gray-400 py-4 mb-2">
                             <button onClick={() => {
-                                const allData = { inventory, customers, suppliers, orderData, supplierReturns };
+                                const allData = { 
+                                    inventory, customers, suppliers, orderData, supplierReturns,
+                                    employees, attendances, leaveRequests, transactions, expenses,
+                                    piutangData, pendingTransactions, appUsers, storeSettings
+                                };
                                 const jsonStr = JSON.stringify(allData, null, 2);
                                 const blob = new Blob([jsonStr], { type: 'application/json' });
                                 const url = URL.createObjectURL(blob);

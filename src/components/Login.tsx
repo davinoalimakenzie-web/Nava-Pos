@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useAppContext } from '../context/AppContext';
 
 export const Login = () => {
-  const { setUser, setActiveTab, appUsers, setAppUsers } = useAppContext();
+  const { setUser, setActiveTab, appUsers, setAppUsers, setInventory, setCustomers, setTransactions, setExpenses, setPiutangData, setOrderData } = useAppContext();
   const [errorMsg, setErrorMsg] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
   const [isChangePinMode, setIsChangePinMode] = useState(false);

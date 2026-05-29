@@ -18,17 +18,45 @@ async function startServer() {
   app.post("/api/gemini", async (req, res) => {
     try {
       const { prompt, systemInstruction } = req.body;
-      const response = await ai.models.generateContent({
-        model: "gemini-2.5-flash",
-        contents: prompt,
-        config: {
-          systemInstruction,
+      let response;
+      let lastError;
+      
+      // Retry logic for 503 Unavailable / High Demand
+      for (let attempt = 1; attempt <= 3; attempt++) {
+        try {
+          response = await ai.models.generateContent({
+            model: "gemini-2.5-flash",
+            contents: prompt,
+            config: {
+              systemInstruction,
+            }
+          });
+          break; // Break if successful
+        } catch (error: any) {
+          lastError = error;
+          const isUnavailable = error?.message?.includes("503") || error?.status === 503 || error?.message?.includes("UNAVAILABLE");
+          if (isUnavailable && attempt < 3) {
+            console.log(`[Retry ${attempt}/3] Gemini API is busy, waiting to retry...`);
+            await new Promise(resolve => setTimeout(resolve, attempt * 1500));
+            continue;
+          }
+          throw error;
         }
-      });
+      }
+      
+      if (!response) {
+        throw lastError;
+      }
+      
       res.json({ text: response.text });
     } catch (error: any) {
       console.error(error);
-      res.status(500).json({ error: error.message });
+      const isUnavailable = error?.message?.includes("503") || error?.status === 503 || error?.message?.includes("UNAVAILABLE");
+      res.status(isUnavailable ? 503 : 500).json({ 
+        error: isUnavailable 
+          ? "Sistem AI sedang sibuk, mohon coba beberapa saat lagi." 
+          : error.message 
+      });
     }
   });
 

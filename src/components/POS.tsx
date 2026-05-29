@@ -24,10 +24,11 @@ export const POS = ({ currentTime }: { currentTime: Date }) => {
     pendingTransactions, setPendingTransactions,
     setShowPendingModal, setShowPiutangModal, setShowPrintOptionsModal,
     setShowExpenseModal, setShowAddCustomerModal,
-    setMasterDataTab, setPendingUser, setShowAuthModal, storeSettings
+    setMasterDataTab, setPendingUser, setShowAuthModal, storeSettings,
+    appLogs, addLog, employees
   } = useAppContext();
 
-  const selectedCustomer = customers.find((c: any) => c.id.toString() === selectedCustomerId);
+  const selectedCustomer = customers.find((c: any) => String(c.id) === String(selectedCustomerId));
   
   const [codeInput, setCodeInput] = useState('');
   const [qtyInput, setQtyInput] = useState('1');
@@ -35,65 +36,25 @@ export const POS = ({ currentTime }: { currentTime: Date }) => {
   const [stagedItem, setStagedItem] = useState<any>(null); 
   const [transactionNote, setTransactionNote] = useState('');
   const [showInputMenu, setShowInputMenu] = useState(false);
-  const [isDirectPrint, setIsDirectPrint] = useState(true);
+  const [showHistoryModal, setShowHistoryModal] = useState(false);
+  const [showBonModal, setShowBonModal] = useState(false);
+  const [bonEmployee, setBonEmployee] = useState('');
+  const [bonAmount, setBonAmount] = useState('');
+  const [bonReason, setBonReason] = useState('');
 
   const [isInputStockMode, setIsInputStockMode] = useState(false);
   const [isBarcodeMode, setIsBarcodeMode] = useState(true);
+  const [isPromoActive, setIsPromoActive] = useState(false);
   const [stockSupplierId, setStockSupplierId] = useState('');
   const [stockDiscount, setStockDiscount] = useState(0);
   const [globalDiscount, setGlobalDiscount] = useState(0);
+  const [discountType, setDiscountType] = useState<string>('Rp');
   const [newStock, setNewStock] = useState({code: '', name: '', category: 'UMUM', supplierPrice: 0, price1: 0, price2: 0, stock: 1});
   const [stockSuggestions, setStockSuggestions] = useState<any[]>([]);
   const [showNewCategory, setShowNewCategory] = useState(false);
 
-  const [aiSuggestions, setAiSuggestions] = useState<any[]>([]);
-  const [isAiLoading, setIsAiLoading] = useState(false);
-
   const codeInputRef = useRef<HTMLInputElement>(null);
   const qtyInputRef = useRef<HTMLInputElement>(null);
-
-  useEffect(() => {
-    if (cart.length === 0 || isInputStockMode) {
-      setAiSuggestions([]);
-      return;
-    }
-    
-    // Debounce to avoid spamming the API
-    const timeout = setTimeout(async () => {
-      setIsAiLoading(true);
-      try {
-        const cartItems = cart.map(c => typeof c.name === 'string' ? c.name.replace('(Retur) ', '') : c.name).join(', ');
-        const prompt = `Based on these items in the cart: ${cartItems}, suggest exactly 3 frequent add-on items a user might buy. 
-        Only suggest items from this inventory list: ${inventory.map((i:any) => i.name).join(', ')}.
-        Return ONLY a JSON array of the top 3 item names. Example: ["Item A", "Item B", "Item C"]. No markdown, no comments.`;
-        
-        const response = await fetch('/api/gemini', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ prompt }),
-        });
-        const data = await response.json();
-        if (data.text) {
-          try {
-            const arr = JSON.parse(data.text) as string[];
-            if (Array.isArray(arr)) {
-              const matchedItems = arr
-                .map(name => inventory.find((i:any) => i.name.toLowerCase() === name.toLowerCase()))
-                .filter(Boolean);
-              setAiSuggestions(matchedItems.slice(0, 3));
-            }
-          } catch(e) {
-            console.error("AI JSON parse error", e);
-          }
-        }
-      } catch (err) {
-        console.error("Failed to fetch AI suggestions", err);
-      }
-      setIsAiLoading(false);
-    }, 1500);
-
-    return () => clearTimeout(timeout);
-  }, [cart, isInputStockMode, inventory]);
 
   // --- AUTO ORDER LOGIC (AI TRIGGER) ---
   const triggerAutoOrder = (currentInv: any[]) => {
@@ -131,15 +92,16 @@ export const POS = ({ currentTime }: { currentTime: Date }) => {
   };
 
   const addToCart = (item: any, qtyToAdd = 1) => {
-    if (!selectedCustomer) return alert('Silakan pilih Pelanggan terlebih dahulu!');
+    if (!isInputStockMode && !selectedCustomer) return alert('Silakan pilih Pelanggan terlebih dahulu!');
+    if (isInputStockMode && !stockSupplierId) return alert('Silakan pilih Supliyer terlebih dahulu!');
     if (!item) return;
-    if (item.stock < qtyToAdd) return alert('Stok barang tidak mencukupi!');
+    if (!isInputStockMode && item.stock < qtyToAdd) return alert('Stok barang tidak mencukupi!');
 
-    const itemPrice = selectedCustomer.level === 2 ? item.price2 : item.price1;
+    const itemPrice = isInputStockMode ? (item.supplierPrice || 0) : (selectedCustomer?.level === 2 ? item.price2 : item.price1);
     const existing = cart.find(c => c.id === item.id && !c.isReturn);
     
     if (existing) {
-      if (existing.qty + qtyToAdd > item.stock) return alert('Melebihi stok yang tersedia!');
+      if (!isInputStockMode && existing.qty + qtyToAdd > item.stock) return alert('Melebihi stok yang tersedia!');
       setCart(cart.map(c => c.id === item.id && !c.isReturn ? { ...c, qty: c.qty + qtyToAdd } : c));
     } else {
       setCart([...cart, { ...item, qty: qtyToAdd, price: itemPrice, isReturn: false, cartUniqueId: 'ITEM-' + Date.now() + Math.random() }]);
@@ -156,7 +118,8 @@ export const POS = ({ currentTime }: { currentTime: Date }) => {
   };
 
   const handleSelectSuggestion = (item: any) => {
-    if (!selectedCustomer) { alert('Silakan pilih Pelanggan terlebih dahulu!'); setSuggestions([]); return; }
+    if (!isInputStockMode && !selectedCustomer) { alert('Silakan pilih Pelanggan terlebih dahulu!'); setSuggestions([]); return; }
+    if (isInputStockMode && !stockSupplierId) { alert('Silakan pilih Supliyer terlebih dahulu!'); setSuggestions([]); return; }
     
     setStagedItem(item);
     setCodeInput(item.code);
@@ -167,7 +130,8 @@ export const POS = ({ currentTime }: { currentTime: Date }) => {
 
   const handleCodeSubmit = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter' && codeInput) {
-      if (!selectedCustomer) return alert('Silakan pilih Pelanggan terlebih dahulu!');
+      if (!isInputStockMode && !selectedCustomer) return alert('Silakan pilih Pelanggan terlebih dahulu!');
+      if (isInputStockMode && !stockSupplierId) return alert('Silakan pilih Supliyer terlebih dahulu!');
       
       const found = inventory.find((i: any) => i.code.toLowerCase() === codeInput.toLowerCase());
       if (found) {
@@ -201,30 +165,47 @@ export const POS = ({ currentTime }: { currentTime: Date }) => {
   };
 
   const removeFromCart = (cartItem: any) => {
-    if (cartItem.isReturn) {
-        let updatedReturTrx = {...activeReturTrx};
-        const itemIdx = updatedReturTrx.items.findIndex((i: any) => i.id === cartItem.originalItemId);
-        if (itemIdx >= 0) updatedReturTrx.items[itemIdx].qty += cartItem.qty;
-        setActiveReturTrx(updatedReturTrx);
-    }
     setCart(cart.filter(c => c.cartUniqueId !== cartItem.cartUniqueId));
   };
   
   const totalBelanjaBaru = cart.filter(c => !c.isReturn).reduce((total, item) => total + (item.price * item.qty), 0);
   const totalNilaiRetur = cart.filter(c => c.isReturn).reduce((total, item) => total + (item.price * item.qty), 0);
   
-  const totalBelanja = (totalBelanjaBaru - totalNilaiRetur) - globalDiscount;
+  const calculatedDiscount = discountType === '%' ? Math.round((totalBelanjaBaru - totalNilaiRetur) * (globalDiscount / 100)) : globalDiscount;
+  const totalBelanja = (totalBelanjaBaru - totalNilaiRetur) - calculatedDiscount;
   const kembalian = amountPaid ? parseInt(amountPaid) - totalBelanja : (totalBelanja < 0 ? Math.abs(totalBelanja) : 0);
+
+  const handleAddBon = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!bonEmployee || !bonAmount || !bonReason) return alert('Semua isian Bon wajib diisi!');
+    const expense = {
+        id: 'BON-' + Date.now(),
+        date: `${transactionDate} ${new Date().toLocaleTimeString('id-ID')}`,
+        isoDate: new Date().toISOString(),
+        name: `Bon - ${bonEmployee} : ${bonReason}`,
+        amount: parseInt(bonAmount.replace(/\D/g, '') || '0'),
+        cashier: user.name,
+        branch: storeSettings.activeBranch || 'Pusat',
+        isBon: true,
+        bonEmployee: bonEmployee,
+        bonReason: bonReason
+    };
+    setExpenses([expense, ...expenses]);
+    addLog('BON', `Kasbon ${bonEmployee} sejumlah Rp ${expense.amount.toLocaleString('id-ID')}`);
+    setBonEmployee('');
+    setBonAmount('');
+    setBonReason('');
+    setShowBonModal(false);
+    alert('Bon Kasbon berhasil dicatat!');
+  };
 
   const updateStockAndSave = (newTransaction: any) => {
     let currentInv = [...inventory];
     let currentTrxData = [...transactions];
-    let newExpenses = [...expenses];
 
     cart.forEach(cartItem => {
         if (cartItem.isReturn) {
-            const originalName = cartItem.name.replace('(Retur) ', '');
-            const invIdx = currentInv.findIndex(i => i.name === originalName);
+            const invIdx = currentInv.findIndex(i => i.id === cartItem.originalItemId);
             if (invIdx >= 0) currentInv[invIdx].stock += cartItem.qty; 
 
             const oTrxIdx = currentTrxData.findIndex(t => t.id === cartItem.originalTrxId);
@@ -236,17 +217,6 @@ export const POS = ({ currentTime }: { currentTime: Date }) => {
                  const oItemIdx = currentTrxData[oTrxIdx].items.findIndex((i: any) => i.id === cartItem.originalItemId);
                  if(oItemIdx >= 0) currentTrxData[oTrxIdx].items[oItemIdx].qty -= cartItem.qty;
             }
-            
-            if (totalBelanja < 0) {
-                newExpenses.push({
-                   id: 'EXP-RET-' + Date.now() + Math.random(),
-                   date: `${transactionDate} ${currentTime.toLocaleTimeString('id-ID')}`,
-                   isoDate: new Date(transactionDate).toISOString(),
-                   name: `Pengembalian Uang Retur Fak: ${cartItem.originalTrxId}`,
-                   amount: Math.abs(totalBelanja),
-                   cashier: user.name
-                });
-            }
         } else {
             const invIdx = currentInv.findIndex(i => i.id === cartItem.id);
             if (invIdx >= 0) currentInv[invIdx].stock -= cartItem.qty;
@@ -254,9 +224,13 @@ export const POS = ({ currentTime }: { currentTime: Date }) => {
     });
 
     setInventory(currentInv);
-    setExpenses(newExpenses);
-    if (newTransaction) setTransactions([newTransaction, ...currentTrxData]);
-    else setTransactions(currentTrxData);
+    if (newTransaction) {
+       setTransactions([newTransaction, ...currentTrxData]);
+       addLog(newTransaction.type === 'PIUTANG' ? 'PIUTANG_BARU' : 'PENJUALAN', `Transaksi ${newTransaction.id} sebesar Rp ${newTransaction.total.toLocaleString('id-ID')}`);
+    }
+    else {
+       setTransactions(currentTrxData);
+    }
     
     triggerAutoOrder(currentInv);
     resetKasirState();
@@ -326,6 +300,7 @@ export const POS = ({ currentTime }: { currentTime: Date }) => {
 
        setInventory([...newInvItems, ...currentInv]);
        setTransactions([newTransaction, ...transactions]);
+       addLog('PEMBELIAN_STOK', `No: ${purchaseFaktur} Total: Rp ${finalTotalCost.toLocaleString('id-ID')}`);
        if (shouldPrint) alert(`Pembelian Stok Tersimpan & Dicetak! (Faktur: ${purchaseFaktur})`);
        else alert('Pembelian Stok Tersimpan!');
        setIsInputStockMode(false);
@@ -356,8 +331,8 @@ export const POS = ({ currentTime }: { currentTime: Date }) => {
       type: finalType,
       method: paymentMethod,
       sisa: finalType === 'PIUTANG' ? (sisaTagihan > 0 ? sisaTagihan : totalBelanja) : 0,
-      returTotal: 0,
-      globalDiscount: globalDiscount,
+      returTotal: totalNilaiRetur,
+      globalDiscount: calculatedDiscount,
       branch: storeSettings.activeBranch || 'Pusat',
       note: transactionNote
     };
@@ -387,12 +362,11 @@ export const POS = ({ currentTime }: { currentTime: Date }) => {
     if (!selectedCustomer) return alert('Pilih pelanggan terlebih dahulu!');
     if (cart.length === 0) return alert('Keranjang masih kosong!');
 
-    processTransaction(isDirectPrint); 
-    if (!isDirectPrint) setShowPrintOptionsModal(true); 
+    processTransaction(true); 
   };
 
   const handleSavePending = () => {
-    if (activeReturTrx) return alert('Selesaikan atau tutup mode retur terlebih dahulu!');
+    if (cart.some(c => c.isReturn)) return alert('Selesaikan atau batalkan retur terlebih dahulu sebelum simpan pending!');
     if (cart.length === 0) return alert('Keranjang masih kosong!');
     if (!selectedCustomer) return alert('Pilih pelanggan terlebih dahulu!');
 
@@ -406,8 +380,31 @@ export const POS = ({ currentTime }: { currentTime: Date }) => {
     };
 
     setPendingTransactions([newPending, ...pendingTransactions]);
+    addLog('PENDING_TRANSAKSI', `Penundaan transaksi untuk pelanggan ${selectedCustomer.name}`);
     resetKasirState();
   };
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Ignore if user is typing in a text input (unless we want global override carefully)
+      // Actually F-keys don't write text, so we can always listen
+      if (e.key === 'F8') {
+        e.preventDefault();
+        handleSimpan();
+      } else if (e.key === 'F9') {
+        e.preventDefault();
+        handleCetakButton();
+      } else if (e.key === 'F5') {
+        e.preventDefault();
+        resetKasirState();
+      } else if (e.key === 'F4') {
+        e.preventDefault();
+        setShowPendingModal(true);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [cart, selectedCustomer, stockSupplierId, paymentMethod, transactionNote, amountPaid, isInputStockMode]);
 
   const resetKasirState = () => {
     setCart([]);
@@ -420,33 +417,6 @@ export const POS = ({ currentTime }: { currentTime: Date }) => {
     setActiveReturTrx(null);
     setIsInputStockMode(false);
     setGlobalDiscount(0);
-  };
-
-  const processItemRetur = (item: any) => {
-    let updatedReturTrx = JSON.parse(JSON.stringify(activeReturTrx));
-    const itemIdx = updatedReturTrx.items.findIndex((i: any) => i.id === item.id);
-    
-    if (itemIdx >= 0 && updatedReturTrx.items[itemIdx].qty >= 1) {
-        updatedReturTrx.items[itemIdx].qty -= 1;
-        setActiveReturTrx(updatedReturTrx);
-        
-        const existingReturCart = cart.find(c => c.originalItemId === item.id && c.isReturn);
-        if (existingReturCart) {
-            setCart(cart.map(c => c.originalItemId === item.id && c.isReturn ? { ...c, qty: c.qty + 1 } : c));
-        } else {
-            setCart([...cart, {
-                ...item, 
-                cartUniqueId: 'RET-' + Date.now() + Math.random(), 
-                code: 'RETUR',
-                name: `(Retur) ${item.name}`,
-                price: Math.abs(item.price), 
-                qty: 1,
-                isReturn: true,
-                originalTrxId: activeReturTrx.id,
-                originalItemId: item.id
-            }]);
-        }
-    }
   };
 
   const handleSwitchKasirRequest = (e: React.ChangeEvent<HTMLSelectElement>) => {
@@ -464,43 +434,8 @@ export const POS = ({ currentTime }: { currentTime: Date }) => {
     <div className="flex-1 flex flex-col bg-[#8fb4d9] border border-[#8fb4d9] overflow-hidden">
       <LegacyWindowHeader title={isInputStockMode ? "POS - INPUT STOCK BARU (PEMBELIAN)" : "POS - TRANSAKSI PENJUALAN"} currentTime={currentTime} />
       
-      <div className="p-2 flex flex-col h-full gap-1 overflow-y-auto">
+      <div className="p-2 flex-1 flex flex-col gap-1 overflow-hidden">
         
-        {/* JIKA MODE RETUR -> TAMPILKAN BANNER KHUSUS */}
-        {activeReturTrx && (
-          <div className="bg-[#ece9d8] border-2 border-red-500 m-1 p-2 shadow-lg relative z-20">
-              <div className="flex justify-between items-center font-bold text-red-800 mb-1 border-b border-red-400 pb-1">
-                  <span className="text-sm uppercase">MODE RETUR - FAKTUR: {activeReturTrx.id}</span>
-                  <button onClick={() => setActiveReturTrx(null)} className="bg-gray-200 border-2 border-gray-500 text-black px-4 py-1 hover:bg-gray-300 shadow font-bold">Tutup Mode Retur</button>
-              </div>
-              <table className="w-full text-left bg-white border border-gray-400 text-xs shadow-sm">
-                  <thead>
-                      <tr className="bg-gray-200">
-                          <th className="p-2 border-r border-gray-300">Nama Item</th>
-                          <th className="p-2 border-r border-gray-300 text-center">Sisa Qty (Asli)</th>
-                          <th className="p-2 border-r border-gray-300 text-right">Harga</th>
-                          <th className="p-2 text-center">Aksi</th>
-                      </tr>
-                  </thead>
-                  <tbody>
-                      {activeReturTrx.items.filter((i: any) => i.qty > 0).map((item: any, idx: number) => (
-                          <tr key={idx} className="border-b border-gray-200">
-                              <td className="p-2 border-r border-gray-300 font-bold">{item.name}</td>
-                              <td className="p-2 border-r border-gray-300 text-center font-bold text-blue-800 text-sm">{item.qty}</td>
-                              <td className="p-2 border-r border-gray-300 text-right font-medium">{formatRp(item.price)}</td>
-                              <td className="p-2 text-center">
-                                  <button onClick={() => processItemRetur(item)} className="bg-red-600 text-white px-4 py-1 rounded shadow-sm hover:bg-red-700 font-bold border border-red-800">Pilih Retur</button>
-                              </td>
-                          </tr>
-                      ))}
-                      {activeReturTrx.items.filter((i: any) => i.qty > 0).length === 0 && (
-                          <tr><td colSpan={4} className="p-3 text-center text-gray-500 italic">Semua item pada faktur ini sudah habis/diretur.</td></tr>
-                      )}
-                  </tbody>
-              </table>
-          </div>
-        )}
-
         {/* TOP CONTROLS */}
         <div className="flex justify-between items-end font-semibold text-blue-900 relative w-full mt-1">
           {/* Kolom Kiri */}
@@ -543,9 +478,11 @@ export const POS = ({ currentTime }: { currentTime: Date }) => {
                   <select 
                     className={`border border-gray-400 px-1 py-0.5 flex-1 outline-none text-black font-normal shadow-inner ${!selectedCustomerId ? 'bg-yellow-100' : 'bg-white'}`}
                     value={selectedCustomerId}
+                    disabled={cart.some(c => c.isReturn)}
                     onChange={(e) => {
-                      if (cart.length > 0) {
-                        if (window.confirm('Mengubah pelanggan akan mengosongkan keranjang. Lanjutkan?')) { setCart([]); setSelectedCustomerId(e.target.value); }
+                      const regularItems = cart.filter(c => !c.isReturn);
+                      if (regularItems.length > 0) {
+                        if (window.confirm('Mengubah pelanggan akan mengosongkan barang belanja biasa. Lanjutkan?')) { setCart(cart.filter(c => c.isReturn)); setSelectedCustomerId(e.target.value); }
                       } else setSelectedCustomerId(e.target.value);
                     }}
                   >
@@ -574,25 +511,21 @@ export const POS = ({ currentTime }: { currentTime: Date }) => {
                        <button onClick={() => { setShowExpenseModal(true); setShowInputMenu(false); }} className="px-3 py-2 hover:bg-blue-100 text-left border-b border-gray-300 font-bold">Input Pengeluaran</button>
                        <button onClick={() => { setIsInputStockMode(true); setCart([]); setShowInputMenu(false); }} className="px-3 py-2 hover:bg-blue-100 text-left border-b border-gray-300 font-bold">Input Stock Baru</button>
                        <button onClick={() => { setActiveTab('masterdata'); setMasterDataTab('order'); setShowInputMenu(false); }} className="px-3 py-2 hover:bg-blue-100 text-left border-b border-gray-300 font-bold">Order Supliyer</button>
-                       <button onClick={() => {
-                           setShowInputMenu(false);
-                           const noFaktur = prompt('Masukkan Nomor Faktur / Nota untuk diretur: (Cth: FAK-...)');
-                           if (!noFaktur) return;
-                           const trx = transactions.find((t: any) => t.id === noFaktur || t.id.includes(noFaktur));
-                           if (trx) {
-                               setActiveReturTrx(trx);
-                           } else {
-                               alert('Data Faktur tidak ditemukan di riwayat transaksi!');
-                           }
-                       }} className="px-3 py-2 hover:bg-red-200 text-left text-red-800 font-bold">Retur Barang (Faktur)</button>
                     </div>
                  )}
               </div>
             </div>
-            <div className="text-red-600 font-bold flex items-baseline gap-2">
-              <span className="text-lg tracking-wide">KAS</span>
-              <span className="text-4xl tracking-tighter drop-shadow-sm leading-none">{formatRp(totalBelanja).replace('Rp', '').trim()}</span>
-            </div>
+            
+            {(() => {
+              const isCashIn = !isInputStockMode ? totalBelanja >= 0 : totalBelanja < 0;
+              return (
+                <div className={`${isCashIn ? "text-green-600" : "text-red-600"} font-bold flex items-baseline gap-2 transition-colors`}>
+                  <span className="text-lg tracking-wide uppercase">{isCashIn ? "Cash In" : "Cash Out"}</span>
+                  <span className="text-4xl tracking-tighter drop-shadow-sm leading-none">{formatRp(Math.abs(totalBelanja)).replace('Rp', '').trim()}</span>
+                </div>
+              );
+            })()}
+
           </div>
         </div>
 
@@ -702,10 +635,6 @@ export const POS = ({ currentTime }: { currentTime: Date }) => {
           <div className="flex flex-col w-[250px] shrink-0 relative">
             <div className="flex justify-between items-center mb-0.5 mt-2">
                 <label className="text-blue-800">Kode Barang (F1)</label>
-                <label className="flex items-center gap-1 text-[10px] text-gray-700 font-bold bg-white px-1.5 py-0.5 border border-gray-300 shadow-sm cursor-pointer hover:bg-gray-100">
-                    <input type="checkbox" checked={isBarcodeMode} onChange={e => setIsBarcodeMode(e.target.checked)} className="w-3 h-3" />
-                    Auto-Scan
-                </label>
             </div>
             <input ref={codeInputRef} type="text" value={codeInput} onChange={handleCodeChange} onKeyDown={handleCodeSubmit} className="border border-gray-400 px-2 py-1.5 w-full outline-none focus:border-blue-600 shadow-inner" placeholder="Ketik Kode/Nama Barang..." />
             
@@ -767,10 +696,25 @@ export const POS = ({ currentTime }: { currentTime: Date }) => {
                   <td className="border-r border-gray-300 px-2 py-1.5">{item.code}</td>
                   <td className="border-r border-gray-300 px-2 py-1.5 font-bold">{item.name}</td>
                   {isInputStockMode && <td className="border-r border-gray-300 px-2 py-1.5">{item.category || 'UMUM'}</td>}
-                  <td className="border-r border-gray-300 px-2 py-1.5 text-center font-bold text-blue-900">{item.qty}</td>
+                  <td className="border-r border-gray-300 px-2 py-1.5 text-center font-bold text-blue-900">
+                    {item.isReturn ? (
+                       <input type="number" min="1" max={item.originalQty || item.qty} value={item.qty} onChange={e => { let n = parseInt(e.target.value) || 1; if (n > (item.originalQty || item.qty)) n = item.originalQty || item.qty; setCart(cart.map(c => c.cartUniqueId === item.cartUniqueId ? {...c, qty: n} : c)); }} className="w-16 outline-none border border-gray-400 text-center shadow-inner font-bold text-blue-900" />
+                    ) : item.qty}
+                  </td>
                   <td className="border-r border-gray-300 px-2 py-1.5 text-center">Pcs</td>
                   <td className="border-r border-gray-300 px-2 py-1.5 text-right font-medium">
-                    {formatRp(item.price)}
+                    {isInputStockMode ? (
+                        <input 
+                          type="number" 
+                          value={item.price || ''} 
+                          onChange={(e) => {
+                              const newPrice = parseInt(e.target.value) || 0;
+                              setCart(cart.map(c => c.cartUniqueId === item.cartUniqueId ? { ...c, price: newPrice } : c));
+                          }}
+                          className="w-20 text-right border border-gray-400 px-1 py-0.5 outline-none font-bold"
+                          placeholder="0"
+                        />
+                    ) : formatRp(item.price)}
                   </td>
                   {isInputStockMode && <td className="border-r border-gray-300 px-2 py-1.5 text-right font-medium text-blue-800">{formatRp(item.price1)}</td>}
                   {isInputStockMode && <td className="border-r border-gray-300 px-2 py-1.5 text-right font-medium text-purple-800">{formatRp(item.price2)}</td>}
@@ -783,9 +727,18 @@ export const POS = ({ currentTime }: { currentTime: Date }) => {
                 </tr>
               ))}
               {/* Expand table visually */}
-              {cart.length < 35 && Array.from({ length: 35 - cart.length }).map((_, i) => (
+              {cart.length < 18 && Array.from({ length: 18 - cart.length }).map((_, i) => (
                 <tr key={`empty-${i}`} className="border-b border-gray-200 h-[30px]">
-                  <td className="border-r border-gray-300 px-2"></td><td className="border-r border-gray-300 px-2"></td><td className="border-r border-gray-300 px-2"></td><td className="border-r border-gray-300 px-2"></td><td className="border-r border-gray-300 px-2"></td><td className="border-r border-gray-300 px-2"></td><td className="px-2"></td>
+                  <td className="border-r border-gray-300 px-2"></td>
+                  <td className="border-r border-gray-300 px-2"></td>
+                  {isInputStockMode && <td className="border-r border-gray-300 px-2"></td>}
+                  <td className="border-r border-gray-300 px-2"></td>
+                  <td className="border-r border-gray-300 px-2"></td>
+                  <td className="border-r border-gray-300 px-2"></td>
+                  {isInputStockMode && <td className="border-r border-gray-300 px-2"></td>}
+                  {isInputStockMode && <td className="border-r border-gray-300 px-2"></td>}
+                  <td className="border-r border-gray-300 px-2"></td>
+                  <td className="px-2"></td>
                 </tr>
               ))}
             </tbody>
@@ -793,27 +746,30 @@ export const POS = ({ currentTime }: { currentTime: Date }) => {
         </div>
 
         {/* BOTTOM SECTION */}
-        <div className={`flex mt-1 ${isInputStockMode ? 'justify-end items-end gap-2' : 'justify-between'}`}>
+        <div className="flex mt-1 justify-between items-stretch gap-3 w-full">
           {/* Left Totals */}
-          <div className="flex flex-col gap-0.5 w-[220px] p-1.5 bg-[#8fb4d9] border border-white/50 shrink-0">
+          <div className="flex flex-col justify-end gap-1 w-[260px] p-2 bg-[#8fb4d9] border border-white/50 shadow-sm shrink-0 rounded-sm">
              <div className="flex items-center">
-               <span className="w-16 font-semibold text-blue-900 shrink-0 text-xs">SubTotal</span>
-               <input type="text" readOnly value={formatRp(totalBelanjaBaru)} className="border border-gray-400 bg-[#8fb4d9] px-1 py-0.5 text-right flex-1 outline-none font-bold text-sm" />
+               <span className="w-[85px] font-semibold text-blue-900 shrink-0 text-xs">SubTotal</span>
+               <input type="text" readOnly value={formatRp(totalBelanjaBaru)} className="border border-gray-400 bg-white px-1 py-0.5 text-right flex-1 min-w-0 outline-none font-bold text-sm shadow-inner" />
              </div>
              {isInputStockMode ? (
                  <div className="flex items-center">
-                   <span className="w-16 font-semibold text-green-800 shrink-0 text-[10px] leading-tight">Diskon %</span>
-                   <input type="number" value={stockDiscount} onChange={e => setStockDiscount(parseInt(e.target.value)||0)} className="border border-gray-400 bg-white px-1 py-0.5 text-right flex-1 outline-none font-bold text-green-800 text-sm shadow-inner" />
+                   <span className="w-[85px] font-semibold text-blue-900 shrink-0 text-xs">Diskon %</span>
+                   <input type="number" value={stockDiscount} onChange={e => setStockDiscount(parseInt(e.target.value)||0)} className="border border-gray-400 bg-white px-1 py-0.5 text-right flex-1 min-w-0 outline-none font-bold text-sm shadow-inner text-black" />
                  </div>
              ) : (
                  <>
                  <div className="flex items-center">
-                   <span className="w-16 font-semibold text-green-800 shrink-0 text-[10px] leading-tight">Potongan Retur</span>
-                   <input type="text" readOnly value={formatRp(totalNilaiRetur)} className="border border-gray-400 bg-[#8fb4d9] px-1 py-0.5 text-right flex-1 outline-none font-bold text-green-800 text-sm" />
+                   <span className="w-[85px] font-semibold text-blue-900 shrink-0 text-xs">Potongan Retur</span>
+                   <input type="text" readOnly value={formatRp(totalNilaiRetur)} className="border border-gray-400 bg-white px-1 py-0.5 text-right flex-1 min-w-0 outline-none font-bold text-sm shadow-inner" />
                  </div>
                  <div className="flex items-center">
-                   <span className="w-16 font-semibold text-orange-800 shrink-0 text-[10px] leading-tight">Diskon (Rp)</span>
-                   <input type="number" value={globalDiscount || ''} onChange={e => setGlobalDiscount(parseInt(e.target.value)||0)} className="border border-gray-400 bg-white px-1 py-0.5 text-right flex-1 outline-none font-bold text-orange-800 text-sm shadow-inner" placeholder="0" />
+                   <select value={discountType} onChange={(e) => setDiscountType(e.target.value)} className="w-[85px] font-semibold text-blue-900 shrink-0 text-xs outline-none bg-transparent cursor-pointer">
+                     <option value="Rp">Diskon Rp</option>
+                     <option value="%">Diskon %</option>
+                   </select>
+                   <input type="text" value={discountType === 'Rp' ? formatRp(globalDiscount || 0) : (globalDiscount || '')} onChange={e => { const val = e.target.value.replace(/\D/g, ''); setGlobalDiscount(val ? parseInt(val, 10) : 0); }} className="border border-gray-400 bg-white px-1 py-0.5 text-right flex-1 min-w-0 outline-none font-bold text-sm shadow-inner text-black" placeholder={discountType === 'Rp' ? "Rp 0" : "0"} />
                  </div>
                  </>
              )}
@@ -821,106 +777,179 @@ export const POS = ({ currentTime }: { currentTime: Date }) => {
              {!isInputStockMode && (
                  <>
                  <div className="flex items-center">
-                   <span className="w-16 font-semibold text-gray-700 shrink-0 text-xs mt-1">Catatan</span>
+                   <span className="w-[85px] font-semibold text-blue-900 shrink-0 text-xs">Tunai</span>
                    <input 
                       type="text" 
-                      value={transactionNote} 
-                      onChange={(e) => setTransactionNote(e.target.value)} 
-                      className="border border-gray-400 bg-white px-1 py-0.5 mt-1 text-left flex-1 font-medium outline-none text-xs shadow-inner" 
-                      placeholder="Cth: Wait for pickup" 
-                   />
-                 </div>
-                 <div className="flex items-center">
-                   <span className="w-16 font-semibold text-blue-900 shrink-0 text-xs mt-1">Tunai</span>
-                   <input 
-                      type="number" 
                       disabled={totalBelanja < 0} 
-                      value={amountPaid} 
-                      onChange={(e) => setAmountPaid(e.target.value)} 
-                      className="border border-gray-400 bg-white px-1 py-0.5 mt-1 text-right flex-1 font-bold outline-none focus:bg-yellow-50 text-sm shadow-inner disabled:bg-gray-300" 
-                      placeholder="0" 
+                      value={amountPaid === "" ? "" : formatRp(Number(amountPaid) || 0)} 
+                      onChange={(e) => {
+                         const val = e.target.value.replace(/\D/g, '');
+                         setAmountPaid(val);
+                      }} 
+                      className="border border-gray-400 bg-white px-1 py-0.5 text-right flex-1 min-w-0 font-bold outline-none focus:bg-yellow-50 text-sm shadow-inner disabled:bg-gray-300 text-black" 
+                      placeholder="Rp 0" 
                    />
                  </div>
                  <div className="flex items-center">
-                   <span className="w-16 font-semibold text-blue-900 shrink-0 text-xs">Kembalian</span>
-                   <input type="text" readOnly value={formatRp(kembalian > 0 ? kembalian : 0)} className="border border-gray-400 bg-[#8fb4d9] px-1 py-0.5 text-right flex-1 outline-none font-bold text-blue-900 text-sm" />
-                 </div>
-                 <div className="flex items-center mt-0.5 justify-end">
-                   <label htmlFor="langsungCetak" className="font-medium cursor-pointer hover:text-blue-900 text-[10px] mr-1">Langsung Cetak</label>
-                   <input id="langsungCetak" type="checkbox" checked={isDirectPrint} onChange={(e) => setIsDirectPrint(e.target.checked)} className="w-3 h-3 cursor-pointer m-0" />
+                   <span className="w-[85px] font-semibold text-blue-900 shrink-0 text-xs">Kembalian</span>
+                   <input type="text" readOnly value={formatRp(kembalian > 0 ? kembalian : 0)} className="border border-gray-400 bg-white px-1 py-0.5 text-right flex-1 min-w-0 outline-none font-bold text-sm shadow-inner" />
                  </div>
                  </>
              )}
              {isInputStockMode && (
                  <div className="flex items-center">
-                   <span className="w-16 font-semibold text-red-800 shrink-0 text-[10px] leading-tight mt-1">Total Biaya</span>
-                   <input type="text" readOnly value={formatRp(totalBelanjaBaru - (totalBelanjaBaru * stockDiscount / 100))} className="border border-gray-400 bg-[#8fb4d9] mt-1 px-1 py-0.5 text-right flex-1 outline-none font-bold text-red-800 text-sm" />
+                   <span className="w-[85px] font-semibold text-blue-900 shrink-0 text-xs">Total Biaya</span>
+                   <input type="text" readOnly value={formatRp(totalBelanjaBaru - (totalBelanjaBaru * stockDiscount / 100))} className="border border-gray-400 bg-white px-1 py-0.5 text-right flex-1 min-w-0 outline-none font-bold text-sm shadow-inner" />
                  </div>
-             )}
+              )}
           </div>
-
-          <div className="flex-1 flex flex-col p-1.5 min-w-[200px] overflow-hidden ml-1 border border-gray-400 bg-[#ece9d8]">
-            <div className="flex items-center gap-1 font-bold text-blue-900 border-b border-gray-400 pb-1 mb-1 shadow-sm">
-                <Sparkles className="w-3 h-3 text-purple-600" />
-                <span className="text-[10px] uppercase">AI Quick Restock</span>
-            </div>
-            <div className="flex-1 overflow-y-auto pr-1">
-                {isAiLoading ? (
-                    <div className="flex items-center justify-center h-full text-xs text-gray-500 font-bold gap-1 mt-2">
-                        <Loader2 className="w-3 h-3 animate-spin"/> Menganalisis...
-                    </div>
-                ) : aiSuggestions.length > 0 ? (
-                    <div className="flex flex-col gap-1">
-                        {aiSuggestions.map((item, idx) => (
-                           <div key={idx} className="bg-white border border-green-300 p-1 flex justify-between items-center shadow-sm hover:border-green-500 transition-colors">
-                               <div className="flex flex-col overflow-hidden max-w-[130px]">
-                                   <span className="text-[10px] font-bold text-blue-900 truncate">{item.name}</span>
-                                   <span className="text-[9px] text-green-700">{formatRp(selectedCustomer?.level === 2 ? item.price2 : item.price1)}</span>
-                               </div>
-                               <button 
-                                   onClick={() => addToCart(item, 1)}
-                                   className="bg-green-100 hover:bg-green-200 border border-green-300 text-green-800 p-1 rounded-sm shadow-sm"
-                               >
-                                   <ShoppingCart className="w-3 h-3" />
-                               </button>
-                           </div>
-                        ))}
-                    </div>
-                ) : (
-                    <div className="text-[10px] text-gray-500 italic mt-2 text-center">
-                        {cart.length > 0 ? "Tidak ada saran." : "Tambahkan item untuk memunculkan saran AI."}
-                    </div>
-                )}
+          
+          <div className="flex-1 relative self-stretch">
+            <div className="absolute inset-0 flex flex-col p-1.5 overflow-hidden border border-gray-400 bg-[#ece9d8]">
+              <div className="flex items-center justify-center font-bold text-blue-900 border-b border-gray-400 pb-1 mb-1 shadow-sm shrink-0">
+                  <span className="text-[10px] uppercase truncate text-center">Log Aktifitas Harian</span>
+              </div>
+              <div className="flex-1 overflow-y-auto pr-1">
+                  {appLogs.filter((l: any) => new Date(l.time).toDateString() === new Date().toDateString()).length > 0 ? (
+                      <div className="flex flex-col gap-1">
+                          {appLogs.filter((l: any) => new Date(l.time).toDateString() === new Date().toDateString()).map((log: any, idx: number) => (
+                             <div key={idx} className="bg-white border border-gray-300 p-1 flex flex-col justify-between shadow-sm hover:border-gray-400 transition-colors">
+                                 <div className="flex justify-between w-full">
+                                     <span className="text-[9px] font-bold text-blue-900 truncate" title={log.type}>{log.type}</span>
+                                     <span className="text-[8px] text-gray-500">{new Date(log.time).toLocaleTimeString('id-ID', {hour: '2-digit', minute:'2-digit'})}</span>
+                                 </div>
+                                 <span className="text-[9px] text-gray-700 leading-tight">{log.desc}</span>
+                             </div>
+                          ))}
+                      </div>
+                  ) : (
+                      <div className="text-[9px] text-gray-500 italic mt-2 text-center leading-tight">
+                          Belum ada aktifitas hari ini.
+                      </div>
+                  )}
+              </div>
             </div>
           </div>
 
           {/* Right Action Buttons */}
-          <div className="flex items-end justify-end pb-0.5 pr-0.5 gap-1.5 shrink-0 p-1">
-            {activeReturTrx ? (
-              <div className="flex flex-col gap-1 w-[280px]">
-                <button onClick={handleSimpan} className="border-2 border-red-600 bg-red-600 px-3 py-3 w-full hover:bg-red-700 text-white font-bold shadow mb-1">SIMPAN TRANSAKSI RETUR [F8]</button>
-                <button onClick={resetKasirState} className="border-2 border-gray-500 bg-gray-200 px-3 py-2 w-full hover:bg-gray-300 text-black font-bold shadow-sm text-sm">BATALKAN MODE RETUR</button>
-              </div>
-            ) : (
-              <>
+          <div className="flex flex-col items-end justify-end pr-0.5 pb-0.5 gap-2 shrink-0">
+            <div className="flex flex-col items-end gap-1.5">
+              <div className="flex gap-1.5">
                 <div className="flex flex-col gap-1 w-[120px]">
                   <button onClick={handleSimpan} className="border-2 border-gray-500 bg-gray-200 px-3 py-1.5 w-full hover:bg-gray-300 text-black font-bold shadow-sm text-xs">Simpan [F8]</button>
-                  <button onClick={handleCetakButton} className="border-2 border-gray-500 bg-gray-200 px-3 py-1.5 w-full hover:bg-gray-300 text-black font-bold shadow-sm text-xs">Cetak [F9]</button>
-                  <button onClick={resetKasirState} className="border-2 border-gray-500 bg-gray-200 px-3 py-1.5 w-full hover:bg-gray-300 text-black font-bold shadow-sm text-xs">Baru [F5]</button>
+                    <button onClick={handleCetakButton} className="border-2 border-gray-500 bg-gray-200 px-3 py-1.5 w-full hover:bg-gray-300 text-black font-bold shadow-sm text-xs">Cetak [F9]</button>
+                    <button onClick={resetKasirState} className="border-2 border-gray-500 bg-gray-200 px-3 py-1.5 w-full hover:bg-gray-300 text-black font-bold shadow-sm text-xs">Baru [F5]</button>
+                    <button onClick={() => setShowHistoryModal(true)} className="border-2 border-gray-500 bg-gray-200 px-3 py-1.5 w-full hover:bg-gray-300 text-black font-bold shadow-sm text-xs">Return</button>
+                    <button onClick={() => setShowBonModal(true)} className="border-2 border-gray-500 bg-gray-200 px-3 py-1.5 w-full hover:bg-gray-300 text-black font-bold shadow-sm text-xs text-red-700">Kasbon</button>
+                  </div>
+                  <div className="flex flex-col gap-1 w-[130px]">
+                    <button onClick={() => setShowPiutangModal(true)} className="border-2 border-gray-500 bg-gray-200 px-3 py-1.5 w-full hover:bg-gray-300 text-black font-bold shadow-sm text-xs">Piutang [F2]</button>
+                    <button onClick={handleSavePending} className="border-2 border-gray-500 bg-gray-200 px-3 py-1.5 w-full hover:bg-gray-300 text-black font-bold shadow-sm text-xs">Pending [F3]</button>
+                    <button onClick={() => setShowPendingModal(true)} className="border-2 border-gray-500 bg-gray-200 px-3 py-1.5 w-full hover:bg-gray-300 text-black font-bold shadow-sm text-xs relative">
+                      Daftar Pnd [F4]
+                      {pendingTransactions.length > 0 && <span className="absolute -top-1.5 -right-1.5 bg-red-600 text-white text-[10px] px-1.5 py-0.5 rounded-full shadow-lg">{pendingTransactions.length}</span>}
+                    </button>
+                    <button onClick={() => setIsBarcodeMode(!isBarcodeMode)} className={`border-2 border-gray-500 px-3 py-1.5 w-full font-bold shadow-sm text-xs text-white ${isBarcodeMode ? 'bg-green-600 hover:bg-green-700' : 'bg-red-600 hover:bg-red-700'}`}>Auto Scan</button>
+                    <button onClick={() => setIsPromoActive(!isPromoActive)} className={`border-2 border-gray-500 px-3 py-1.5 w-full font-bold shadow-sm text-xs text-white ${isPromoActive ? 'bg-green-600 hover:bg-green-700' : 'bg-red-600 hover:bg-red-700'}`}>Promo</button>
+                  </div>
                 </div>
-                <div className="flex flex-col gap-1 w-[130px]">
-                  <button onClick={() => setShowPiutangModal(true)} className="border-2 border-gray-500 bg-gray-200 px-3 py-1.5 w-full hover:bg-gray-300 text-black font-bold shadow-sm text-xs">Piutang [F2]</button>
-                  <button onClick={handleSavePending} className="border-2 border-gray-500 bg-gray-200 px-3 py-1.5 w-full hover:bg-gray-300 text-black font-bold shadow-sm text-xs">Pending [F3]</button>
-                  <button onClick={() => setShowPendingModal(true)} className="border-2 border-gray-500 bg-gray-200 px-3 py-1.5 w-full hover:bg-gray-300 text-black font-bold shadow-sm text-xs relative">
-                    Daftar Pnd [F4]
-                    {pendingTransactions.length > 0 && <span className="absolute -top-1.5 -right-1.5 bg-red-600 text-white text-[10px] px-1.5 py-0.5 rounded-full shadow-lg">{pendingTransactions.length}</span>}
-                  </button>
-                </div>
-              </>
-            )}
+              </div>
           </div>
         </div>
       </div>
+      
+      {/* HISTORY MODAL FOR RETUR */}
+      {showHistoryModal && (
+          <div className="fixed inset-0 bg-black/60 z-[9999] flex items-center justify-center p-4">
+              <div className="bg-[#ece9d8] border-2 border-gray-500 w-[600px] flex flex-col shadow-2xl">
+                  <div className="bg-[#000040] text-white px-3 py-1.5 flex justify-between items-center cursor-default">
+                      <span className="font-bold text-sm tracking-wide">PILIH RIWAYAT TRANSAKSI (UNTUK RETUR)</span>
+                      <button onClick={() => setShowHistoryModal(false)} className="hover:bg-red-600 px-2 py-0.5 font-bold">X</button>
+                  </div>
+                  <div className="p-3 bg-white border border-gray-400 mx-2 my-2 overflow-y-auto max-h-[400px]">
+                      <table className="w-full text-left text-xs border-collapse">
+                          <thead className="bg-gray-200 sticky top-0">
+                              <tr>
+                                  <th className="p-2 border border-gray-400">FAKTUR</th>
+                                  <th className="p-2 border border-gray-400">TANGGAL</th>
+                                  <th className="p-2 border border-gray-400">PELANGGAN</th>
+                                  <th className="p-2 border border-gray-400 w-24 text-right">TOTAL</th>
+                                  <th className="p-2 border border-gray-400 text-center w-16">AKSI</th>
+                              </tr>
+                          </thead>
+                          <tbody>
+                              {transactions.slice().reverse().slice(0, 50).map((t: any) => (
+                                  <tr key={t.id} className="hover:bg-blue-50 border-b border-gray-300">
+                                      <td className="p-2 border-r border-gray-400 font-bold">{t.id}</td>
+                                      <td className="p-2 border-r border-gray-400">{t.date}</td>
+                                      <td className="p-2 border-r border-gray-400 truncate max-w-[120px]">{t.customer}</td>
+                                      <td className="p-2 border-r border-gray-400 font-medium text-right text-blue-900">{formatRp(t.total)}</td>
+                                      <td className="p-2 text-center p-1">
+                                          <button onClick={() => {
+                                              const matchCust = customers.find((c: any) => c.name === t.customer);
+                                              if (matchCust) setSelectedCustomerId(String(matchCust.id));
+                                              
+                                              const returnItems = t.items.filter((i: any) => i.qty > 0).map((item: any) => ({
+                                                  ...item,
+                                                  cartUniqueId: 'RET-' + item.id + '-' + Date.now() + Math.random(),
+                                                  code: 'RETUR',
+                                                  name: `(Retur) ${item.name}`,
+                                                  price: Math.abs(item.price),
+                                                  qty: item.qty,
+                                                  originalQty: item.qty,
+                                                  isReturn: true,
+                                                  originalTrxId: t.id,
+                                                  originalItemId: item.id
+                                              }));
+                                              // we just clear activeReturTrx since we don't need the banner anymore, and put items to cart
+                                              setActiveReturTrx(null);
+                                              setCart([...cart, ...returnItems]);
+                                              setShowHistoryModal(false);
+                                          }} className="bg-red-600 text-white px-2 py-1 font-bold text-xs hover:bg-red-700 shadow border border-red-800">Retur</button>
+                                      </td>
+                                  </tr>
+                              ))}
+                              {transactions.length === 0 && (
+                                  <tr><td colSpan={5} className="p-4 text-center text-gray-500 font-bold">Tidak ada riwayat transaksi</td></tr>
+                              )}
+                          </tbody>
+                      </table>
+                  </div>
+              </div>
+          </div>
+      )}
+
+      {/* Bon Modal */}
+      {showBonModal && (
+          <div className="fixed inset-0 bg-black/60 z-[9999] flex items-center justify-center p-4">
+              <div className="bg-[#ece9d8] border-2 border-gray-500 w-full max-w-md shadow-2xl flex flex-col">
+                  <div className="bg-blue-900 text-white font-bold px-3 py-2 flex justify-between items-center shadow-sm">
+                      <span>Catat Bon / Kasbon Karyawan</span>
+                      <button onClick={() => setShowBonModal(false)} className="bg-red-600 hover:bg-red-700 px-2 py-0.5 border border-white/50 shadow-sm leading-none font-bold">X</button>
+                  </div>
+                  <form onSubmit={handleAddBon} className="p-4 bg-white m-1 border border-gray-400">
+                      <div className="flex flex-col gap-3 mb-4">
+                         <label className="text-sm font-bold text-gray-700">Pilih Karyawan</label>
+                         <select required value={bonEmployee} onChange={e => setBonEmployee(e.target.value)} className="border border-gray-400 p-2 outline-none">
+                            <option value="">-- Nama --</option>
+                            {employees.map((e: any) => <option key={e.id} value={e.name}>{e.name} ({e.position})</option>)}
+                         </select>
+
+                         <label className="text-sm font-bold text-gray-700 mt-2">Alasan Bon</label>
+                         <input required type="text" value={bonReason} onChange={e => setBonReason(e.target.value)} className="border border-gray-400 p-2 outline-none" placeholder="Cth: Pinjam uang makan" />
+
+                         <label className="text-sm font-bold text-gray-700 mt-2">Nominal (Rp)</label>
+                         <input required type="text" value={bonAmount === "" ? "" : formatRp(Number(bonAmount) || 0)} onChange={e => { const val = e.target.value.replace(/\D/g, ''); setBonAmount(val); }} className="border border-gray-400 p-2 outline-none font-bold" placeholder="Rp 0" />
+                      </div>
+                      
+                      <div className="flex justify-end gap-2 text-sm mt-6">
+                         <button type="button" onClick={() => setShowBonModal(false)} className="px-4 py-1.5 border-2 border-gray-500 bg-gray-200 hover:bg-gray-300 font-bold shadow-sm">Batal</button>
+                         <button type="submit" className="px-4 py-1.5 border-2 border-red-800 bg-red-600 text-white hover:bg-red-700 font-bold shadow-sm">Simpan Bon</button>
+                      </div>
+                  </form>
+              </div>
+          </div>
+      )}
     </div>
   );
 };

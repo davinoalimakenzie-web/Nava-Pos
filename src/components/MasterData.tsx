@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { ArrowLeftRight, Truck, Clock } from 'lucide-react';
+import { ArrowLeftRight, Truck, Clock, Database, DownloadCloud, UploadCloud, History, Trash2, AlertTriangle, FileJson, RotateCcw, Check } from 'lucide-react';
 import { useAppContext } from '../context/AppContext';
 import { LegacyWindowHeader } from './LegacyWindowHeader';
 import { formatRp, formatDateDisplay } from '../utils';
@@ -8,7 +8,10 @@ import { currentMonthStr, defaultDate } from '../data';
 export const MasterData = ({ currentTime }: { currentTime: Date }) => {
   const { 
     inventory, setInventory, customers, setCustomers, orderData, setOrderData, masterDataTab, setMasterDataTab,
-    setShowAddCustomerModal, suppliers, setSuppliers, supplierReturns, setSupplierReturns, storeSettings
+    setShowAddCustomerModal, suppliers, setSuppliers, supplierReturns, setSupplierReturns, storeSettings,
+    employees, setEmployees, attendances, setAttendances, leaveRequests, setLeaveRequests,
+    transactions, setTransactions, expenses, setExpenses, piutangData, setPiutangData,
+    pendingTransactions, setPendingTransactions, appUsers, setAppUsers, setStoreSettings
   } = useAppContext();
 
   const [opnameInputs, setOpnameInputs] = useState<Record<string, number>>({});
@@ -17,6 +20,20 @@ export const MasterData = ({ currentTime }: { currentTime: Date }) => {
   const [showAddSupplierModal, setShowAddSupplierModal] = useState(false);
   const [newStock, setNewStock] = useState({code: '', name: '', category: 'UMUM', supplierPrice: 0, price1: 0, price2: 0, stock: 0});
   const [newSupplier, setNewSupplier] = useState({name: '', contact: '', address: ''});
+
+  // Backup & Restore states
+  const [snapshots, setSnapshots] = useState<any[]>(() => {
+    try {
+      const saved = localStorage.getItem('POS_Snapshots');
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
+  });
+  const [uploadedFileStats, setUploadedFileStats] = useState<any | null>(null);
+  const [uploadedFileData, setUploadedFileData] = useState<any | null>(null);
+  const [resetInput, setResetInput] = useState('');
+  const [showResetConfirm, setShowResetConfirm] = useState(false);
 
   return (
     <div className="flex-1 flex flex-col bg-[#8fb4d9] border border-[#8fb4d9] overflow-hidden">
@@ -30,7 +47,6 @@ export const MasterData = ({ currentTime }: { currentTime: Date }) => {
          <button onClick={() => setMasterDataTab('return')} className={`px-3 py-1.5 border border-gray-500 font-bold hover:bg-white ${masterDataTab === 'return' ? 'bg-white border-b-white text-blue-900' : 'bg-gray-200 text-black'}`}>Stock Return</button>
          <button onClick={() => setMasterDataTab('pelanggan')} className={`px-3 py-1.5 border border-gray-500 font-bold hover:bg-white ${masterDataTab === 'pelanggan' ? 'bg-white border-b-white text-blue-900' : 'bg-gray-200 text-black'}`}>Data Pelanggan</button>
          <button onClick={() => setMasterDataTab('supliyer')} className={`px-3 py-1.5 border border-gray-500 font-bold hover:bg-white ${masterDataTab === 'supliyer' ? 'bg-white border-b-white text-blue-900' : 'bg-gray-200 text-black'}`}>Data Supliyer</button>
-         <button onClick={() => setMasterDataTab('backup')} className={`px-3 py-1.5 border border-gray-500 font-bold hover:bg-white ${masterDataTab === 'backup' ? 'bg-white border-b-white text-blue-900' : 'bg-gray-200 text-black'}`}>Backup & Restore</button>
       </div>
 
       <div className="p-2 flex flex-col h-full gap-2 overflow-y-auto">
@@ -39,9 +55,8 @@ export const MasterData = ({ currentTime }: { currentTime: Date }) => {
           {/* SUB TAB: MASTER STOCK */}
           {masterDataTab === 'stock' && (
             <div className="flex flex-col h-full">
-              <div className="flex justify-between items-center bg-[#ece9d8] border-b border-gray-400 p-2 shadow-sm sticky top-0 z-20">
-                <span className="font-bold">Daftar Inventaris Barang</span>
-                <button onClick={() => setShowAddStockModal(true)} className="bg-gray-200 border border-gray-500 px-3 py-1 font-bold hover:bg-gray-300 shadow">+ Tambah Baru</button>
+              <div className="flex justify-center items-center bg-[#ece9d8] border-b border-gray-400 p-2 shadow-sm sticky top-0 z-20">
+                <span className="font-bold text-center w-full">Master Stock</span>
               </div>
               {showAddStockModal && (
                  <div className="bg-[#ece9d8] border border-gray-400 p-3 flex flex-wrap gap-2 items-end mb-2 shadow-sm rounded-sm m-2">
@@ -320,56 +335,6 @@ export const MasterData = ({ currentTime }: { currentTime: Date }) => {
                   ))}
                 </tbody>
               </table>
-            </div>
-          )}
-
-          {masterDataTab === 'backup' && (
-            <div className="absolute inset-0 overflow-auto p-6 bg-[#ece9d8]">
-              <h2 className="text-xl font-bold text-blue-900 border-b border-gray-400 pb-2 mb-4">Export & Import Master Data</h2>
-              <div className="grid grid-cols-2 gap-6">
-                 <div className="bg-white p-6 border border-gray-400 shadow-sm flex flex-col items-center text-center gap-3">
-                    <h3 className="font-bold text-lg text-green-700">Export Backup Database</h3>
-                    <p className="text-sm text-gray-600 mb-2">Mengunduh semua data (Barang, Pelanggan, Supliyer, PO, dsb) ke file .JSON lokal.</p>
-                    <button onClick={() => {
-                        const allData = { inventory, customers, suppliers, orderData, supplierReturns };
-                        const jsonStr = JSON.stringify(allData, null, 2);
-                        const blob = new Blob([jsonStr], { type: 'application/json' });
-                        const url = URL.createObjectURL(blob);
-                        const a = document.createElement('a');
-                        a.href = url;
-                        a.download = `backup_master_data_${new Date().toISOString().split('T')[0]}.json`;
-                        a.click();
-                        URL.revokeObjectURL(url);
-                    }} className="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-8 shadow-sm">DOWNLOAD BACKUP DATA</button>
-                 </div>
-                 <div className="bg-white p-6 border border-gray-400 shadow-sm flex flex-col items-center text-center gap-3">
-                    <h3 className="font-bold text-lg text-blue-700">Import / Restore Data</h3>
-                    <p className="text-sm text-gray-600 mb-2">Mengganti data saat ini dengan data yang ada di file backup (.JSON).</p>
-                    <input type="file" accept=".json" id="file-upload" className="hidden" onChange={(e) => {
-                        const file = e.target.files?.[0];
-                        if (!file) return;
-                        if (!window.confirm('PERINGATAN: Data yang ada sekarang akan ditimpa dengan data dari file backup. Lanjutkan?')) return;
-                        const reader = new FileReader();
-                        reader.onload = (event) => {
-                           try {
-                               const data = JSON.parse(event.target?.result as string);
-                               if (data.inventory) setInventory(data.inventory);
-                               if (data.customers) setCustomers(data.customers);
-                               if (data.suppliers) setSuppliers(data.suppliers);
-                               if (data.orderData) setOrderData(data.orderData);
-                               if (data.supplierReturns) setSupplierReturns(data.supplierReturns);
-                               alert('Import Master Data berhasil!');
-                           } catch (err) {
-                               alert('Gagal membaca file! Pastikan file adalah backup JSON dari sistem ini.');
-                           }
-                        };
-                        reader.readAsText(file);
-                        // Reset input
-                        e.target.value = '';
-                    }} />
-                    <label htmlFor="file-upload" className="cursor-pointer bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-8 shadow-sm inline-block">UPLOAD FILE BACKUP</label>
-                 </div>
-              </div>
             </div>
           )}
 

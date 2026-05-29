@@ -6,29 +6,17 @@ import { currentMonthStr, defaultDate } from '../data';
 
 export const Absensi = ({ currentTime }: { currentTime: Date }) => {
   const { 
-    user, appUsers, employees, setEmployees, attendances, setAttendances, setShowAddEmpModal
+    user, appUsers, employees, setEmployees, attendances, setAttendances, setShowAddEmpModal, appLogs, addLog, expenses
   } = useAppContext();
 
   const [absensiSubTab, setAbsensiSubTab] = useState('harian');
   const [selectedEmployeeAbsensi, setSelectedEmployeeAbsensi] = useState('');
-  const [rekapMonth, setRekapMonth] = useState(currentMonthStr);
   const { leaveRequests, setLeaveRequests } = useAppContext();
 
-  const handlePrevRekapMonth = () => {
-      if (!rekapMonth) return;
-      const [y, m] = rekapMonth.split('-');
-      if (!y || !m) return;
-      const date = new Date(parseInt(y), parseInt(m) - 2, 1);
-      setRekapMonth(`${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`);
-  };
-
-  const handleNextRekapMonth = () => {
-      if (!rekapMonth) return;
-      const [y, m] = rekapMonth.split('-');
-      if (!y || !m) return;
-      const date = new Date(parseInt(y), parseInt(m), 1);
-      setRekapMonth(`${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`);
-  };
+  const [filterStartDate, setFilterStartDate] = useState(defaultDate);
+  const [filterUseStart, setFilterUseStart] = useState(true);
+  const [filterEndDate, setFilterEndDate] = useState(defaultDate);
+  const [filterUseEnd, setFilterUseEnd] = useState(true);
 
   // Cuti Form State
   const [viewCutiDate, setViewCutiDate] = useState(new Date());
@@ -67,7 +55,9 @@ export const Absensi = ({ currentTime }: { currentTime: Date }) => {
 
   const calculateLateMinutes = (timeStr: string) => {
     if (!timeStr || timeStr === '-') return 0;
-    const [h, m] = timeStr.split(':').map(Number);
+    const parts = timeStr.replace('.', ':').split(':');
+    const h = Number(parts[0]);
+    const m = Number(parts[1] || 0);
     const late = (h * 60 + m) - (9 * 60); 
     return late > 0 ? late : 0;
   };
@@ -82,7 +72,7 @@ export const Absensi = ({ currentTime }: { currentTime: Date }) => {
       // or we can just let any user edit for now, or only admin (button is hidden otherwise)
       if (user?.role !== 'admin' && user?.role !== 'owner') return alert('Hanya admin/owner yang bisa mengubah jam masuk');
       setEditingAttId(id);
-      setEditingAttTime(current !== '-' ? current : '09:00');
+      setEditingAttTime(current !== '-' ? current.replace('.', ':') : '09:00');
   };
 
   const saveEditTimeIn = (id: number) => {
@@ -116,6 +106,7 @@ export const Absensi = ({ currentTime }: { currentTime: Date }) => {
       status: 'Libur',
       lateMins: 0
     }, ...attendances]);
+    addLog('ABSENSI', `${selectedEmployeeAbsensi} diset Libur`);
     alert(`Berhasil set Libur untuk ${selectedEmployeeAbsensi}!`);
   };
 
@@ -124,7 +115,7 @@ export const Absensi = ({ currentTime }: { currentTime: Date }) => {
     const existing = attendances.find((a: any) => a.date === defaultDate && a.user === selectedEmployeeAbsensi);
     if (existing && existing.status !== 'Libur') return alert('Karyawan tersebut sudah Clock In hari ini!');
     
-    const timeNowStr = currentTime.toLocaleTimeString('id-ID').substring(0, 5);
+    const timeNowStr = currentTime.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }).replace(/\./g, ':');
     setAttendances([{
       id: Date.now(),
       date: defaultDate,
@@ -135,6 +126,7 @@ export const Absensi = ({ currentTime }: { currentTime: Date }) => {
       status: 'Clock In',
       lateMins: calculateLateMinutes(timeNowStr)
     }, ...attendances]);
+    addLog('ABSENSI', `${selectedEmployeeAbsensi} Clock In pada ${timeNowStr}`);
     alert(`Berhasil Clock In untuk ${selectedEmployeeAbsensi}!`);
   };
 
@@ -144,12 +136,13 @@ export const Absensi = ({ currentTime }: { currentTime: Date }) => {
     const updated = attendances.map((a: any) => {
       if (a.date === defaultDate && a.user === selectedEmployeeAbsensi && a.status === 'Clock In') {
         found = true;
-        return { ...a, timeOut: currentTime.toLocaleTimeString('id-ID').substring(0,5), status: 'Selesai' };
+        return { ...a, timeOut: currentTime.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }).replace(/\./g, ':'), status: 'Selesai' };
       }
       return a;
     });
     if (found) {
       setAttendances(updated);
+      addLog('ABSENSI', `${selectedEmployeeAbsensi} Clock Out`);
       alert(`Berhasil Clock Out untuk ${selectedEmployeeAbsensi}!`);
     } else {
       alert('Karyawan tersebut belum Clock In hari ini!');
@@ -157,16 +150,29 @@ export const Absensi = ({ currentTime }: { currentTime: Date }) => {
   };
 
   const generateRekapAbsen = () => {
-     const monthlyData = attendances.filter((a: any) => a.date.startsWith(rekapMonth));
+     let filteredData = attendances;
+     let filteredBon = expenses;
+
+     if (filterUseStart && filterStartDate) {
+         filteredData = filteredData.filter((a: any) => a.date >= filterStartDate);
+         filteredBon = filteredBon.filter((e: any) => (e.date && e.date >= filterStartDate) || (e.isoDate && e.isoDate.startsWith(filterStartDate)));
+     }
+     if (filterUseEnd && filterEndDate) {
+         filteredData = filteredData.filter((a: any) => a.date <= filterEndDate);
+         filteredBon = filteredBon.filter((e: any) => (e.date && e.date <= filterEndDate) || (e.isoDate && e.isoDate.startsWith(filterEndDate)));
+     }
+
      const summary = employees.map((emp: any) => {
-        const empAtt = monthlyData.filter((a: any) => a.user === emp.name && a.status === 'Selesai');
+        const empAtt = filteredData.filter((a: any) => a.user === emp.name && a.status === 'Selesai');
+        const empBon = filteredBon.filter((e: any) => e.isBon && e.bonEmployee === emp.name);
+        const totalBon = empBon.reduce((sum: number, b: any) => sum + (b.amount || 0), 0);
         const totalLate = empAtt.reduce((sum: number, a: any) => sum + (a.lateMins || 0), 0);
         const dailyPay = emp.dailySalary ? emp.dailySalary : 0;
         const penaltyPerHour = emp.latePenaltyPerMin ? emp.latePenaltyPerMin : 10000;
         const grossSalary = empAtt.length * dailyPay;
         const hoursLate = Math.ceil(totalLate / 60);
         const totalPenalty = hoursLate * penaltyPerHour;
-        const finalSalary = grossSalary - totalPenalty;
+        const finalSalary = grossSalary - totalPenalty - totalBon;
         return {
            name: emp.name,
            position: emp.position,
@@ -174,6 +180,7 @@ export const Absensi = ({ currentTime }: { currentTime: Date }) => {
            totalLate: totalLate,
            dailyPay,
            totalPenalty,
+           totalBon,
            finalSalary: finalSalary > 0 ? finalSalary : 0
         };
      });
@@ -184,6 +191,24 @@ export const Absensi = ({ currentTime }: { currentTime: Date }) => {
     <div className="flex-1 flex flex-col bg-[#8fb4d9] border border-[#8fb4d9] overflow-hidden">
       <LegacyWindowHeader title="SISTEM ABSENSI" currentTime={currentTime} />
       
+      {/* Global Filter Bar */}
+      <div className="bg-[#000040] p-1.5 flex items-end gap-2 shrink-0 shadow-sm border-b border-[#000030]">
+         <div className="flex flex-col gap-0.5 text-white w-48">
+            <label className="text-[12px] font-medium">Dari Tanggal</label>
+            <div className="flex items-center gap-1 bg-white px-1 rounded-sm h-[28px]">
+               <input type="checkbox" checked={filterUseStart} onChange={e => setFilterUseStart(e.target.checked)} className="w-3.5 h-3.5 cursor-pointer shrink-0" />
+               <input type="date" value={filterStartDate} onChange={e => setFilterStartDate(e.target.value)} disabled={!filterUseStart} className="text-black outline-none w-full font-medium text-[13px] bg-transparent disabled:opacity-50" />
+            </div>
+         </div>
+         <div className="flex flex-col gap-0.5 text-white w-48">
+            <label className="text-[12px] font-medium">Sampai Tanggal</label>
+            <div className="flex items-center gap-1 bg-white px-1 rounded-sm h-[28px]">
+               <input type="checkbox" checked={filterUseEnd} onChange={e => setFilterUseEnd(e.target.checked)} className="w-3.5 h-3.5 cursor-pointer shrink-0" />
+               <input type="date" value={filterEndDate} onChange={e => setFilterEndDate(e.target.value)} disabled={!filterUseEnd} className="text-black outline-none w-full font-medium text-[13px] bg-transparent disabled:opacity-50" />
+            </div>
+         </div>
+      </div>
+
       <div className="flex gap-1 shrink-0 bg-[#f9fafb] p-1 border-b border-gray-300">
           <button onClick={() => setAbsensiSubTab('harian')} className={`px-4 py-1.5 font-bold ${absensiSubTab === 'harian' ? 'bg-blue-100 text-blue-900 border-b-2 border-blue-600' : 'text-gray-600 hover:bg-gray-200'}`}>Absen Hari Ini</button>
           <button onClick={() => setAbsensiSubTab('cuti')} className={`px-4 py-1.5 font-bold ${absensiSubTab === 'cuti' ? 'bg-blue-100 text-blue-900 border-b-2 border-blue-600' : 'text-gray-600 hover:bg-gray-200'}`}>Permintaan Cuti / Off</button>
@@ -207,15 +232,21 @@ export const Absensi = ({ currentTime }: { currentTime: Date }) => {
                   <button onClick={handleClockOut} className="bg-blue-600 text-white font-bold py-2 px-6 shadow hover:bg-blue-700">CLOCK OUT</button>
               </div>
               
-              <h3 className="font-bold border-b pb-1">Log Kedatangan Hari Ini ({defaultDate})</h3>
+              <h3 className="font-bold border-b pb-1 text-blue-900">Log Kedatangan</h3>
               <table className="w-full text-left border-collapse whitespace-nowrap border border-gray-400">
-                <thead className="bg-gray-100 border-b border-gray-400">
-                  <tr><th className="p-2 border-r">Nama Karyawan</th><th className="p-2 border-r text-center">Jam Masuk</th><th className="p-2 border-r text-center">Jam Keluar</th><th className="p-2 border-r text-center">Status</th><th className="p-2 text-center"><Clock className="w-4 h-4 inline-block"/> Keterlambatan</th></tr>
+                <thead className="bg-[#ece9d8] border-b border-gray-400">
+                  <tr><th className="p-2 border-r">Nama Karyawan</th><th className="p-2 border-r text-center">Tanggal</th><th className="p-2 border-r text-center">Jam Masuk</th><th className="p-2 border-r text-center">Jam Keluar</th><th className="p-2 border-r text-center">Status</th><th className="p-2 text-center"><Clock className="w-4 h-4 inline-block"/> Keterlambatan</th></tr>
                 </thead>
                 <tbody>
-                  {attendances.filter((a: any) => a.date === defaultDate).map((a: any) => (
+                  {attendances.filter((a: any) => {
+                      let pass = true;
+                      if (filterUseStart && filterStartDate) pass = pass && a.date >= filterStartDate;
+                      if (filterUseEnd && filterEndDate) pass = pass && a.date <= filterEndDate;
+                      return pass;
+                  }).map((a: any) => (
                       <tr key={a.id} className="border-b">
                         <td className="p-2 border-r font-bold">{a.user}</td>
+                        <td className="p-2 border-r font-mono text-center text-sm">{a.date.split('-').reverse().join('/')}</td>
                         <td className="p-2 border-r text-center font-mono group">
                            {editingAttId === a.id ? (
                                <div className="flex items-center justify-center gap-1">
@@ -318,17 +349,9 @@ export const Absensi = ({ currentTime }: { currentTime: Date }) => {
         )}
         {absensiSubTab === 'rekap' && (
             <div className="flex flex-col gap-4">
-              <div className="flex items-center gap-2 mb-2">
-                  <label className="font-bold">Pilih Bulan:</label>
-                  <div className="flex gap-1 items-center">
-                    <button onClick={handlePrevRekapMonth} className="px-2 py-1 bg-gray-200 border border-gray-400 font-bold hover:bg-gray-300">&lt; Prev</button>
-                    <input type="month" value={rekapMonth} onChange={e => e.target.value && setRekapMonth(e.target.value)} className="border border-gray-400 p-1 font-mono outline-none" />
-                    <button onClick={handleNextRekapMonth} className="px-2 py-1 bg-gray-200 border border-gray-400 font-bold hover:bg-gray-300">Next &gt;</button>
-                  </div>
-              </div>
               <table className="w-full text-left border-collapse whitespace-nowrap border border-gray-400">
                 <thead className="bg-[#ece9d8] border-b border-gray-400">
-                  <tr><th className="p-2 border-r">Nama Karyawan</th><th className="p-2 border-r">Posisi</th><th className="p-2 border-r text-center">Kehadiran</th><th className="p-2 border-r text-center">Gaji Perhari</th><th className="p-2 border-r text-center">Total Telat</th><th className="p-2 border-r text-center text-red-600">Denda Telat</th><th className="p-2 text-right">Gaji Bersih</th></tr>
+                  <tr><th className="p-2 border-r">Nama Karyawan</th><th className="p-2 border-r">Posisi</th><th className="p-2 border-r text-center">Kehadiran</th><th className="p-2 border-r text-center">Gaji Perhari</th><th className="p-2 border-r text-center">Total Telat</th><th className="p-2 border-r text-center text-red-600">Denda Telat</th><th className="p-2 border-r text-center text-red-600">Total Bon</th><th className="p-2 text-right">Gaji Bersih</th></tr>
                 </thead>
                 <tbody>
                   {generateRekapAbsen().map((rec: any, idx) => (
@@ -349,6 +372,7 @@ export const Absensi = ({ currentTime }: { currentTime: Date }) => {
                         </td>
                         <td className="p-2 border-r text-center text-red-600 font-bold">{rec.totalLate} Min</td>
                         <td className="p-2 border-r text-center text-red-600 font-bold">-{rec.totalPenalty > 0 ? rec.totalPenalty.toLocaleString('id-ID') : '0'}</td>
+                        <td className="p-2 border-r text-center text-red-600 font-bold">-{rec.totalBon > 0 ? rec.totalBon.toLocaleString('id-ID') : '0'}</td>
                         <td className="p-2 text-right font-bold text-green-700 text-lg">Rp {rec.finalSalary.toLocaleString('id-ID')}</td>
                       </tr>
                   ))}

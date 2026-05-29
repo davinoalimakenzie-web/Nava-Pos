@@ -1,6 +1,6 @@
 import React, { useMemo, useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Sparkles, Loader2, PartyPopper } from 'lucide-react';
+import { Sparkles, Loader2, PartyPopper, RefreshCw } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { useAppContext } from '../context/AppContext';
 import { LegacyWindowHeader } from './LegacyWindowHeader';
@@ -79,45 +79,48 @@ export const Dashboard = ({ currentTime }: { currentTime: Date }) => {
   const [dailyAiTip, setDailyAiTip] = useState("");
   const [dailyAiTipLoading, setDailyAiTipLoading] = useState(false);
 
-  useEffect(() => {
-    const fetchDailyTip = async () => {
-      const today = new Date().toISOString().split('T')[0];
-      const cachedTipKey = `POS_dailyAiTip_${today}`;
+  const fetchDailyTip = async (forceRefresh = false) => {
+    const today = new Date().toISOString().split('T')[0];
+    const cachedTipKey = `POS_dailyAiTip_${today}`;
+    
+    if (!forceRefresh) {
       const cachedTip = localStorage.getItem(cachedTipKey);
-      
       if (cachedTip) {
         setDailyAiTip(cachedTip);
         return;
       }
-      
-      setDailyAiTipLoading(true);
-      try {
-        const recentTxs = transactions.slice(-100).map((t: any) => ({
-            date: t.date,
-            total: t.total,
-        }));
-        const prompt = `Based on the latest ${recentTxs.length} transactions: ${JSON.stringify(recentTxs)}.
-        Give exactly one short, actionable business improvement tip for today to boost sales or improve efficiency.
-        Max 2 sentences. No markdown, just plain text.`;
-        
-        const response = await fetch('/api/gemini', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ prompt }),
-        });
-        const data = await response.json();
-        if (data.text) {
-             setDailyAiTip(data.text);
-             localStorage.setItem(cachedTipKey, data.text);
-        }
-      } catch (err) {
-        console.error("Failed to fetch daily AI tip", err);
-        setDailyAiTip("Sapa pelanggan dengan senyuman hari ini, tawari produk bundle untuk naikkan penjualan!"); // fallback tip
-      } finally {
-        setDailyAiTipLoading(false);
-      }
-    };
+    }
     
+    setDailyAiTipLoading(true);
+    try {
+      const recentTxs = transactions.slice(-100).map((t: any) => ({
+          date: t.date,
+          total: t.total,
+      }));
+      const prompt = `Based on the latest ${recentTxs.length} transactions: ${JSON.stringify(recentTxs)}.
+      Give exactly one short, actionable business improvement tip for today to boost sales or improve efficiency.
+      Max 2 sentences. No markdown, just plain text. Always respond in Indonesian (Gunakan bahasa Indonesia).`;
+      
+      const response = await fetch('/api/gemini', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ prompt }),
+      });
+      const data = await response.json();
+      if (data.text) {
+           setDailyAiTip(data.text);
+           localStorage.setItem(cachedTipKey, data.text);
+      }
+    } catch (err) {
+      console.error("Failed to fetch daily AI tip", err);
+      // Removed fallback so users see there's an error if needed, but keeping fallback is fine
+      setDailyAiTip("Sapa pelanggan dengan senyuman hari ini, tawari produk bundle untuk naikkan penjualan!");
+    } finally {
+      setDailyAiTipLoading(false);
+    }
+  };
+
+  useEffect(() => {
     if (transactions.length > 0 && !dailyAiTip) {
         fetchDailyTip();
     }
@@ -134,7 +137,7 @@ export const Dashboard = ({ currentTime }: { currentTime: Date }) => {
         }));
         const prompt = `Analyze these recent transactions (up to 50): ${JSON.stringify(recentTxs)}. 
         Provide a very brief 2-3 sentence 'Sales Forecast' and suggest 2 practical promotional strategies for the next week.
-        Format without markdown just plain text or bullets. No markdown.`;
+        Format without markdown just plain text or bullets. No markdown. Always respond in Indonesian (Gunakan bahasa Indonesia).`;
         
         const response = await fetch('/api/gemini', {
           method: 'POST',
@@ -244,6 +247,7 @@ export const Dashboard = ({ currentTime }: { currentTime: Date }) => {
     
     transactions.forEach((t: any) => {
         t.items.forEach((item: any) => {
+            if (item.isReturn) return;
             if (!itemCounts[item.name]) {
                 itemCounts[item.name] = { name: item.name, qty: 0, total: 0 };
             }
@@ -266,7 +270,11 @@ export const Dashboard = ({ currentTime }: { currentTime: Date }) => {
             if (!categoryTotals[cat]) {
                 categoryTotals[cat] = 0;
             }
-            categoryTotals[cat] += (item.qty * item.price);
+            if (item.isReturn) {
+                categoryTotals[cat] -= (item.qty * item.price);
+            } else {
+                categoryTotals[cat] += (item.qty * item.price);
+            }
         });
     });
 
@@ -477,7 +485,15 @@ export const Dashboard = ({ currentTime }: { currentTime: Date }) => {
                     <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-banknote"><rect width="20" height="12" x="2" y="6" rx="2"/><circle cx="12" cy="12" r="2"/><path d="M6 12h.01M18 12h.01"/></svg>
                 </div>
                 <span className="text-gray-500 font-bold mb-1">Pemasukan Hari Ini</span>
-                <span className="text-2xl font-bold text-green-700">{formatRp(cashFlowToday.income)}</span>
+                <motion.span 
+                  key={cashFlowToday.income}
+                  initial={{ opacity: 0.5, scale: 0.95 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  transition={{ duration: 0.3 }}
+                  className="text-2xl font-bold text-green-700"
+                >
+                  {formatRp(cashFlowToday.income)}
+                </motion.span>
                 <div className="flex items-center gap-1 mt-2 text-[10px]">
                     <span className={`font-bold px-1.5 py-0.5 rounded-sm ${cashFlowToday.incomeGrowth > 0 ? 'bg-green-100 text-green-700' : cashFlowToday.incomeGrowth < 0 ? 'bg-red-100 text-red-700' : 'bg-gray-100 text-gray-600'}`}>
                         {cashFlowToday.incomeGrowth > 0 ? '+' : ''}{cashFlowToday.incomeGrowth.toFixed(1)}%
@@ -495,7 +511,15 @@ export const Dashboard = ({ currentTime }: { currentTime: Date }) => {
                      <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-wallet"><path d="M19 7V4a1 1 0 0 0-1-1H5a2 2 0 0 0 0 4h15a1 1 0 0 1 1 1v4h-3a2 2 0 0 0 0 4h3a8 8 0 0 1-9 7.96V22a1 1 0 0 0-1-1 1 1 0 0 0-1 1v.04A8 8 0 0 1 4 19.34"/><path d="M22 17v-4h-3a2 2 0 1 0 0 4h3Z"/></svg>
                 </div>
                 <span className="text-gray-500 font-bold mb-1">Pengeluaran Hari Ini</span>
-                <span className="text-2xl font-bold text-red-700">{formatRp(cashFlowToday.expense)}</span>
+                <motion.span 
+                  key={cashFlowToday.expense}
+                  initial={{ opacity: 0.5, scale: 0.95 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  transition={{ duration: 0.3 }}
+                  className="text-2xl font-bold text-red-700"
+                >
+                  {formatRp(cashFlowToday.expense)}
+                </motion.span>
                 <div className="flex items-center gap-1 mt-2 text-[10px]">
                     <span className={`font-bold px-1.5 py-0.5 rounded-sm ${cashFlowToday.expenseGrowth > 0 ? 'bg-red-100 text-red-700' : cashFlowToday.expenseGrowth < 0 ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-600'}`}>
                         {cashFlowToday.expenseGrowth > 0 ? '+' : ''}{cashFlowToday.expenseGrowth.toFixed(1)}%
@@ -513,7 +537,15 @@ export const Dashboard = ({ currentTime }: { currentTime: Date }) => {
                     <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-trending-up"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/></svg>
                 </div>
                 <span className="text-gray-500 font-bold mb-1">Laba Bersih Hari Ini</span>
-                <span className="text-2xl font-bold text-blue-800">{formatRp(cashFlowToday.net)}</span>
+                <motion.span 
+                  key={cashFlowToday.net}
+                  initial={{ opacity: 0.5, scale: 0.95 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  transition={{ duration: 0.3 }}
+                  className="text-2xl font-bold text-blue-800"
+                >
+                  {formatRp(cashFlowToday.net)}
+                </motion.span>
             </motion.div>
 
             <motion.div 
@@ -544,22 +576,18 @@ export const Dashboard = ({ currentTime }: { currentTime: Date }) => {
                       </button>
                   </div>
                 </div>
-                <span className="text-2xl font-bold text-orange-600">{lowStockCount} Item</span>
+                <motion.span 
+                  key={lowStockCount}
+                  initial={{ opacity: 0.5, scale: 0.95 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  transition={{ duration: 0.3 }}
+                  className="text-2xl font-bold text-orange-600"
+                >
+                  {lowStockCount} Item
+                </motion.span>
                 <div className="mt-auto pt-2 relative z-10 flex items-center justify-between">
                     <button onClick={() => setActiveTab('masterdata')} className="text-xs bg-orange-100 hover:bg-orange-200 text-orange-800 px-3 py-1.5 rounded font-bold border border-orange-300 transition-colors shadow-sm">Lihat Data &rarr;</button>
                 </div>
-            </motion.div>
-
-            <motion.div 
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.4, delay: 0.5 }}
-                className="bg-white border border-gray-400 p-4 shadow-sm flex flex-col relative overflow-hidden">
-                <div className="absolute top-0 right-0 p-2 opacity-10">
-                     <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-calendar-clock"><path d="M21 7.5V6a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h3.5"/><path d="M16 2v4"/><path d="M8 2v4"/><path d="M3 10h5"/><path d="M17.5 17.5 16 16.3V14"/><circle cx="16" cy="16" r="6"/></svg>
-                </div>
-                <span className="text-gray-500 font-bold mb-1">Proyeksi (Bulan)</span>
-                <span className="text-2xl font-bold text-purple-700">{formatRp(projectedMonthlyRevenue)}</span>
             </motion.div>
         </div>
 
@@ -569,9 +597,15 @@ export const Dashboard = ({ currentTime }: { currentTime: Date }) => {
             animate={{ opacity: 1, scale: 1 }}
             className="bg-[#ece9d8] border border-gray-400 shadow-sm flex flex-col"
         >
-            <div className="bg-purple-800 text-white font-bold px-3 py-1.5 text-sm flex items-center gap-2 shadow-sm">
-                <Sparkles className="w-4 h-4 text-yellow-300" />
-                TIP BISNIS HARIAN AI
+            <div className="bg-purple-800 text-white font-bold px-3 py-1.5 text-sm flex items-center justify-between shadow-sm">
+                <div className="flex items-center gap-2">
+                    <Sparkles className="w-4 h-4 text-yellow-300" />
+                    TIP BISNIS HARIAN AI
+                </div>
+                <button onClick={() => fetchDailyTip(true)} disabled={dailyAiTipLoading} className="text-gray-200 hover:text-white flex items-center gap-1 text-xs px-2 cursor-pointer outline-none">
+                    <RefreshCw className={`w-3 h-3 ${dailyAiTipLoading ? 'animate-spin' : ''}`} />
+                    Refresh
+                </button>
             </div>
             <div className="p-3 bg-white m-1 border border-gray-300 flex items-center gap-3">
                {dailyAiTipLoading ? (

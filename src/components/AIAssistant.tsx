@@ -105,6 +105,9 @@ Jangan sertakan markdown \`\`\`json.`;
           });
 
           const data = await response.json();
+          if (!data.text) {
+             throw new Error(data.error || "AI service unavailable");
+          }
           let jsonStr = data.text.replace(/```json/g, '').replace(/```/g, '').trim();
           const pData = JSON.parse(jsonStr);
 
