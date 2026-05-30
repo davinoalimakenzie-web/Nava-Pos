@@ -6,7 +6,7 @@ import { currentMonthStr, defaultDate } from '../data';
 
 export const Absensi = ({ currentTime }: { currentTime: Date }) => {
   const { 
-    user, appUsers, employees, setEmployees, attendances, setAttendances, setShowAddEmpModal, appLogs, addLog, expenses
+    user, appUsers, employees, setEmployees, attendances, setAttendances, setShowAddEmpModal, appLogs, addLog, expenses, storeSettings
   } = useAppContext();
 
   const [absensiSubTab, setAbsensiSubTab] = useState('harian');
@@ -14,13 +14,12 @@ export const Absensi = ({ currentTime }: { currentTime: Date }) => {
   const { leaveRequests, setLeaveRequests } = useAppContext();
 
   const [filterStartDate, setFilterStartDate] = useState(defaultDate);
-  const [filterUseStart, setFilterUseStart] = useState(true);
   const [filterEndDate, setFilterEndDate] = useState(defaultDate);
-  const [filterUseEnd, setFilterUseEnd] = useState(true);
+  const [filterBranch, setFilterBranch] = useState('Semua');
+  const [absenAction, setAbsenAction] = useState('');
 
   // Cuti Form State
   const [viewCutiDate, setViewCutiDate] = useState(new Date());
-  const [cutiEmployee, setCutiEmployee] = useState('');
   const [cutiDateStr, setCutiDateStr] = useState('');
   const [cutiReason, setCutiReason] = useState('');
 
@@ -35,10 +34,16 @@ export const Absensi = ({ currentTime }: { currentTime: Date }) => {
       setViewCutiDate(newD);
   }
   const handleCutiSubmit = () => {
-      if (!cutiEmployee || !cutiDateStr || !cutiReason) return alert('Harap isi semua field cuti!');
+      if (!selectedEmployeeAbsensi || !cutiDateStr || !cutiReason) return alert('Harap isi semua field cuti, pilih karyawan di header!');
+      
+      const existingCutiOnDate = leaveRequests?.find((r: any) => r.date === cutiDateStr && r.status !== 'Ditolak');
+      if (existingCutiOnDate) {
+          return alert(`Sudah ada karyawan ngajukan cuti / off (${existingCutiOnDate.employeeName}) pada tanggal tersebut! Hanya boleh 1 karyawan cuti per hari.`);
+      }
+
       const req = {
           id: 'CUTI-' + Date.now(),
-          employeeName: cutiEmployee,
+          employeeName: selectedEmployeeAbsensi,
           date: cutiDateStr,
           reason: cutiReason,
           status: 'Pending'
@@ -153,25 +158,26 @@ export const Absensi = ({ currentTime }: { currentTime: Date }) => {
      let filteredData = attendances;
      let filteredBon = expenses;
 
-     if (filterUseStart && filterStartDate) {
+     if (filterStartDate) {
          filteredData = filteredData.filter((a: any) => a.date >= filterStartDate);
          filteredBon = filteredBon.filter((e: any) => (e.date && e.date >= filterStartDate) || (e.isoDate && e.isoDate.startsWith(filterStartDate)));
      }
-     if (filterUseEnd && filterEndDate) {
+     if (filterEndDate) {
          filteredData = filteredData.filter((a: any) => a.date <= filterEndDate);
          filteredBon = filteredBon.filter((e: any) => (e.date && e.date <= filterEndDate) || (e.isoDate && e.isoDate.startsWith(filterEndDate)));
      }
 
-     const summary = employees.map((emp: any) => {
+     const summary = employees
+        .filter((emp: any) => filterBranch === 'Semua' || emp.branch === filterBranch)
+        .filter((emp: any) => !selectedEmployeeAbsensi || emp.name === selectedEmployeeAbsensi)
+        .map((emp: any) => {
         const empAtt = filteredData.filter((a: any) => a.user === emp.name && a.status === 'Selesai');
         const empBon = filteredBon.filter((e: any) => e.isBon && e.bonEmployee === emp.name);
         const totalBon = empBon.reduce((sum: number, b: any) => sum + (b.amount || 0), 0);
         const totalLate = empAtt.reduce((sum: number, a: any) => sum + (a.lateMins || 0), 0);
         const dailyPay = emp.dailySalary ? emp.dailySalary : 0;
-        const penaltyPerHour = emp.latePenaltyPerMin ? emp.latePenaltyPerMin : 10000;
         const grossSalary = empAtt.length * dailyPay;
-        const hoursLate = Math.ceil(totalLate / 60);
-        const totalPenalty = hoursLate * penaltyPerHour;
+        const totalPenalty = Math.round((totalLate / 60) * 10000);
         const finalSalary = grossSalary - totalPenalty - totalBon;
         return {
            name: emp.name,
@@ -192,26 +198,72 @@ export const Absensi = ({ currentTime }: { currentTime: Date }) => {
       <LegacyWindowHeader title="SISTEM ABSENSI" currentTime={currentTime} />
       
       {/* Global Filter Bar */}
-      <div className="bg-[#000040] p-1.5 flex items-end gap-2 shrink-0 shadow-sm border-b border-[#000030]">
-         <div className="flex flex-col gap-0.5 text-white w-48">
+      <div className="bg-[#000040] p-1.5 flex items-end gap-2 shrink-0 shadow-sm border-b border-[#000030] overflow-x-auto">
+         <div className="flex flex-col gap-0.5 text-white w-40 shrink-0">
             <label className="text-[12px] font-medium">Dari Tanggal</label>
             <div className="flex items-center gap-1 bg-white px-1 rounded-sm h-[28px]">
-               <input type="checkbox" checked={filterUseStart} onChange={e => setFilterUseStart(e.target.checked)} className="w-3.5 h-3.5 cursor-pointer shrink-0" />
-               <input type="date" value={filterStartDate} onChange={e => setFilterStartDate(e.target.value)} disabled={!filterUseStart} className="text-black outline-none w-full font-medium text-[13px] bg-transparent disabled:opacity-50" />
+               <input type="date" value={filterStartDate} onChange={e => setFilterStartDate(e.target.value)} className="text-black outline-none w-full font-medium text-[13px] bg-transparent" />
             </div>
          </div>
-         <div className="flex flex-col gap-0.5 text-white w-48">
+         <div className="flex flex-col gap-0.5 text-white w-40 shrink-0">
             <label className="text-[12px] font-medium">Sampai Tanggal</label>
             <div className="flex items-center gap-1 bg-white px-1 rounded-sm h-[28px]">
-               <input type="checkbox" checked={filterUseEnd} onChange={e => setFilterUseEnd(e.target.checked)} className="w-3.5 h-3.5 cursor-pointer shrink-0" />
-               <input type="date" value={filterEndDate} onChange={e => setFilterEndDate(e.target.value)} disabled={!filterUseEnd} className="text-black outline-none w-full font-medium text-[13px] bg-transparent disabled:opacity-50" />
+               <input type="date" value={filterEndDate} onChange={e => setFilterEndDate(e.target.value)} className="text-black outline-none w-full font-medium text-[13px] bg-transparent" />
             </div>
+         </div>
+         <div className="flex flex-col gap-0.5 text-white w-32 shrink-0">
+            <label className="text-[12px] font-medium">Cabang</label>
+            <div className="flex items-center gap-1 bg-white px-1 rounded-sm h-[28px]">
+               <select value={filterBranch} onChange={e => { setFilterBranch(e.target.value); setSelectedEmployeeAbsensi(''); }} className="w-full text-black outline-none font-medium text-[13px] bg-transparent">
+                  <option value="Semua">Semua</option>
+                  {storeSettings?.branches?.map((b: string) => <option key={b} value={b}>{b}</option>)}
+               </select>
+            </div>
+         </div>
+         <div className="flex flex-col gap-0.5 text-white w-48 shrink-0">
+            <label className="text-[12px] font-medium">Karyawan</label>
+            <div className="flex items-center gap-1 bg-white px-1 rounded-sm h-[28px]">
+               <select value={selectedEmployeeAbsensi} onChange={e => setSelectedEmployeeAbsensi(e.target.value)} className="w-full text-black outline-none font-medium text-[13px] bg-transparent">
+                  <option value="">Semua Karyawan</option>
+                  {employees.filter((e: any) => filterBranch === 'Semua' || e.branch === filterBranch).map((e: any) => (
+                      <option key={e.id} value={e.name}>{e.name}</option>
+                  ))}
+               </select>
+            </div>
+         </div>
+         <div className="flex flex-col gap-0.5 text-white w-40 shrink-0">
+            <label className="text-[12px] font-medium">Aksi Absen</label>
+            <div className="flex items-center gap-1 bg-white px-1 rounded-sm h-[28px]">
+               <select disabled={absensiSubTab !== 'harian'} value={absenAction} onChange={e => setAbsenAction(e.target.value)} className="w-full text-black outline-none font-medium text-[13px] bg-transparent disabled:opacity-50">
+                  <option value="">-- Pilih Aksi --</option>
+                  <option value="clockin">Clock In</option>
+                  <option value="clockout">Clock Out</option>
+                  <option value="libur">Off / Libur</option>
+               </select>
+            </div>
+         </div>
+         <div className="flex flex-col gap-0.5 text-white shrink-0">
+            <label className="text-[12px] font-medium">&nbsp;</label>
+            <button onClick={() => {
+                if (absenAction === 'clockin') handleClockIn();
+                else if (absenAction === 'clockout') handleClockOut();
+                else if (absenAction === 'libur') handleLibur();
+                else {
+                    setFilterStartDate(defaultDate); 
+                    setFilterEndDate(defaultDate); 
+                    setFilterBranch('Semua'); 
+                    setSelectedEmployeeAbsensi('');
+                }
+                setAbsenAction('');
+            }} className={`h-[28px] ${absensiSubTab === 'harian' && absenAction ? 'bg-green-600 hover:bg-green-700' : 'bg-blue-600 hover:bg-blue-700'} px-3 font-bold text-[12px] rounded-sm shadow-sm transition-colors whitespace-nowrap`}>
+                {absensiSubTab === 'harian' && absenAction ? 'Refresh / Simpan' : 'Refresh'}
+            </button>
          </div>
       </div>
 
       <div className="flex gap-1 shrink-0 bg-[#f9fafb] p-1 border-b border-gray-300">
           <button onClick={() => setAbsensiSubTab('harian')} className={`px-4 py-1.5 font-bold ${absensiSubTab === 'harian' ? 'bg-blue-100 text-blue-900 border-b-2 border-blue-600' : 'text-gray-600 hover:bg-gray-200'}`}>Absen Hari Ini</button>
-          <button onClick={() => setAbsensiSubTab('cuti')} className={`px-4 py-1.5 font-bold ${absensiSubTab === 'cuti' ? 'bg-blue-100 text-blue-900 border-b-2 border-blue-600' : 'text-gray-600 hover:bg-gray-200'}`}>Permintaan Cuti / Off</button>
+          <button onClick={() => setAbsensiSubTab('cuti')} className={`px-4 py-1.5 font-bold ${absensiSubTab === 'cuti' ? 'bg-blue-100 text-blue-900 border-b-2 border-blue-600' : 'text-gray-600 hover:bg-gray-200'}`}>Req Cuti</button>
           <button onClick={() => setAbsensiSubTab('rekap')} className={`px-4 py-1.5 font-bold ${absensiSubTab === 'rekap' ? 'bg-blue-100 text-blue-900 border-b-2 border-blue-600' : 'text-gray-600 hover:bg-gray-200'}`}>Rekap Bulanan</button>
           <button onClick={() => setAbsensiSubTab('karyawan')} className={`px-4 py-1.5 font-bold ${absensiSubTab === 'karyawan' ? 'bg-blue-100 text-blue-900 border-b-2 border-blue-600' : 'text-gray-600 hover:bg-gray-200'}`}>Daftar Karyawan</button>
       </div>
@@ -219,19 +271,6 @@ export const Absensi = ({ currentTime }: { currentTime: Date }) => {
       <div className="flex-1 p-2 overflow-auto bg-white">
         {absensiSubTab === 'harian' && (
             <div className="flex flex-col gap-4">
-              <div className="p-4 border border-gray-400 bg-[#ece9d8] shadow-sm flex items-end gap-3 rounded-sm">
-                  <div className="flex-1">
-                    <label className="block font-bold mb-1">Pilih Karyawan:</label>
-                    <select value={selectedEmployeeAbsensi} onChange={e => setSelectedEmployeeAbsensi(e.target.value)} className="w-full border border-gray-400 p-2 outline-none">
-                        <option value="">-- Nama --</option>
-                        {employees.map((e: any) => <option key={e.id} value={e.name}>{e.name} ({e.position})</option>)}
-                    </select>
-                  </div>
-                  <button onClick={handleClockIn} className="bg-green-600 text-white font-bold py-2 px-6 shadow hover:bg-green-700">CLOCK IN</button>
-                  <button onClick={handleLibur} className="bg-gray-600 text-white font-bold py-2 px-6 shadow hover:bg-gray-700">OFF / LIBUR</button>
-                  <button onClick={handleClockOut} className="bg-blue-600 text-white font-bold py-2 px-6 shadow hover:bg-blue-700">CLOCK OUT</button>
-              </div>
-              
               <h3 className="font-bold border-b pb-1 text-blue-900">Log Kedatangan</h3>
               <table className="w-full text-left border-collapse whitespace-nowrap border border-gray-400">
                 <thead className="bg-[#ece9d8] border-b border-gray-400">
@@ -240,8 +279,14 @@ export const Absensi = ({ currentTime }: { currentTime: Date }) => {
                 <tbody>
                   {attendances.filter((a: any) => {
                       let pass = true;
-                      if (filterUseStart && filterStartDate) pass = pass && a.date >= filterStartDate;
-                      if (filterUseEnd && filterEndDate) pass = pass && a.date <= filterEndDate;
+                      if (filterStartDate) pass = pass && a.date >= filterStartDate;
+                      if (filterEndDate) pass = pass && a.date <= filterEndDate;
+                      if (filterBranch !== 'Semua') {
+                         const empInfo = employees.find((e: any) => e.name === a.user);
+                         if (empInfo) pass = pass && empInfo.branch === filterBranch;
+                         else pass = false;
+                      }
+                      if (selectedEmployeeAbsensi) pass = pass && a.user === selectedEmployeeAbsensi;
                       return pass;
                   }).map((a: any) => (
                       <tr key={a.id} className="border-b">
@@ -329,10 +374,9 @@ export const Absensi = ({ currentTime }: { currentTime: Date }) => {
                       <h4 className="font-bold border-b border-gray-300 pb-2 mb-4">Form Cuti Karyawan</h4>
                       <div className="flex flex-col gap-2 mb-3">
                          <label className="text-xs font-bold uppercase text-gray-600">Pilih Karyawan</label>
-                         <select value={cutiEmployee} onChange={e => setCutiEmployee(e.target.value)} className="border border-gray-400 p-1.5 outline-none font-medium text-sm">
-                            <option value="">== Pilih ==</option>
-                            {employees.map((e: any) => <option key={e.id} value={e.name}>{e.name}</option>)}
-                         </select>
+                         <div className="border border-gray-400 p-1.5 bg-gray-100 font-medium text-sm text-gray-600">
+                             {selectedEmployeeAbsensi || 'Pilih Karyawan di Header Global Atas 👆'}
+                         </div>
                       </div>
                       <div className="flex flex-col gap-2 mb-3">
                          <label className="text-xs font-bold uppercase text-gray-600">Tanggal Pengajuan</label>
@@ -386,14 +430,18 @@ export const Absensi = ({ currentTime }: { currentTime: Date }) => {
               <button onClick={() => setShowAddEmpModal(true)} className="bg-blue-600 text-white font-bold py-2 w-48 mb-2 shadow rounded hover:bg-blue-700">+ Tambah Karyawan Baru</button>
               <table className="w-full text-left border-collapse whitespace-nowrap border border-gray-400">
                 <thead className="bg-gray-100 border-b border-gray-400">
-                  <tr><th className="p-2 border-r w-16">ID</th><th className="p-2 border-r">Nama</th><th className="p-2 border-r">Posisi/Jabatan</th></tr>
+                  <tr><th className="p-2 border-r w-16">ID</th><th className="p-2 border-r">Nama</th><th className="p-2 border-r">Posisi/Jabatan</th><th className="p-2 border-r">Cabang</th></tr>
                 </thead>
                 <tbody>
-                  {employees.map((emp: any) => (
-                      <tr key={emp.id} className="border-b">
+                  {employees
+                    .filter((emp: any) => filterBranch === 'Semua' || emp.branch === filterBranch)
+                    .filter((emp: any) => !selectedEmployeeAbsensi || emp.name === selectedEmployeeAbsensi)
+                    .map((emp: any) => (
+                      <tr key={emp.id} className="border-b hover:bg-gray-50">
                         <td className="p-2 border-r text-gray-500 font-mono">#{emp.id}</td>
                         <td className="p-2 border-r font-bold">{emp.name}</td>
                         <td className="p-2 border-r">{emp.position}</td>
+                        <td className="p-2">{emp.branch || '-'}</td>
                       </tr>
                   ))}
                 </tbody>

@@ -30,6 +30,7 @@ export const GlobalModals = () => {
     const [newCustomerLevel, setNewCustomerLevel] = useState('1');
     const [newEmpName, setNewEmpName] = useState('');
     const [newEmpPos, setNewEmpPos] = useState('');
+    const [newEmpBranch, setNewEmpBranch] = useState(storeSettings?.branches?.[0] || 'Kudus');
     const [authPassword, setAuthPassword] = useState('');
 
     const loadPendingTransaction = (pendingItem: any) => {
@@ -93,8 +94,8 @@ export const GlobalModals = () => {
 
     const handleAddEmployee = (e: React.FormEvent) => {
         e.preventDefault();
-        setEmployees([...employees, { id: Date.now(), name: newEmpName, position: newEmpPos }]);
-        addLog('KARYAWAN', `Karyawan baru ditambahkan: ${newEmpName}`);
+        setEmployees([...employees, { id: Date.now(), name: newEmpName, position: newEmpPos, branch: newEmpBranch, dailySalary: 0, latePenaltyPerMin: 10000/60 }]);
+        addLog('KARYAWAN', `Karyawan baru ditambahkan: ${newEmpName} (${newEmpBranch})`);
         setNewEmpName(''); setNewEmpPos(''); setShowAddEmpModal(false);
         alert('Karyawan baru berhasil ditambahkan!');
     };
@@ -373,7 +374,13 @@ export const GlobalModals = () => {
                         <label className="block mb-1">Nama Lengkap:</label>
                         <input type="text" required value={newEmpName} onChange={(e) => setNewEmpName(e.target.value)} className="w-full p-1.5 border border-gray-400 mb-3 outline-none focus:border-blue-600" />
                         <label className="block mb-1">Posisi / Jabatan:</label>
-                        <input type="text" required value={newEmpPos} onChange={(e) => setNewEmpPos(e.target.value)} className="w-full p-1.5 border border-gray-400 mb-4 outline-none focus:border-blue-600" />
+                        <input type="text" required value={newEmpPos} onChange={(e) => setNewEmpPos(e.target.value)} className="w-full p-1.5 border border-gray-400 mb-3 outline-none focus:border-blue-600" />
+                        <label className="block mb-1">Penempatan Cabang:</label>
+                        <select required value={newEmpBranch} onChange={(e) => setNewEmpBranch(e.target.value)} className="w-full p-1.5 border border-gray-400 mb-4 outline-none focus:border-blue-600">
+                            {storeSettings?.branches?.map((b: string) => (
+                                <option key={b} value={b}>{b}</option>
+                            ))}
+                        </select>
                         <div className="flex justify-end gap-2">
                         <button type="button" onClick={() => setShowAddEmpModal(false)} className="px-4 py-1.5 border-2 border-gray-500 bg-gray-200 hover:bg-gray-300 font-bold">Batal</button>
                         <button type="submit" className="px-4 py-1.5 border-2 border-gray-500 bg-gray-200 hover:bg-gray-300 font-bold text-blue-900">Simpan Data</button>

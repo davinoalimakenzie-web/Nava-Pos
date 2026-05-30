@@ -58,7 +58,7 @@ export const Cashflow = ({ currentTime }: { currentTime: Date }) => {
 
   const monthlyCashflow = React.useMemo(() => {
     const data: any = {};
-    transactions.filter((t:any) => t.type !== 'PEMBELIAN' && (filterBranch === 'Semua Cabang' || (t.branch || 'Pusat') === filterBranch)).forEach(t => {
+    filteredTransactions.forEach(t => {
       const isoMonth = t.isoDate ? t.isoDate.substring(0, 7) : 'Unknown';
       if (!data[isoMonth]) data[isoMonth] = { incomeCash: 0, incomeNonCash: 0, expenses: 0, incomeTotal: 0 };
       
@@ -73,7 +73,7 @@ export const Cashflow = ({ currentTime }: { currentTime: Date }) => {
       data[isoMonth].incomeTotal += grossNet;
     });
 
-    expenses.filter((e:any) => filterBranch === 'Semua Cabang' || (e.branch || 'Pusat') === filterBranch).forEach(e => {
+    filteredExpenses.forEach(e => {
       const isoMonth = e.isoDate ? e.isoDate.substring(0, 7) : 'Unknown';
       if (!data[isoMonth]) data[isoMonth] = { incomeCash: 0, incomeNonCash: 0, expenses: 0, incomeTotal: 0 };
       if (e.amount > 0) {
@@ -85,7 +85,7 @@ export const Cashflow = ({ currentTime }: { currentTime: Date }) => {
       month: k,
       ...data[k]
     }));
-  }, [transactions, expenses, filterBranch]);
+  }, [filteredTransactions, filteredExpenses]);
 
   return (
     <div className="flex-1 flex flex-col bg-[#8fb4d9] border border-[#8fb4d9] overflow-hidden">
@@ -97,62 +97,92 @@ export const Cashflow = ({ currentTime }: { currentTime: Date }) => {
          <button onClick={() => setCashflowTab('bulanan')} className={`px-4 py-1.5 border border-gray-500 font-bold hover:bg-white ${cashflowTab === 'bulanan' ? 'bg-white border-b-white text-blue-900' : 'bg-gray-200 text-black'}`}>Cashflow Bulanan</button>
       </div>
 
-      {/* TAB: CASHFLOW HARIAN */}
-      {cashflowTab === 'harian' && (
-        <div className="p-[2px] flex flex-col h-full gap-[2px] overflow-hidden">
-          {/* Header Filter Baru (Sesuai Gambar) */}
-          <div className="bg-[#000040] p-1.5 flex items-end gap-2 shrink-0 shadow-sm border border-[#000030]">
-             {/* Dari Tanggal */}
-             <div className="flex flex-col gap-0.5 text-white flex-1">
-                <label className="text-[12px] font-medium">Dari Tanggal</label>
-                <div className="flex items-center gap-1 bg-white px-1 rounded-sm h-[28px]">
-                   <input type="checkbox" checked={filterUseStart} onChange={e => setFilterUseStart(e.target.checked)} className="w-3.5 h-3.5 cursor-pointer shrink-0" />
-                   <input type="date" value={filterStartDate} onChange={e => setFilterStartDate(e.target.value)} disabled={!filterUseStart} className="text-black outline-none w-full font-medium text-[13px] bg-transparent disabled:opacity-50" />
-                </div>
-             </div>
-             {/* Sampai Tanggal */}
-             <div className="flex flex-col gap-0.5 text-white flex-1">
-                <label className="text-[12px] font-medium">Sampai Tanggal</label>
-                <div className="flex items-center gap-1 bg-white px-1 rounded-sm h-[28px]">
-                   <input type="checkbox" checked={filterUseEnd} onChange={e => setFilterUseEnd(e.target.checked)} className="w-3.5 h-3.5 cursor-pointer shrink-0" />
-                   <input type="date" value={filterEndDate} onChange={e => setFilterEndDate(e.target.value)} disabled={!filterUseEnd} className="text-black outline-none w-full font-medium text-[13px] bg-transparent disabled:opacity-50" />
-                </div>
-             </div>
-             {/* Jenis (Teknisi) */}
-             <div className="flex flex-col gap-0.5 text-white flex-1">
-                <label className="text-[12px] font-medium">Jenis</label>
-                <select value={cashflowHarianSubTab} onChange={e => setCashflowHarianSubTab(e.target.value)} className="bg-white text-black outline-none px-1 w-full font-medium text-[13px] rounded-sm h-[28px]">
-                   <option value="laporan">Laporan Transaksi</option>
-                   <option value="pengeluaran">Pengeluaran</option>
-                   <option value="return">Return</option>
-                </select>
-             </div>
-             {/* Cabang (Status) */}
-             <div className="flex flex-col gap-0.5 text-white flex-1">
-                <label className="text-[12px] font-medium">Cabang</label>
-                <select value={filterBranch} onChange={e => setFilterBranch(e.target.value)} className="bg-white text-black outline-none px-1 w-full font-medium text-[13px] rounded-sm h-[28px]">
-                   <option value="Semua Cabang">Semua Cabang</option>
-                   {(storeSettings.branches || ['Pusat']).map((b: string) => <option key={b} value={b}>{b}</option>)}
-                </select>
-             </div>
-             {/* Tunai / Non Tunai (Cash/TF) */}
-             <div className="flex flex-col gap-0.5 text-white flex-1">
-                <label className="text-[12px] font-medium">Tunai / Non Tunai</label>
-                <select value={filterPaymentMethod} onChange={e => setFilterPaymentMethod(e.target.value)} className="bg-white text-black outline-none px-1 w-full font-medium text-[13px] rounded-sm h-[28px]">
-                   <option value="Semua">Semua</option>
-                   <option value="TUNAI">Tunai</option>
-                   <option value="NON-TUNAI">Non Tunai</option>
-                </select>
-             </div>
-             {/* No Nota & Search */}
-             <div className="flex flex-col gap-0.5 text-white flex-1 relative">
+      {/* Header Filter Baru (Sesuai Gambar) - Global for Both Tabs */}
+      <div className="bg-[#000040] p-1.5 flex items-end gap-2 shrink-0 shadow-sm border-b border-[#000030]">
+         {/* Dari Tanggal */}
+         <div className="flex flex-col gap-0.5 text-white flex-1">
+            <label className="text-[12px] font-medium">Dari Tanggal</label>
+            <div className="flex items-center gap-1 bg-white px-1 rounded-sm h-[28px]">
+               <input type="checkbox" checked={filterUseStart} onChange={e => setFilterUseStart(e.target.checked)} className="w-3.5 h-3.5 cursor-pointer shrink-0" />
+               <input type="date" value={filterStartDate} onChange={e => setFilterStartDate(e.target.value)} disabled={!filterUseStart} className="text-black outline-none w-full font-medium text-[13px] bg-transparent disabled:opacity-50" />
+            </div>
+         </div>
+         {/* Sampai Tanggal */}
+         <div className="flex flex-col gap-0.5 text-white flex-1">
+            <label className="text-[12px] font-medium">Sampai Tanggal</label>
+            <div className="flex items-center gap-1 bg-white px-1 rounded-sm h-[28px]">
+               <input type="checkbox" checked={filterUseEnd} onChange={e => setFilterUseEnd(e.target.checked)} className="w-3.5 h-3.5 cursor-pointer shrink-0" />
+               <input type="date" value={filterEndDate} onChange={e => setFilterEndDate(e.target.value)} disabled={!filterUseEnd} className="text-black outline-none w-full font-medium text-[13px] bg-transparent disabled:opacity-50" />
+            </div>
+         </div>
+         {/* Jenis (Teknisi) */}
+         <div className="flex flex-col gap-0.5 text-white flex-1">
+            <label className="text-[12px] font-medium">Jenis</label>
+            <select value={cashflowHarianSubTab} onChange={e => setCashflowHarianSubTab(e.target.value)} className="bg-white text-black outline-none px-1 w-full font-medium text-[13px] rounded-sm h-[28px]">
+               <option value="laporan">Laporan Transaksi</option>
+               <option value="pengeluaran">Pengeluaran</option>
+               <option value="return">Return</option>
+            </select>
+         </div>
+         {/* Cabang (Status) */}
+         <div className="flex flex-col gap-0.5 text-white flex-1">
+            <label className="text-[12px] font-medium">Cabang</label>
+            <select value={filterBranch} onChange={e => setFilterBranch(e.target.value)} className="bg-white text-black outline-none px-1 w-full font-medium text-[13px] rounded-sm h-[28px]">
+               <option value="Semua Cabang">Semua Cabang</option>
+               {(storeSettings.branches || ['Pusat']).map((b: string) => <option key={b} value={b}>{b}</option>)}
+            </select>
+         </div>
+         {/* Tunai / Non Tunai (Cash/TF) */}
+         <div className="flex flex-col gap-0.5 text-white flex-1">
+            <label className="text-[12px] font-medium">Tunai / Non Tunai</label>
+            <select value={filterPaymentMethod} onChange={e => setFilterPaymentMethod(e.target.value)} className="bg-white text-black outline-none px-1 w-full font-medium text-[13px] rounded-sm h-[28px]">
+               <option value="Semua">Semua</option>
+               <option value="TUNAI">Tunai</option>
+               <option value="NON-TUNAI">Non Tunai</option>
+            </select>
+         </div>
+         {/* No Nota & Search / Export CSV */}
+         <div className="flex flex-col gap-0.5 text-white flex-1 justify-end">
+            {cashflowTab === 'harian' ? (
+              <>
                 <label className="text-[12px] font-medium">No. Nota</label>
                 <div className="flex items-center gap-1">
                    <input type="text" value={searchNota} onChange={e => setSearchNota(e.target.value)} className="bg-white text-black px-2 w-full font-medium text-[13px] outline-none rounded-sm h-[28px]" />
                    <button className="bg-white text-black px-4 font-bold text-[13px] border border-gray-300 rounded-sm shadow-sm hover:bg-gray-200 h-[28px]">CARI</button>
                 </div>
-             </div>
-          </div>
+              </>
+            ) : (
+                <button onClick={() => {
+                   const rows = [
+                       ['Bulan', 'Omset Total', 'Tunai Masuk', 'Non-Tunai / Piutang', 'Total Pengeluaran', 'Saldo Akhir Tunai (Laci)'],
+                       ...monthlyCashflow.map((m: any) => [
+                           m.month, 
+                           (m.incomeTotal).toString(), 
+                           (m.incomeCash).toString(), 
+                           (m.incomeNonCash).toString(), 
+                           (m.expenses).toString(), 
+                           (m.incomeCash - m.expenses).toString()
+                       ])
+                   ];
+                   const csvContent = "data:text/csv;charset=utf-8," + rows.map(e => e.join(",")).join("\n");
+                   const encodedUri = encodeURI(csvContent);
+                   const link = document.createElement("a");
+                   link.setAttribute("href", encodedUri);
+                   link.setAttribute("download", `laporan_bulanan_${new Date().getTime()}.csv`);
+                   document.body.appendChild(link);
+                   link.click();
+                   document.body.removeChild(link);
+               }} className="bg-white text-black hover:bg-gray-200 font-bold px-4 shadow-sm border border-gray-300 rounded-sm text-[13px] h-[28px] w-full">
+                   Export CSV
+               </button>
+            )}
+         </div>
+      </div>
+
+      {/* TAB: CASHFLOW HARIAN */}
+      {cashflowTab === 'harian' && (
+        <div className="p-[2px] flex flex-col h-full gap-[2px] overflow-hidden">
+
 
           {/* Box Rangkuman */}
           <div className="flex gap-[2px] shrink-0">
@@ -191,10 +221,10 @@ export const Cashflow = ({ currentTime }: { currentTime: Date }) => {
                       <tr>
                         <th className="p-3 border-r border-gray-300">Tanggal</th>
                         <th className="p-3 border-r border-gray-300">Faktur</th>
-                        <th className="p-3 border-r border-gray-300 text-center">Jumlah (Pcs)</th>
+                        <th className="p-3 border-r border-gray-300 text-center">Qty</th>
                         <th className="p-3 border-r border-gray-300">Pelanggan</th>
                         <th className="p-3 border-r border-gray-300 text-center">Metode</th>
-                        <th className="p-3 border-r border-gray-300 text-center">Jatuh Tempo</th>
+                        {filterPaymentMethod !== 'TUNAI' && <th className="p-3 border-r border-gray-300 text-center">Jatuh Tempo</th>}
                         <th className="p-3 border-r border-gray-300 text-right">Total Harga</th>
                         <th className="p-3 border-r border-gray-300 text-right text-red-600">Retur Rp</th>
                         <th className="p-3 text-center">User</th>
@@ -214,9 +244,11 @@ export const Cashflow = ({ currentTime }: { currentTime: Date }) => {
                            <td className="p-3 border-r border-gray-300 text-center">
                              <span className={trx.method === 'TUNAI' ? 'text-green-700 font-bold' : 'text-orange-600 font-bold'}>{trx.method}</span>
                            </td>
-                           <td className="p-3 border-r border-gray-300 text-center text-red-600 font-medium">
-                             {calculateJatuhTempo(trx.isoDate, trx.method)}
-                           </td>
+                           {filterPaymentMethod !== 'TUNAI' && (
+                             <td className="p-3 border-r border-gray-300 text-center text-red-600 font-medium">
+                               {calculateJatuhTempo(trx.isoDate, trx.method)}
+                             </td>
+                           )}
                            <td className="p-3 border-r border-gray-300 text-right font-bold text-blue-800">{formatRp(trx.total)}</td>
                            <td className="p-3 border-r border-gray-300 text-right font-bold text-red-600">{formatRp(trx.returTotal || 0)}</td>
                            <td className="p-3 text-center text-gray-600">{trx.cashier}</td>
@@ -299,70 +331,7 @@ export const Cashflow = ({ currentTime }: { currentTime: Date }) => {
       {/* TAB: CASHFLOW BULANAN (DUMMY) */}
       {cashflowTab === 'bulanan' && (
          <div className="flex-1 flex flex-col overflow-hidden">
-             {/* Styled Header matching image */}
-             <div className="bg-[#a8c6e6] p-4 flex justify-between items-center border-b-2 border-blue-400 shadow-sm shrink-0">
-                <div className="flex flex-col gap-3 relative z-10 w-[300px]">
-                   <div className="flex items-center justify-between">
-                     <span className="text-blue-900 text-[11px] uppercase tracking-normal font-bold">Filter Cabang</span>
-                     <select value={filterBranch} onChange={e => setFilterBranch(e.target.value)} className="w-[150px] px-1 py-0.5 border border-gray-400 outline-none text-black font-medium">
-                       <option value="Semua Cabang">Semua Cabang</option>
-                       {(storeSettings.branches || ['Pusat']).map((b: string) => <option key={b} value={b}>{b}</option>)}
-                     </select>
-                   </div>
-                   <div className="flex items-center justify-between">
-                     <span className="text-blue-900 text-[11px] uppercase tracking-normal font-bold">Mulai Tgl</span>
-                     <input type="date" value={filterStartDate} onChange={e => { setFilterStartDate(e.target.value); setFilterUseStart(true); }} className="w-[150px] px-1 py-0.5 border border-gray-400 outline-none text-black font-medium" />
-                   </div>
-                   <div className="flex items-center justify-between">
-                     <span className="text-blue-900 text-[11px] uppercase tracking-normal font-bold">S/d Tgl</span>
-                     <input type="date" value={filterEndDate} onChange={e => { setFilterEndDate(e.target.value); setFilterUseEnd(true); }} className="w-[150px] px-1 py-0.5 border border-gray-400 outline-none text-black font-medium" />
-                   </div>
-                </div>
-
-                <div className="flex flex-col relative z-10 flex-1 ml-4 justify-center items-center">
-                   <button onClick={() => {
-                       const rows = [
-                           ['Bulan', 'Omset Total', 'Tunai Masuk', 'Non-Tunai / Piutang', 'Total Pengeluaran', 'Saldo Akhir Tunai (Laci)'],
-                           ...monthlyCashflow.map((m: any) => [
-                               m.month, 
-                               (m.incomeTotal).toString(), 
-                               (m.incomeCash).toString(), 
-                               (m.incomeNonCash).toString(), 
-                               (m.expenses).toString(), 
-                               (m.incomeCash - m.expenses).toString()
-                           ])
-                       ];
-                       const csvContent = "data:text/csv;charset=utf-8," + rows.map(e => e.join(",")).join("\n");
-                       const encodedUri = encodeURI(csvContent);
-                       const link = document.createElement("a");
-                       link.setAttribute("href", encodedUri);
-                       link.setAttribute("download", `laporan_bulanan_${new Date().getTime()}.csv`);
-                       document.body.appendChild(link);
-                       link.click();
-                       document.body.removeChild(link);
-                   }} className="bg-white text-black hover:bg-gray-100 font-bold py-1.5 px-6 shadow-sm border border-gray-400 text-sm tracking-wide">
-                       Export CSV
-                   </button>
-                </div>
-
-                <div className="ml-auto w-[350px] flex flex-col relative z-10">
-                   <div className="flex justify-between items-center text-[11px] text-blue-900 border-b border-blue-200/50 pb-1">
-                      <span className="font-bold">PEMASUKAN KAS</span>
-                      <span className="font-bold text-sm tracking-wider">{formatRp(monthlyCashflow.reduce((sum, m) => sum + m.incomeCash, 0))}</span>
-                   </div>
-                   <div className="flex justify-between items-center text-[11px] text-red-700 mt-1 pb-1">
-                      <span className="font-bold">PENGELUARAN KAS</span>
-                      <span className="font-bold text-sm tracking-wider">{formatRp(monthlyCashflow.reduce((sum, m) => sum + m.expenses, 0))}</span>
-                   </div>
-                   <div className="w-full h-[1px] bg-red-500 my-1 relative"></div>
-                   <div className="flex justify-between items-center text-[11px] text-blue-900 mt-1">
-                      <span className="font-bold uppercase">Total Omzet</span>
-                      <span className="font-bold text-sm tracking-wider">{formatRp(monthlyCashflow.reduce((sum, m) => sum + m.incomeTotal, 0))}</span>
-                   </div>
-                </div>
-             </div>
-
-             <div className="flex-1 bg-white border border-gray-400 m-2 shadow-inner flex flex-col overflow-auto">
+             <div className="flex-1 bg-white border border-gray-400 m-[2px] shadow-inner flex flex-col overflow-auto">
              <table className="w-full text-left border-collapse whitespace-nowrap">
                <thead className="bg-[#ece9d8] sticky top-0 border-b-2 border-gray-400 font-bold text-blue-900 shadow-sm z-10 text-sm">
                  <tr>

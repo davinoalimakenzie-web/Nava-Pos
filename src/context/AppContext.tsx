@@ -16,9 +16,18 @@ import {
 
 const AppContext = createContext<any>(null);
 
+const DUMMY_VERSION = "3";
+
 function useSyncState<T>(key: string, initial: T, syncEnabled: boolean) {
   const [state, setState] = useState<T>(() => {
+    const version = localStorage.getItem('POS_DUMMY_VERSION');
     const saved = localStorage.getItem(`POS_${key}`);
+    
+    // Force reload dummy data if version is bumped
+    if (version !== DUMMY_VERSION) {
+       return initial;
+    }
+    
     if (saved) {
       try {
         return JSON.parse(saved) as T;
@@ -65,7 +74,30 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
   
   // System Settings
   const [storeSettings, setStoreSettings] = useState(() => {
+    const version = localStorage.getItem('POS_DUMMY_VERSION');
     const saved = localStorage.getItem('POS_storeSettings');
+    
+    if (version !== DUMMY_VERSION) {
+       return {
+          storeName: 'NAVA POS',
+          storeAddress: 'Jl. Pahlawan No 123, Surabaya',
+          storePhone: '0812-3456-7890',
+          footerText: 'Terima Kasih Telah Berbelanja',
+          printerDriver: 'Generic / Text Only',
+          scannerPrefix: '',
+          scannerSuffix: 'Enter',
+          syncEnabled: false,
+          branches: ['Kudus', 'Pati'],
+          activeBranch: 'Kudus',
+          margins: {
+              UMUM: { level1: 30, level2: 15 },
+              LCD: { level1: 50, level2: 25 },
+              Batre: { level1: 40, level2: 20 },
+              Aksesoris: { level1: 75, level2: 30 }
+          }
+       };
+    }
+    
     return saved ? JSON.parse(saved) : {
       storeName: 'NAVA POS',
       storeAddress: 'Jl. Pahlawan No 123, Surabaya',
@@ -83,6 +115,7 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
 
   useEffect(() => {
     localStorage.setItem('POS_storeSettings', JSON.stringify(storeSettings));
+    localStorage.setItem('POS_DUMMY_VERSION', DUMMY_VERSION);
   }, [storeSettings]);
 
   const [appUsers, setAppUsers] = useSyncState<any[]>('appUsers', initialUsers, storeSettings.syncEnabled);

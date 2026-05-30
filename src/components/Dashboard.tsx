@@ -212,7 +212,12 @@ export const Dashboard = ({ currentTime }: { currentTime: Date }) => {
     }).length;
   }, [inventory, categoryThresholds]);
 
-  // 1. Daily Sales Trends (Last 7 Days)
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const handleRefresh = () => {
+      setIsRefreshing(true);
+      setTimeout(() => setIsRefreshing(false), 800);
+  };
+
   const salesData = useMemo(() => {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
@@ -458,7 +463,15 @@ export const Dashboard = ({ currentTime }: { currentTime: Date }) => {
         )}
       </AnimatePresence>
 
-      <div className="bg-[#d4d0c8] px-2 py-1 flex justify-end shadow-sm border-b border-gray-400">
+      <div className="bg-[#d4d0c8] px-2 py-1 flex justify-end gap-2 shadow-sm border-b border-gray-400">
+         <button 
+           onClick={handleRefresh}
+           disabled={isRefreshing}
+           className="text-[10px] px-2 py-1 font-bold border rounded-sm transition-colors flex items-center gap-1 bg-white hover:bg-gray-100 text-blue-900 border-gray-400 disabled:opacity-50"
+         >
+            <RefreshCw className={`w-3 h-3 ${isRefreshing ? 'animate-spin' : ''}`} />
+            Refresh
+         </button>
          <button 
            onClick={() => {
                const newMode = !compactMode;
@@ -618,115 +631,130 @@ export const Dashboard = ({ currentTime }: { currentTime: Date }) => {
             </div>
         </motion.div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 flex-1 min-h-[300px]">
-            {/* WIDGET: DAILY SALES GOAL */}
+        {/* AI SALES FORECAST WIDGET */}
+        <motion.div 
+            initial={{ opacity: 0, scale: 0.98 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ duration: 0.4 }}
+            className="bg-[#ece9d8] border border-gray-400 shadow-sm flex flex-col mb-4"
+        >
+            <div className="bg-blue-900 text-white font-bold px-3 py-1.5 text-sm flex gap-2 items-center shadow-sm">
+               <Sparkles className="w-4 h-4 text-purple-400" />
+               AI SALES FORECAST & STRATEGY
+            </div>
+            <div className="flex-1 p-3 bg-white m-1 border border-gray-300 flex flex-col items-center justify-center text-center">
+                {!hasFetchedForecast ? (
+                     <button 
+                         onClick={fetchAiForecast}
+                         disabled={forecastLoading}
+                         className="bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white font-bold py-2 px-4 rounded shadow flex items-center gap-2 text-sm"
+                     >
+                         {forecastLoading ? <><Loader2 className="w-4 h-4 animate-spin"/> Menganalisis Data...</> : <><Sparkles className="w-4 h-4"/> Buat Prediksi via AI</>}
+                     </button>
+                ) : (
+                     <div className="w-full text-left font-sans text-sm text-gray-800 flex flex-col gap-2">
+                         {forecastAiText ? (
+                             <div className="whitespace-pre-wrap leading-relaxed">{forecastAiText}</div>
+                         ) : (
+                             <div className="text-gray-500 italic">Gagal membuat prediksi.</div>
+                         )}
+                         <div className="mt-1 text-right border-t border-gray-200 pt-1">
+                             <button onClick={fetchAiForecast} disabled={forecastLoading} className="text-blue-600 hover:underline text-xs font-bold inline-flex items-center gap-1 cursor-pointer">
+                                 {forecastLoading ? <Loader2 className="w-3 h-3 animate-spin"/> : <Sparkles className="w-3 h-3"/>}
+                                 Refresh
+                             </button>
+                         </div>
+                     </div>
+                )}
+            </div>
+        </motion.div>
+
+        <div className={`grid grid-cols-1 lg:grid-cols-3 gap-4 flex-1 min-h-[300px] transition-all duration-300 ${isRefreshing ? 'opacity-30 blur-[2px] pointer-events-none' : 'opacity-100'}`}>
+            {/* WIDGET: PENDAPATAN HARI INI & MINGGUAN (GABUNGAN) */}
             <motion.div 
                 initial={{ opacity: 0, scale: 0.8 }}
                 animate={{ opacity: 1, scale: 1 }}
                 transition={{ duration: 0.6, delay: 0.2, ease: "easeOut" }}
                 className="bg-[#ece9d8] border border-gray-400 shadow-sm flex flex-col">
                 <div className="bg-blue-900 text-white font-bold px-3 py-1.5 text-sm flex justify-between items-center shadow-sm">
-                   <span>TARGET PENDAPATAN HARI INI</span>
+                   <span>TARGET PENDAPATAN</span>
                    <button onClick={() => setShowGoalModal(true)} title="Atur Target" className="hover:bg-blue-800 p-0.5 rounded transition-colors text-white/80 hover:text-white">
                       <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-settings-2"><path d="M20 7h-9"/><path d="M14 17H5"/><circle cx="17" cy="17" r="3"/><circle cx="7" cy="7" r="3"/></svg>
                    </button>
                 </div>
-                <div className="flex-1 p-4 bg-white m-1 border border-gray-300 flex flex-col items-center justify-center relative overflow-hidden text-center">
-                    <motion.div 
-                        className="relative w-32 h-32 flex items-center justify-center"
-                        animate={
-                            dailyGoalProgress >= 100 ? { scale: [1, 1.1, 1] } :
-                            dailyGoalProgress >= 50 ? { scale: [1, 1.05, 1] } : 
-                            { scale: 1 }
-                        }
-                        transition={{ duration: 1.5, repeat: dailyGoalProgress >= 50 ? Infinity : 0, ease: "easeInOut" }}
-                    >
-                        <svg className="transform -rotate-90 w-32 h-32 absolute inset-0">
-                           <circle
-                             cx="64" cy="64" r={dailyGoalRadius}
-                             stroke="currentColor" strokeWidth="10" fill="transparent"
-                             className="text-gray-100"
-                           />
-                           <circle
-                             cx="64" cy="64" r={dailyGoalRadius}
-                             stroke="currentColor" strokeWidth="10" fill="transparent"
-                             strokeDasharray={dailyGoalCircumference}
-                             strokeDashoffset={dailyGoalOffset}
-                             strokeLinecap="round"
-                             className={`transition-all duration-1000 ease-out ${dailyGoalProgress >= 100 ? 'text-green-500' : 'text-blue-600'}`}
-                           />
-                        </svg>
-                        <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-                            <span className="text-2xl font-black text-gray-800 tracking-tighter">{dailyGoalProgress}%</span>
+                <div className="flex-1 p-2 bg-white m-1 border border-gray-300 flex flex-row items-center justify-around overflow-hidden text-center gap-2">
+                    {/* Harian */}
+                    <div className="flex flex-col items-center justify-center flex-1 w-1/2">
+                        <span className="text-[10px] text-gray-500 font-bold mb-1">HARI INI</span>
+                        <motion.div 
+                            className="relative w-20 h-20 flex items-center justify-center"
+                            animate={
+                                dailyGoalProgress >= 100 ? { scale: [1, 1.1, 1] } :
+                                dailyGoalProgress >= 50 ? { scale: [1, 1.05, 1] } : 
+                                { scale: 1 }
+                            }
+                            transition={{ duration: 1.5, repeat: dailyGoalProgress >= 50 ? Infinity : 0, ease: "easeInOut" }}
+                        >
+                            <svg className="transform -rotate-90 w-20 h-20 absolute inset-0">
+                               <circle cx="40" cy="40" r="32" stroke="currentColor" strokeWidth="6" fill="transparent" className="text-gray-100" />
+                               <circle cx="40" cy="40" r="32" stroke="currentColor" strokeWidth="6" fill="transparent"
+                                 strokeDasharray={201}
+                                 strokeDashoffset={201 - (201 * dailyGoalProgress / 100)}
+                                 strokeLinecap="round"
+                                 className={`transition-all duration-1000 ease-out ${dailyGoalProgress >= 100 ? 'text-green-500' : 'text-blue-600'}`}
+                               />
+                            </svg>
+                            <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+                                <span className="text-[13px] font-black text-gray-800 tracking-tighter">{dailyGoalProgress}%</span>
+                            </div>
+                        </motion.div>
+                        <div className="mt-2 flex flex-col items-center">
+                            <span className={`text-[12px] font-bold ${dailyGoalProgress >= 100 ? 'text-green-700' : 'text-blue-900'}`}>{formatRp(cashFlowToday.income)}</span>
+                            <span className="text-[9px] text-gray-500 mt-0.5">Target: {formatRp(dailyGoal)}</span>
+                            {dailyGoalNote && (
+                                <span className="mt-1 text-[9px] italic text-gray-600 bg-gray-50 px-1 py-0.5 rounded w-full max-w-[120px] truncate border border-gray-200">
+                                    {dailyGoalNote}
+                                </span>
+                            )}
                         </div>
-                    </motion.div>
-                    <div className="mt-4 flex flex-col items-center">
-                        <span className="text-xs text-gray-500 font-bold uppercase tracking-wider">Tercapai</span>
-                        <span className={`text-lg font-bold ${dailyGoalProgress >= 100 ? 'text-green-700' : 'text-blue-900'}`}>{formatRp(cashFlowToday.income)}</span>
-                        <span className="text-[10px] text-gray-500 mt-1">
-                            Target: {formatRp(dailyGoal)}
-                        </span>
-                        {dailyGoalNote && (
-                            <span className="mt-2 text-[10px] italic text-gray-600 bg-gray-50 px-2 py-1 rounded w-full max-w-[150px] truncate border border-gray-200">
-                                {dailyGoalNote}
-                            </span>
-                        )}
                     </div>
-                </div>
-            </motion.div>
 
-            {/* WIDGET: WEEKLY TARGET */}
-            <motion.div 
-                initial={{ opacity: 0, scale: 0.8 }}
-                animate={{ opacity: 1, scale: 1 }}
-                transition={{ duration: 0.6, delay: 0.3, ease: "easeOut" }}
-                className="bg-[#ece9d8] border border-gray-400 shadow-sm flex flex-col">
-                <div className="bg-blue-900 text-white font-bold px-3 py-1.5 text-sm flex justify-between items-center shadow-sm">
-                   <span>TARGET MINGGUAN (7 HARI)</span>
-                   <button onClick={() => setShowGoalModal(true)} title="Atur Target" className="hover:bg-blue-800 p-0.5 rounded transition-colors text-white/80 hover:text-white">
-                      <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-settings-2"><path d="M20 7h-9"/><path d="M14 17H5"/><circle cx="17" cy="17" r="3"/><circle cx="7" cy="7" r="3"/></svg>
-                   </button>
-                </div>
-                <div className="flex-1 p-4 bg-white m-1 border border-gray-300 flex flex-col items-center justify-center relative overflow-hidden text-center">
-                    <motion.div 
-                        className="relative w-32 h-32 flex items-center justify-center"
-                        animate={
-                            weeklyGoalProgress >= 100 ? { scale: [1, 1.1, 1] } :
-                            weeklyGoalProgress >= 50 ? { scale: [1, 1.05, 1] } : 
-                            { scale: 1 }
-                        }
-                        transition={{ duration: 1.5, repeat: weeklyGoalProgress >= 50 ? Infinity : 0, ease: "easeInOut" }}
-                    >
-                        <svg className="transform -rotate-90 w-32 h-32 absolute inset-0">
-                           <circle
-                             cx="64" cy="64" r={weeklyGoalRadius}
-                             stroke="currentColor" strokeWidth="10" fill="transparent"
-                             className="text-gray-100"
-                           />
-                           <circle
-                             cx="64" cy="64" r={weeklyGoalRadius}
-                             stroke="currentColor" strokeWidth="10" fill="transparent"
-                             strokeDasharray={weeklyGoalCircumference}
-                             strokeDashoffset={weeklyGoalOffset}
-                             strokeLinecap="round"
-                             className={`transition-all duration-1000 ease-out ${weeklyGoalProgress >= 100 ? 'text-green-500' : 'text-blue-600'}`}
-                           />
-                        </svg>
-                        <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-                            <span className="text-2xl font-black text-gray-800 tracking-tighter">{weeklyGoalProgress}%</span>
+                    <div className="w-px bg-gray-200 h-[80%]"></div>
+
+                    {/* Mingguan */}
+                    <div className="flex flex-col items-center justify-center flex-1 w-1/2">
+                        <span className="text-[10px] text-gray-500 font-bold mb-1">MINGGUAN</span>
+                        <motion.div 
+                            className="relative w-20 h-20 flex items-center justify-center"
+                            animate={
+                                weeklyGoalProgress >= 100 ? { scale: [1, 1.1, 1] } :
+                                weeklyGoalProgress >= 50 ? { scale: [1, 1.05, 1] } : 
+                                { scale: 1 }
+                            }
+                            transition={{ duration: 1.5, repeat: weeklyGoalProgress >= 50 ? Infinity : 0, ease: "easeInOut" }}
+                        >
+                            <svg className="transform -rotate-90 w-20 h-20 absolute inset-0">
+                               <circle cx="40" cy="40" r="32" stroke="currentColor" strokeWidth="6" fill="transparent" className="text-gray-100" />
+                               <circle cx="40" cy="40" r="32" stroke="currentColor" strokeWidth="6" fill="transparent"
+                                 strokeDasharray={201}
+                                 strokeDashoffset={201 - (201 * weeklyGoalProgress / 100)}
+                                 strokeLinecap="round"
+                                 className={`transition-all duration-1000 ease-out ${weeklyGoalProgress >= 100 ? 'text-green-500' : 'text-blue-600'}`}
+                               />
+                            </svg>
+                            <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+                                <span className="text-[13px] font-black text-gray-800 tracking-tighter">{weeklyGoalProgress}%</span>
+                            </div>
+                        </motion.div>
+                        <div className="mt-2 flex flex-col items-center">
+                            <span className={`text-[12px] font-bold ${weeklyGoalProgress >= 100 ? 'text-green-700' : 'text-blue-900'}`}>{formatRp(total7Days)}</span>
+                            <span className="text-[9px] text-gray-500 mt-0.5">Target: {formatRp(weeklyGoal)}</span>
+                            {weeklyGoalNote && (
+                                <span className="mt-1 text-[9px] italic text-gray-600 bg-gray-50 px-1 py-0.5 rounded w-full max-w-[120px] truncate border border-gray-200">
+                                    {weeklyGoalNote}
+                                </span>
+                            )}
                         </div>
-                    </motion.div>
-                    <div className="mt-4 flex flex-col items-center">
-                        <span className="text-xs text-gray-500 font-bold uppercase tracking-wider">Tercapai</span>
-                        <span className={`text-lg font-bold ${weeklyGoalProgress >= 100 ? 'text-green-700' : 'text-blue-900'}`}>{formatRp(total7Days)}</span>
-                        <span className="text-[10px] text-gray-500 mt-1">
-                            Target: {formatRp(weeklyGoal)}
-                        </span>
-                        {weeklyGoalNote && (
-                            <span className="mt-2 text-[10px] italic text-gray-600 bg-gray-50 px-2 py-1 rounded w-full max-w-[150px] truncate border border-gray-200">
-                                {weeklyGoalNote}
-                            </span>
-                        )}
                     </div>
                 </div>
             </motion.div>
@@ -879,43 +907,6 @@ export const Dashboard = ({ currentTime }: { currentTime: Date }) => {
                     </div>
                 </motion.div>
             )}
-
-            {/* AI SALES FORECAST WIDGET */}
-            <motion.div 
-                initial={{ opacity: 0, scale: 0.95 }}
-                animate={{ opacity: 1, scale: 1 }}
-                transition={{ duration: 0.5, delay: 0.9 }}
-                className="bg-[#ece9d8] border border-gray-400 shadow-sm flex flex-col lg:col-span-3 min-h-[150px]">
-                <div className="bg-blue-900 text-white font-bold px-3 py-1.5 text-sm flex gap-2 items-center shadow-sm">
-                   <Sparkles className="w-4 h-4 text-purple-400" />
-                   AI SALES FORECAST & STRATEGY
-                </div>
-                <div className="flex-1 p-4 bg-white m-1 border border-gray-300 flex flex-col items-center justify-center text-center">
-                    {!hasFetchedForecast ? (
-                         <button 
-                             onClick={fetchAiForecast}
-                             disabled={forecastLoading}
-                             className="bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white font-bold py-2 px-4 rounded shadow flex items-center gap-2"
-                         >
-                             {forecastLoading ? <><Loader2 className="w-4 h-4 animate-spin"/> Menganalisis Data...</> : <><Sparkles className="w-4 h-4"/> Buat Prediksi via AI</>}
-                         </button>
-                    ) : (
-                         <div className="w-full text-left font-sans text-sm text-gray-800 flex flex-col gap-2">
-                             {forecastAiText ? (
-                                 <div className="whitespace-pre-wrap">{forecastAiText}</div>
-                             ) : (
-                                 <div className="text-gray-500 italic">Gagal membuat prediksi.</div>
-                             )}
-                             <div className="mt-2 text-right border-t border-gray-200 pt-2">
-                                 <button onClick={fetchAiForecast} disabled={forecastLoading} className="text-blue-600 hover:underline text-xs font-bold inline-flex items-center gap-1">
-                                     {forecastLoading ? <Loader2 className="w-3 h-3 animate-spin"/> : <Sparkles className="w-3 h-3"/>}
-                                     Refresh
-                                 </button>
-                             </div>
-                         </div>
-                    )}
-                </div>
-            </motion.div>
         </div>
       </div>
       

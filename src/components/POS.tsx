@@ -37,8 +37,10 @@ export const POS = ({ currentTime }: { currentTime: Date }) => {
   const [transactionNote, setTransactionNote] = useState('');
   const [showInputMenu, setShowInputMenu] = useState(false);
   const [showHistoryModal, setShowHistoryModal] = useState(false);
+  const [searchNotaRetur, setSearchNotaRetur] = useState('');
   const [showBonModal, setShowBonModal] = useState(false);
   const [bonEmployee, setBonEmployee] = useState('');
+  const [bonBranch, setBonBranch] = useState(storeSettings.activeBranch || 'Pusat');
   const [bonAmount, setBonAmount] = useState('');
   const [bonReason, setBonReason] = useState('');
 
@@ -177,7 +179,7 @@ export const POS = ({ currentTime }: { currentTime: Date }) => {
 
   const handleAddBon = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!bonEmployee || !bonAmount || !bonReason) return alert('Semua isian Bon wajib diisi!');
+    if (!bonEmployee || !bonAmount || !bonReason || !bonBranch) return alert('Semua isian Bon wajib diisi!');
     const expense = {
         id: 'BON-' + Date.now(),
         date: `${transactionDate} ${new Date().toLocaleTimeString('id-ID')}`,
@@ -185,13 +187,13 @@ export const POS = ({ currentTime }: { currentTime: Date }) => {
         name: `Bon - ${bonEmployee} : ${bonReason}`,
         amount: parseInt(bonAmount.replace(/\D/g, '') || '0'),
         cashier: user.name,
-        branch: storeSettings.activeBranch || 'Pusat',
+        branch: bonBranch,
         isBon: true,
         bonEmployee: bonEmployee,
         bonReason: bonReason
     };
     setExpenses([expense, ...expenses]);
-    addLog('BON', `Kasbon ${bonEmployee} sejumlah Rp ${expense.amount.toLocaleString('id-ID')}`);
+    addLog('BON', `Kasbon ${bonEmployee} sejumlah Rp ${expense.amount.toLocaleString('id-ID')} (${bonBranch})`);
     setBonEmployee('');
     setBonAmount('');
     setBonReason('');
@@ -636,7 +638,7 @@ export const POS = ({ currentTime }: { currentTime: Date }) => {
             <div className="flex justify-between items-center mb-0.5 mt-2">
                 <label className="text-blue-800">Kode Barang (F1)</label>
             </div>
-            <input ref={codeInputRef} type="text" value={codeInput} onChange={handleCodeChange} onKeyDown={handleCodeSubmit} className="border border-gray-400 px-2 py-1.5 w-full outline-none focus:border-blue-600 shadow-inner" placeholder="Ketik Kode/Nama Barang..." />
+            <input ref={codeInputRef} type="text" value={codeInput} onChange={handleCodeChange} onKeyDown={handleCodeSubmit} className="bg-white border border-gray-400 px-2 py-1.5 w-full outline-none focus:border-blue-600 shadow-inner" placeholder="Ketik Kode/Nama Barang..." />
             
             {suggestions.length > 0 && (
               <div className="absolute top-full left-0 mt-0.5 w-[500px] bg-white border border-gray-400 shadow-xl max-h-[250px] overflow-y-auto text-black z-50">
@@ -658,7 +660,7 @@ export const POS = ({ currentTime }: { currentTime: Date }) => {
 
           <div className="flex flex-col w-[60px] shrink-0">
             <div className="h-[18px]"></div>
-            <input ref={qtyInputRef} type="number" value={qtyInput} onChange={(e) => setQtyInput(e.target.value)} onKeyDown={handleQtySubmit} className="border border-gray-400 px-1 py-1.5 w-full text-center outline-none focus:border-blue-600 shadow-inner" />
+            <input ref={qtyInputRef} type="number" value={qtyInput} onChange={(e) => setQtyInput(e.target.value)} onKeyDown={handleQtySubmit} className="bg-white border border-gray-400 px-1 py-1.5 w-full text-center outline-none focus:border-blue-600 shadow-inner" />
           </div>
           
           <div className="flex-1 flex flex-col min-w-0">
@@ -666,7 +668,7 @@ export const POS = ({ currentTime }: { currentTime: Date }) => {
               <span className="w-1/3">Nama Barang</span>
               {stagedItem && <span className="text-gray-500 italic text-[10px]">Tekan Enter pada kolom Jumlah...</span>}
             </div>
-            <div className="bg-[#a3c6e8] h-[28px] border-t border-blue-300 w-full flex items-center px-2 text-black font-bold truncate text-sm">
+            <div className="bg-white h-[34px] border border-gray-400 w-full flex items-center px-2 text-black font-bold truncate text-sm">
               {stagedItem ? stagedItem.name : ''}
             </div>
           </div>
@@ -863,12 +865,22 @@ export const POS = ({ currentTime }: { currentTime: Date }) => {
           <div className="fixed inset-0 bg-black/60 z-[9999] flex items-center justify-center p-4">
               <div className="bg-[#ece9d8] border-2 border-gray-500 w-[600px] flex flex-col shadow-2xl">
                   <div className="bg-[#000040] text-white px-3 py-1.5 flex justify-between items-center cursor-default">
-                      <span className="font-bold text-sm tracking-wide">PILIH RIWAYAT TRANSAKSI (UNTUK RETUR)</span>
+                      <span className="font-bold text-sm tracking-wide">PILIH TRANSAKSI</span>
+                      <div className="flex items-center gap-2 ml-auto mr-4">
+                          <label className="text-[13px] font-medium leading-none">No. Nota</label>
+                          <input 
+                              type="text" 
+                              value={searchNotaRetur} 
+                              onChange={e => setSearchNotaRetur(e.target.value)} 
+                              className="text-black bg-white outline-none px-2 py-0.5 rounded-[3px] text-[13px] font-bold w-40 h-[24px]"
+                          />
+                          <button onClick={() => {}} className="bg-white text-black font-extrabold px-3 h-[24px] rounded-[3px] text-[12px] hover:bg-gray-200">CARI</button>
+                      </div>
                       <button onClick={() => setShowHistoryModal(false)} className="hover:bg-red-600 px-2 py-0.5 font-bold">X</button>
                   </div>
                   <div className="p-3 bg-white border border-gray-400 mx-2 my-2 overflow-y-auto max-h-[400px]">
                       <table className="w-full text-left text-xs border-collapse">
-                          <thead className="bg-gray-200 sticky top-0">
+                          <thead className="bg-[#ece9d8] sticky top-0 shadow-sm z-10 border-b border-gray-400">
                               <tr>
                                   <th className="p-2 border border-gray-400">FAKTUR</th>
                                   <th className="p-2 border border-gray-400">TANGGAL</th>
@@ -878,7 +890,7 @@ export const POS = ({ currentTime }: { currentTime: Date }) => {
                               </tr>
                           </thead>
                           <tbody>
-                              {transactions.slice().reverse().slice(0, 50).map((t: any) => (
+                              {transactions.slice().reverse().filter((t: any) => !searchNotaRetur || t.id.toLowerCase().includes(searchNotaRetur.toLowerCase())).slice(0, searchNotaRetur ? 200 : 50).map((t: any) => (
                                   <tr key={t.id} className="hover:bg-blue-50 border-b border-gray-300">
                                       <td className="p-2 border-r border-gray-400 font-bold">{t.id}</td>
                                       <td className="p-2 border-r border-gray-400">{t.date}</td>
@@ -923,16 +935,21 @@ export const POS = ({ currentTime }: { currentTime: Date }) => {
       {showBonModal && (
           <div className="fixed inset-0 bg-black/60 z-[9999] flex items-center justify-center p-4">
               <div className="bg-[#ece9d8] border-2 border-gray-500 w-full max-w-md shadow-2xl flex flex-col">
-                  <div className="bg-blue-900 text-white font-bold px-3 py-2 flex justify-between items-center shadow-sm">
-                      <span>Catat Bon / Kasbon Karyawan</span>
-                      <button onClick={() => setShowBonModal(false)} className="bg-red-600 hover:bg-red-700 px-2 py-0.5 border border-white/50 shadow-sm leading-none font-bold">X</button>
+                  <div className="bg-blue-900 text-white font-bold px-3 py-2 flex items-center justify-center shadow-sm relative">
+                      <span>Catat Kasbon</span>
+                      <button onClick={() => setShowBonModal(false)} className="bg-red-600 hover:bg-red-700 px-2 py-0.5 border border-white/50 shadow-sm leading-none font-bold absolute right-3">X</button>
                   </div>
                   <form onSubmit={handleAddBon} className="p-4 bg-white m-1 border border-gray-400">
                       <div className="flex flex-col gap-3 mb-4">
-                         <label className="text-sm font-bold text-gray-700">Pilih Karyawan</label>
+                         <label className="text-sm font-bold text-gray-700">Cabang</label>
+                         <select required value={bonBranch} onChange={e => { setBonBranch(e.target.value); setBonEmployee(''); }} className="border border-gray-400 p-2 outline-none">
+                            {(storeSettings.branches || ['Pusat']).map((b: string) => <option key={b} value={b}>{b}</option>)}
+                         </select>
+
+                         <label className="text-sm font-bold text-gray-700 mt-2">Pilih Karyawan</label>
                          <select required value={bonEmployee} onChange={e => setBonEmployee(e.target.value)} className="border border-gray-400 p-2 outline-none">
                             <option value="">-- Nama --</option>
-                            {employees.map((e: any) => <option key={e.id} value={e.name}>{e.name} ({e.position})</option>)}
+                            {employees.filter((e: any) => e.branch === bonBranch || !e.branch).map((e: any) => <option key={e.id} value={e.name}>{e.name} ({e.position})</option>)}
                          </select>
 
                          <label className="text-sm font-bold text-gray-700 mt-2">Alasan Bon</label>
