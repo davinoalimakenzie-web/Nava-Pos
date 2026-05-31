@@ -5,7 +5,7 @@ import { LegacyWindowHeader } from './LegacyWindowHeader';
 import { formatRp, formatDateDisplay, calculateJatuhTempo } from '../utils';
 
 export const Cashflow = ({ currentTime }: { currentTime: Date }) => {
-  const { transactions, expenses, setExpenses, storeSettings } = useAppContext();
+  const { transactions, expenses, setExpenses, storeSettings, setActiveTab, cart, setCart } = useAppContext();
   
   const [cashflowTab, setCashflowTab] = useState('harian');
   const [cashflowHarianSubTab, setCashflowHarianSubTab] = useState('laporan');
@@ -102,17 +102,15 @@ export const Cashflow = ({ currentTime }: { currentTime: Date }) => {
          {/* Dari Tanggal */}
          <div className="flex flex-col gap-0.5 text-white flex-1">
             <label className="text-[12px] font-medium">Dari Tanggal</label>
-            <div className="flex items-center gap-1 bg-white px-1 rounded-sm h-[28px]">
-               <input type="checkbox" checked={filterUseStart} onChange={e => setFilterUseStart(e.target.checked)} className="w-3.5 h-3.5 cursor-pointer shrink-0" />
-               <input type="date" value={filterStartDate} onChange={e => setFilterStartDate(e.target.value)} disabled={!filterUseStart} className="text-black outline-none w-full font-medium text-[13px] bg-transparent disabled:opacity-50" />
+            <div className="flex items-center bg-white px-1 rounded-sm h-[28px]">
+               <input type="date" value={filterStartDate} onChange={e => { setFilterStartDate(e.target.value); setFilterUseStart(true); }} className="text-black outline-none w-full font-medium text-[13px] bg-transparent" />
             </div>
          </div>
          {/* Sampai Tanggal */}
          <div className="flex flex-col gap-0.5 text-white flex-1">
             <label className="text-[12px] font-medium">Sampai Tanggal</label>
-            <div className="flex items-center gap-1 bg-white px-1 rounded-sm h-[28px]">
-               <input type="checkbox" checked={filterUseEnd} onChange={e => setFilterUseEnd(e.target.checked)} className="w-3.5 h-3.5 cursor-pointer shrink-0" />
-               <input type="date" value={filterEndDate} onChange={e => setFilterEndDate(e.target.value)} disabled={!filterUseEnd} className="text-black outline-none w-full font-medium text-[13px] bg-transparent disabled:opacity-50" />
+            <div className="flex items-center bg-white px-1 rounded-sm h-[28px]">
+               <input type="date" value={filterEndDate} onChange={e => { setFilterEndDate(e.target.value); setFilterUseEnd(true); }} className="text-black outline-none w-full font-medium text-[13px] bg-transparent" />
             </div>
          </div>
          {/* Jenis (Teknisi) */}
@@ -236,6 +234,18 @@ export const Cashflow = ({ currentTime }: { currentTime: Date }) => {
                            key={trx.id} 
                            className="border-b border-gray-200 hover:bg-blue-100 cursor-pointer text-black"
                            title="Klik 2x untuk membuka faktur di mode Retur"
+                           onDoubleClick={() => {
+                               const returnItems = trx.items.map((item: any) => ({
+                                   ...item,
+                                   qty: -item.qty,
+                                   originalQty: item.qty,
+                                   isReturn: true,
+                                   originalTrxId: trx.id,
+                                   originalItemId: item.id
+                               }));
+                               setCart([...cart, ...returnItems]);
+                               setActiveTab('pos');
+                           }}
                          >
                            <td className="p-3 border-r border-gray-300">{trx.date.split(' ')[0]}</td>
                            <td className="p-3 border-r border-gray-300 font-mono font-bold text-blue-800">{trx.id}</td>

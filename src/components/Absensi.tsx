@@ -49,7 +49,7 @@ export const Absensi = ({ currentTime }: { currentTime: Date }) => {
           status: 'Pending'
       };
       setLeaveRequests([...(leaveRequests || []), req]);
-      setCutiEmployee('');
+      setSelectedEmployeeAbsensi('');
       setCutiDateStr('');
       setCutiReason('');
       alert('Pengajuan Cuti berhasil dikirim!');

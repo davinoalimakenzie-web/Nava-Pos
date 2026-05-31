@@ -46,6 +46,9 @@ export const POS = ({ currentTime }: { currentTime: Date }) => {
 
   const [isInputStockMode, setIsInputStockMode] = useState(false);
   const [isBarcodeMode, setIsBarcodeMode] = useState(true);
+  const [confirmAction, setConfirmAction] = useState<{message: string, isAlert?: boolean, onConfirm?: () => void} | null>(null);
+  const [printActionModal, setPrintActionModal] = useState(false);
+  const [waNumber, setWaNumber] = useState('');
   const [isPromoActive, setIsPromoActive] = useState(false);
   const [stockSupplierId, setStockSupplierId] = useState('');
   const [stockDiscount, setStockDiscount] = useState(0);
@@ -94,16 +97,16 @@ export const POS = ({ currentTime }: { currentTime: Date }) => {
   };
 
   const addToCart = (item: any, qtyToAdd = 1) => {
-    if (!isInputStockMode && !selectedCustomer) return alert('Silakan pilih Pelanggan terlebih dahulu!');
-    if (isInputStockMode && !stockSupplierId) return alert('Silakan pilih Supliyer terlebih dahulu!');
+    if (!isInputStockMode && !selectedCustomer) return setConfirmAction({message: 'Silakan pilih Pelanggan terlebih dahulu!', isAlert: true});
+    if (isInputStockMode && !stockSupplierId) return setConfirmAction({message: 'Silakan pilih Supliyer terlebih dahulu!', isAlert: true});
     if (!item) return;
-    if (!isInputStockMode && item.stock < qtyToAdd) return alert('Stok barang tidak mencukupi!');
+    if (!isInputStockMode && item.stock < qtyToAdd) return setConfirmAction({message: 'Stok barang tidak mencukupi!', isAlert: true});
 
     const itemPrice = isInputStockMode ? (item.supplierPrice || 0) : (selectedCustomer?.level === 2 ? item.price2 : item.price1);
     const existing = cart.find(c => c.id === item.id && !c.isReturn);
     
     if (existing) {
-      if (!isInputStockMode && existing.qty + qtyToAdd > item.stock) return alert('Melebihi stok yang tersedia!');
+      if (!isInputStockMode && existing.qty + qtyToAdd > item.stock) return setConfirmAction({message: 'Melebihi stok yang tersedia!', isAlert: true});
       setCart(cart.map(c => c.id === item.id && !c.isReturn ? { ...c, qty: c.qty + qtyToAdd } : c));
     } else {
       setCart([...cart, { ...item, qty: qtyToAdd, price: itemPrice, isReturn: false, cartUniqueId: 'ITEM-' + Date.now() + Math.random() }]);
@@ -120,8 +123,8 @@ export const POS = ({ currentTime }: { currentTime: Date }) => {
   };
 
   const handleSelectSuggestion = (item: any) => {
-    if (!isInputStockMode && !selectedCustomer) { alert('Silakan pilih Pelanggan terlebih dahulu!'); setSuggestions([]); return; }
-    if (isInputStockMode && !stockSupplierId) { alert('Silakan pilih Supliyer terlebih dahulu!'); setSuggestions([]); return; }
+    if (!isInputStockMode && !selectedCustomer) { setConfirmAction({message: 'Silakan pilih Pelanggan terlebih dahulu!', isAlert: true}); setSuggestions([]); return; }
+    if (isInputStockMode && !stockSupplierId) { setConfirmAction({message: 'Silakan pilih Supliyer terlebih dahulu!', isAlert: true}); setSuggestions([]); return; }
     
     setStagedItem(item);
     setCodeInput(item.code);
@@ -132,8 +135,8 @@ export const POS = ({ currentTime }: { currentTime: Date }) => {
 
   const handleCodeSubmit = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter' && codeInput) {
-      if (!isInputStockMode && !selectedCustomer) return alert('Silakan pilih Pelanggan terlebih dahulu!');
-      if (isInputStockMode && !stockSupplierId) return alert('Silakan pilih Supliyer terlebih dahulu!');
+      if (!isInputStockMode && !selectedCustomer) return setConfirmAction({message: 'Silakan pilih Pelanggan terlebih dahulu!', isAlert: true});
+      if (isInputStockMode && !stockSupplierId) return setConfirmAction({message: 'Silakan pilih Supliyer terlebih dahulu!', isAlert: true});
       
       const found = inventory.find((i: any) => i.code.toLowerCase() === codeInput.toLowerCase());
       if (found) {
@@ -148,7 +151,9 @@ export const POS = ({ currentTime }: { currentTime: Date }) => {
             setSuggestions([]);
             setTimeout(() => qtyInputRef.current?.focus(), 50);
         }
-      } else alert('Barang tidak ditemukan!');
+      } else {
+         setConfirmAction({message: 'Barang tidak ditemukan!', isAlert: true});
+      }
     }
   };
 
@@ -179,7 +184,7 @@ export const POS = ({ currentTime }: { currentTime: Date }) => {
 
   const handleAddBon = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!bonEmployee || !bonAmount || !bonReason || !bonBranch) return alert('Semua isian Bon wajib diisi!');
+    if (!bonEmployee || !bonAmount || !bonReason || !bonBranch) return setConfirmAction({message: 'Semua isian Bon wajib diisi!', isAlert: true});
     const expense = {
         id: 'BON-' + Date.now(),
         date: `${transactionDate} ${new Date().toLocaleTimeString('id-ID')}`,
@@ -198,7 +203,7 @@ export const POS = ({ currentTime }: { currentTime: Date }) => {
     setBonAmount('');
     setBonReason('');
     setShowBonModal(false);
-    alert('Bon Kasbon berhasil dicatat!');
+    setConfirmAction({message: 'Bon Kasbon berhasil dicatat!', isAlert: true});
   };
 
   const updateStockAndSave = (newTransaction: any) => {
@@ -303,8 +308,8 @@ export const POS = ({ currentTime }: { currentTime: Date }) => {
        setInventory([...newInvItems, ...currentInv]);
        setTransactions([newTransaction, ...transactions]);
        addLog('PEMBELIAN_STOK', `No: ${purchaseFaktur} Total: Rp ${finalTotalCost.toLocaleString('id-ID')}`);
-       if (shouldPrint) alert(`Pembelian Stok Tersimpan & Dicetak! (Faktur: ${purchaseFaktur})`);
-       else alert('Pembelian Stok Tersimpan!');
+       if (shouldPrint) setConfirmAction({message: `Pembelian Stok Tersimpan & Dicetak! (Faktur: ${purchaseFaktur})`, isAlert: true});
+       else setConfirmAction({message: 'Pembelian Stok Tersimpan!', isAlert: true});
        setIsInputStockMode(false);
        setCart([]);
        setStockSupplierId('');
@@ -313,9 +318,57 @@ export const POS = ({ currentTime }: { currentTime: Date }) => {
        return;
     }
 
+    const piutangPaymentItem = cart.find(c => c.isPiutangPayment);
     const paid = amountPaid ? parseInt(amountPaid) : 0;
+
+    if (piutangPaymentItem) {
+        if (paid <= 0) return setConfirmAction({message: 'Masukkan nominal pembayaran!', isAlert: true});
+        const piutangToUpdate = piutangData.find(p => p.id === piutangPaymentItem.piutangId);
+        
+        let successMessage = '';
+        if (piutangToUpdate) {
+            const newSisa = Math.max(0, piutangToUpdate.sisa - paid);
+            if (newSisa === 0) {
+               setPiutangData(piutangData.filter(p => p.id !== piutangToUpdate.id));
+               successMessage = 'Piutang lunas!';
+            } else {
+               setPiutangData(piutangData.map(p => p.id === piutangToUpdate.id ? { ...p, sisa: newSisa } : p));
+               successMessage = `Pembayaran cicilan piutang berhasil. Sisa tagihan: Rp ${formatRp(newSisa).replace("Rp", "").trim()}`;
+            }
+        }
+
+        const piutangTransaction = {
+          id: noFaktur.replace('FAK', 'PLN'),
+          date: `${transactionDate} ${currentTime.toLocaleTimeString('id-ID')}`,
+          isoDate: new Date(transactionDate).toISOString(), 
+          customer: selectedCustomer?.name || piutangPaymentItem.name.replace('Pelunasan Piutang - ', ''),
+          items: [...cart],
+          total: paid, 
+          paid: paid,
+          change: 0,
+          cashier: user.name,
+          type: 'PELUNASAN_PIUTANG',
+          method: paymentMethod,
+          sisa: 0,
+          returTotal: 0,
+          globalDiscount: 0,
+          branch: storeSettings.activeBranch || 'Pusat',
+          note: `Pelunasan piutang ${piutangPaymentItem.piutangId}`
+        };
+        
+        setTransactions([piutangTransaction, ...transactions]);
+        addLog('PELUNASAN_PIUTANG', `Transaksi ${piutangTransaction.id} sebesar Rp ${piutangTransaction.total.toLocaleString('id-ID')}`);
+        
+        resetKasirState();
+        if (shouldPrint) {
+           setTimeout(() => window.print(), 200);
+        } else {
+           setConfirmAction({message: successMessage || 'Pelunasan Piutang Berhasil Disimpan!', isAlert: true});
+        }
+        return;
+    }
     
-    if (!isPiutang && paid < totalBelanja && totalBelanja > 0) return alert('Uang pembayaran kurang! (Atur pembayaran ke DP/Qriss/1 Minggu untuk mencatat sebagai Piutang)');
+    if (!isPiutang && paid < totalBelanja && totalBelanja > 0) return setConfirmAction({message: 'Uang pembayaran kurang! (Atur pembayaran ke DP/Qriss/1 Minggu untuk mencatat sebagai Piutang)', isAlert: true});
 
     const sisaTagihan = totalBelanja > 0 ? totalBelanja - paid : 0;
     const finalType = (isPiutang || sisaTagihan > 0) ? 'PIUTANG' : 'LUNAS';
@@ -351,39 +404,127 @@ export const POS = ({ currentTime }: { currentTime: Date }) => {
     }
 
     updateStockAndSave(newTransaction);
+    if (!shouldPrint) {
+        setConfirmAction({message: 'Transaksi Berhasil Disimpan!', isAlert: true});
+    }
   };
 
   const handleSimpan = () => {
-    if (isInputStockMode && !stockSupplierId) return alert('Pilih supliyer terlebih dahulu!');
-    if (!isInputStockMode && !selectedCustomer) return alert('Pilih pelanggan terlebih dahulu!');
-    if (cart.length === 0) return alert('Keranjang masih kosong!');
-    processTransaction(false); 
+    const isPiutangPayment = cart.some(c => c.isPiutangPayment);
+    if (isInputStockMode && !stockSupplierId) return setConfirmAction({message: 'Pilih supliyer terlebih dahulu!', isAlert: true});
+    if (!isInputStockMode && !isPiutangPayment && !selectedCustomer) return setConfirmAction({message: 'Pilih pelanggan terlebih dahulu!', isAlert: true});
+    if (cart.length === 0) return setConfirmAction({message: 'Keranjang masih kosong!', isAlert: true});
+    
+    // Validasi Pembayaran Tunai
+    const paid = amountPaid ? parseInt(amountPaid) : 0;
+    const isPiutang = paymentMethod === 'Qriss/TF' || paymentMethod === 'DP' || paymentMethod === '1 Minggu';
+    if (isPiutangPayment && paid <= 0) {
+        return setConfirmAction({
+            message: `Pembayaran pelunasan tidak valid. Silakan isi nominal Tunai terlebih dahulu sebagai syarat wajib pelunasan.`,
+            isAlert: true,
+            onConfirm: () => { setTimeout(() => document.getElementById('tunai-input')?.focus(), 100); }
+        });
+    }
+    if (!isInputStockMode && !isPiutangPayment && !isPiutang && paid < totalBelanja && totalBelanja > 0) {
+        return setConfirmAction({
+            message: `Pembayaran kurang Rp ${(totalBelanja - paid).toLocaleString('id-ID')}. Silakan isi nominal Tunai terlebih dahulu sebagai syarat wajib terjadi transaksi.`,
+            isAlert: true,
+            onConfirm: () => { setTimeout(() => document.getElementById('tunai-input')?.focus(), 100); }
+        });
+    }
+
+    setConfirmAction({
+      message: isPiutangPayment ? 'Simpan pelunasan piutang ini?' : 'Simpan transaksi ini?',
+      onConfirm: () => processTransaction(false)
+    });
   };
 
   const handleCetakButton = () => {
-    if (!selectedCustomer) return alert('Pilih pelanggan terlebih dahulu!');
-    if (cart.length === 0) return alert('Keranjang masih kosong!');
-
-    processTransaction(true); 
+    const isPiutangPayment = cart.some(c => c.isPiutangPayment);
+    if (!isInputStockMode && !isPiutangPayment && !selectedCustomer) return setConfirmAction({message: 'Pilih pelanggan terlebih dahulu!', isAlert: true});
+    if (cart.length === 0) return setConfirmAction({message: 'Keranjang masih kosong!', isAlert: true});
+    
+    // Validasi Pembayaran Tunai
+    const paid = amountPaid ? parseInt(amountPaid) : 0;
+    const isPiutang = paymentMethod === 'Qriss/TF' || paymentMethod === 'DP' || paymentMethod === '1 Minggu';
+    if (isPiutangPayment && paid <= 0) {
+        return setConfirmAction({
+            message: `Pembayaran pelunasan tidak valid. Silakan isi nominal Tunai terlebih dahulu sebagai syarat wajib pelunasan.`,
+            isAlert: true,
+            onConfirm: () => { setTimeout(() => document.getElementById('tunai-input')?.focus(), 100); }
+        });
+    }
+    if (!isInputStockMode && !isPiutangPayment && !isPiutang && paid < totalBelanja && totalBelanja > 0) {
+        return setConfirmAction({
+            message: `Pembayaran kurang Rp ${(totalBelanja - paid).toLocaleString('id-ID')}. Silakan isi nominal Tunai terlebih dahulu sebagai syarat wajib terjadi transaksi.`,
+            isAlert: true,
+            onConfirm: () => { setTimeout(() => document.getElementById('tunai-input')?.focus(), 100); }
+        });
+    }
+    
+    // Automatically fill WA number if customer has phone
+    if (selectedCustomer && selectedCustomer.phone && selectedCustomer.phone !== '-') {
+       setWaNumber(selectedCustomer.phone);
+    } else {
+       setWaNumber('');
+    }
+    setPrintActionModal(true);
   };
 
   const handleSavePending = () => {
-    if (cart.some(c => c.isReturn)) return alert('Selesaikan atau batalkan retur terlebih dahulu sebelum simpan pending!');
-    if (cart.length === 0) return alert('Keranjang masih kosong!');
-    if (!selectedCustomer) return alert('Pilih pelanggan terlebih dahulu!');
+    if (cart.some(c => c.isReturn)) {
+      return setConfirmAction({
+        message: 'PERINGATAN: Selesaikan atau batalkan retur terlebih dahulu sebelum simpan pending! Jangan tunda transaksi retur.',
+        isAlert: true
+      });
+    }
+    if (cart.length === 0) return setConfirmAction({message: 'Keranjang masih kosong!', isAlert: true});
+    if (!selectedCustomer) return setConfirmAction({message: 'Pilih pelanggan terlebih dahulu!', isAlert: true});
+    setConfirmAction({
+      message: 'Simpan transaksi ke daftar pending?',
+      onConfirm: () => {
+        const rawId = Date.now();
+        const dateObj = new Date();
+        const yyyymmdd = dateObj.getFullYear().toString() + String(dateObj.getMonth() + 1).padStart(2, '0') + String(dateObj.getDate()).padStart(2, '0');
+        const hhmmss = String(dateObj.getHours()).padStart(2, '0') + String(dateObj.getMinutes()).padStart(2, '0') + String(dateObj.getSeconds()).padStart(2, '0');
+        
+        let pendingUser = user?.name || 'Kasir';
+        if (storeSettings?.activeBranch) pendingUser += ' (' + storeSettings.activeBranch + ')';
+        
+        const newPending = {
+          id: `${yyyymmdd}${hhmmss}-PENDING-${selectedCustomer.name.toUpperCase().replace(/\s+/g, ' ').substring(0, 30)}`,
+          time: dateObj.toLocaleTimeString('id-ID'),
+          dateString: dateObj.toLocaleDateString('id-ID', {day: '2-digit', month: 'short', year: 'numeric'}),
+          customerName: selectedCustomer.name,
+          customerId: selectedCustomerId,
+          sales: pendingUser,
+          items: [...cart],
+          total: totalBelanja,
+        };
 
-    const newPending = {
-      id: 'PND-' + Date.now(),
-      time: new Date().toLocaleTimeString('id-ID'),
-      customerName: selectedCustomer.name,
-      customerId: selectedCustomerId,
-      items: [...cart],
-      total: totalBelanja,
-    };
+        setPendingTransactions([newPending, ...pendingTransactions]);
+        addLog('PENDING_TRANSAKSI', `Penundaan transaksi untuk pelanggan ${selectedCustomer.name}`);
+        resetKasirState();
+      }
+    });
+  };
 
-    setPendingTransactions([newPending, ...pendingTransactions]);
-    addLog('PENDING_TRANSAKSI', `Penundaan transaksi untuk pelanggan ${selectedCustomer.name}`);
-    resetKasirState();
+  const handleResetBaru = () => {
+    if (cart.length > 0) {
+      if (cart.some(c => c.isReturn)) {
+        setConfirmAction({
+          message: 'PERINGATAN KERAS: Harap simpan transaksi laporan retur! Jangan hapus transaksi ini karena sangat berbahaya dan bisa menyebabkan kehilangan omzet.',
+          isAlert: true
+        });
+      } else {
+        setConfirmAction({
+          message: 'Hapus transaksi yang sedang berjalan & buat baru?',
+          onConfirm: () => resetKasirState()
+        });
+      }
+    } else {
+      resetKasirState();
+    }
   };
 
   useEffect(() => {
@@ -395,13 +536,19 @@ export const POS = ({ currentTime }: { currentTime: Date }) => {
         handleSimpan();
       } else if (e.key === 'F9') {
         e.preventDefault();
-        handleCetakButton();
+        if (!cart.some(c => c.isReturn)) handleCetakButton();
       } else if (e.key === 'F5') {
         e.preventDefault();
-        resetKasirState();
+        handleResetBaru();
       } else if (e.key === 'F4') {
         e.preventDefault();
-        setShowPendingModal(true);
+        if (!cart.some(c => c.isReturn)) setShowPendingModal(true);
+      } else if (e.key === 'F3') {
+        e.preventDefault();
+        if (!cart.some(c => c.isReturn)) handleSavePending();
+      } else if (e.key === 'F2') {
+        e.preventDefault();
+        if (!cart.some(c => c.isReturn)) setShowPiutangModal(true);
       }
     };
     window.addEventListener('keydown', handleKeyDown);
@@ -519,11 +666,13 @@ export const POS = ({ currentTime }: { currentTime: Date }) => {
             </div>
             
             {(() => {
-              const isCashIn = !isInputStockMode ? totalBelanja >= 0 : totalBelanja < 0;
+              const parsedPaid = amountPaid ? parseInt(amountPaid) : 0;
+              const outstandingAmount = !isInputStockMode ? Math.max(0, Math.abs(totalBelanja) - parsedPaid) : Math.abs(totalBelanja);
+              const isCashInLabel = !isInputStockMode ? totalBelanja >= 0 : totalBelanja < 0;
               return (
-                <div className={`${isCashIn ? "text-green-600" : "text-red-600"} font-bold flex items-baseline gap-2 transition-colors`}>
-                  <span className="text-lg tracking-wide uppercase">{isCashIn ? "Cash In" : "Cash Out"}</span>
-                  <span className="text-4xl tracking-tighter drop-shadow-sm leading-none">{formatRp(Math.abs(totalBelanja)).replace('Rp', '').trim()}</span>
+                <div className={`${isCashInLabel ? "text-green-600" : "text-red-600"} font-bold flex items-baseline gap-2 transition-colors`}>
+                  <span className="text-lg tracking-wide uppercase">{isCashInLabel ? "Cash In" : "Cash Out"}</span>
+                  <span className="text-4xl tracking-tighter drop-shadow-sm leading-none">{formatRp(outstandingAmount).replace('Rp', '').trim()}</span>
                 </div>
               );
             })()}
@@ -635,10 +784,10 @@ export const POS = ({ currentTime }: { currentTime: Date }) => {
         ) : (
         <div className="flex items-end gap-1 w-full relative z-20 mt-1">
           <div className="flex flex-col w-[250px] shrink-0 relative">
-            <div className="flex justify-between items-center mb-0.5 mt-2">
-                <label className="text-blue-800">Kode Barang (F1)</label>
+            <div className="mb-0.5 h-[18px] flex items-center text-blue-800">
+                <label>Kode Barang (F1)</label>
             </div>
-            <input ref={codeInputRef} type="text" value={codeInput} onChange={handleCodeChange} onKeyDown={handleCodeSubmit} className="bg-white border border-gray-400 px-2 py-1.5 w-full outline-none focus:border-blue-600 shadow-inner" placeholder="Ketik Kode/Nama Barang..." />
+            <input ref={codeInputRef} type="text" value={codeInput} onChange={handleCodeChange} onKeyDown={handleCodeSubmit} className="bg-white border border-gray-400 px-2 py-1.5 h-[34px] w-full outline-none focus:border-blue-600 shadow-inner" placeholder="Ketik Kode/Nama Barang..." />
             
             {suggestions.length > 0 && (
               <div className="absolute top-full left-0 mt-0.5 w-[500px] bg-white border border-gray-400 shadow-xl max-h-[250px] overflow-y-auto text-black z-50">
@@ -659,8 +808,10 @@ export const POS = ({ currentTime }: { currentTime: Date }) => {
           </div>
 
           <div className="flex flex-col w-[60px] shrink-0">
-            <div className="h-[18px]"></div>
-            <input ref={qtyInputRef} type="number" value={qtyInput} onChange={(e) => setQtyInput(e.target.value)} onKeyDown={handleQtySubmit} className="bg-white border border-gray-400 px-1 py-1.5 w-full text-center outline-none focus:border-blue-600 shadow-inner" />
+            <div className="mb-0.5 h-[18px] flex items-center justify-center text-blue-800">
+                <label>Qty</label>
+            </div>
+            <input ref={qtyInputRef} type="number" value={qtyInput} onChange={(e) => setQtyInput(e.target.value)} onKeyDown={handleQtySubmit} className="bg-white border border-gray-400 px-1 py-1.5 h-[34px] w-full text-center outline-none focus:border-blue-600 shadow-inner" />
           </div>
           
           <div className="flex-1 flex flex-col min-w-0">
@@ -677,19 +828,19 @@ export const POS = ({ currentTime }: { currentTime: Date }) => {
 
         {/* DATA GRID */}
         <div className="flex-1 bg-white border border-gray-400 mt-1 overflow-auto shadow-inner relative z-10 min-h-[150px]">
-          <table className="w-full text-left border-collapse whitespace-nowrap text-black">
-            <thead>
-              <tr className="border-b-2 border-gray-400 bg-[#ece9d8]">
-                <th className="font-bold border-r border-gray-300 px-2 py-1.5 w-24">Kode</th>
-                <th className="font-bold border-r border-gray-300 px-2 py-1.5">Nama</th>
-                {isInputStockMode && <th className="font-bold border-r border-gray-300 px-2 py-1.5">Kategori</th>}
-                <th className="font-bold border-r border-gray-300 px-2 py-1.5 w-16 text-center">Jumlah</th>
-                <th className="font-bold border-r border-gray-300 px-2 py-1.5 w-16 text-center">Satuan</th>
-                <th className="font-bold border-r border-gray-300 px-2 py-1.5 w-28 text-right">{isInputStockMode ? 'Harga Supliyer' : 'Harga'}</th>
-                {isInputStockMode && <th className="font-bold border-r border-gray-300 px-2 py-1.5 w-28 text-right">Lvl 1 (Jual)</th>}
-                {isInputStockMode && <th className="font-bold border-r border-gray-300 px-2 py-1.5 w-28 text-right">Lvl 2 (Grosir)</th>}
-                <th className="font-bold border-r border-gray-300 px-2 py-1.5 w-28 text-right">Total</th>
-                <th className="font-bold px-2 py-1.5 w-16 text-center">Aksi</th>
+          <table className="w-full text-left border-collapse whitespace-nowrap text-black relative">
+            <thead className="sticky top-0 z-20 shadow-[0_2px_0_gray]">
+              <tr className="bg-[#ece9d8]">
+                <th className="font-bold border-r border-b-2 border-gray-400 px-2 py-1.5 w-24">Kode</th>
+                <th className="font-bold border-r border-b-2 border-gray-400 px-2 py-1.5">Nama</th>
+                {isInputStockMode && <th className="font-bold border-r border-b-2 border-gray-400 px-2 py-1.5">Kategori</th>}
+                <th className="font-bold border-r border-b-2 border-gray-400 px-2 py-1.5 w-16 text-center">Jumlah</th>
+                <th className="font-bold border-r border-b-2 border-gray-400 px-2 py-1.5 w-16 text-center">Satuan</th>
+                <th className="font-bold border-r border-b-2 border-gray-400 px-2 py-1.5 w-28 text-right">{isInputStockMode ? 'Harga Supliyer' : 'Harga'}</th>
+                {isInputStockMode && <th className="font-bold border-r border-b-2 border-gray-400 px-2 py-1.5 w-28 text-right">Lvl 1 (Jual)</th>}
+                {isInputStockMode && <th className="font-bold border-r border-b-2 border-gray-400 px-2 py-1.5 w-28 text-right">Lvl 2 (Grosir)</th>}
+                <th className="font-bold border-r border-b-2 border-gray-400 px-2 py-1.5 w-28 text-right">Total</th>
+                <th className="font-bold border-b-2 border-gray-400 px-2 py-1.5 w-16 text-center">Aksi</th>
               </tr>
             </thead>
             <tbody className="text-xs">
@@ -750,37 +901,38 @@ export const POS = ({ currentTime }: { currentTime: Date }) => {
         {/* BOTTOM SECTION */}
         <div className="flex mt-1 justify-between items-stretch gap-3 w-full">
           {/* Left Totals */}
-          <div className="flex flex-col justify-end gap-1 w-[260px] p-2 bg-[#8fb4d9] border border-white/50 shadow-sm shrink-0 rounded-sm">
-             <div className="flex items-center">
-               <span className="w-[85px] font-semibold text-blue-900 shrink-0 text-xs">SubTotal</span>
-               <input type="text" readOnly value={formatRp(totalBelanjaBaru)} className="border border-gray-400 bg-white px-1 py-0.5 text-right flex-1 min-w-0 outline-none font-bold text-sm shadow-inner" />
+          <div className="flex flex-col justify-end gap-1 w-[280px] p-2 bg-[#8fb4d9] border border-white/50 shadow-sm shrink-0 rounded-sm">
+             <div className="flex items-center h-[26px]">
+               <span className="w-[110px] font-semibold text-blue-900 shrink-0 text-xs tracking-wide">SUBTOTAL</span>
+               <input type="text" readOnly value={formatRp(totalBelanjaBaru)} className="border border-gray-400 bg-white px-1 leading-none text-right flex-1 min-w-0 h-full outline-none font-bold text-sm shadow-inner" />
              </div>
              {isInputStockMode ? (
-                 <div className="flex items-center">
-                   <span className="w-[85px] font-semibold text-blue-900 shrink-0 text-xs">Diskon %</span>
-                   <input type="number" value={stockDiscount} onChange={e => setStockDiscount(parseInt(e.target.value)||0)} className="border border-gray-400 bg-white px-1 py-0.5 text-right flex-1 min-w-0 outline-none font-bold text-sm shadow-inner text-black" />
+                 <div className="flex items-center h-[26px]">
+                   <span className="w-[110px] font-semibold text-blue-900 shrink-0 text-xs tracking-wide">DISKON %</span>
+                   <input type="number" value={stockDiscount} onChange={e => setStockDiscount(parseInt(e.target.value)||0)} className="border border-gray-400 bg-white px-1 leading-none text-right flex-1 min-w-0 h-full outline-none font-bold text-sm shadow-inner text-black" />
                  </div>
              ) : (
                  <>
-                 <div className="flex items-center">
-                   <span className="w-[85px] font-semibold text-blue-900 shrink-0 text-xs">Potongan Retur</span>
-                   <input type="text" readOnly value={formatRp(totalNilaiRetur)} className="border border-gray-400 bg-white px-1 py-0.5 text-right flex-1 min-w-0 outline-none font-bold text-sm shadow-inner" />
+                 <div className="flex items-center h-[26px]">
+                   <span className="w-[110px] font-semibold text-blue-900 shrink-0 text-xs tracking-wide">POTONGAN RETUR</span>
+                   <input type="text" readOnly value={formatRp(totalNilaiRetur)} className="border border-gray-400 bg-white px-1 leading-none text-right flex-1 min-w-0 h-full outline-none font-bold text-sm shadow-inner" />
                  </div>
-                 <div className="flex items-center">
-                   <select value={discountType} onChange={(e) => setDiscountType(e.target.value)} className="w-[85px] font-semibold text-blue-900 shrink-0 text-xs outline-none bg-transparent cursor-pointer">
-                     <option value="Rp">Diskon Rp</option>
-                     <option value="%">Diskon %</option>
+                 <div className="flex items-center h-[26px]">
+                   <select value={discountType} onChange={(e) => setDiscountType(e.target.value)} className="w-[110px] font-semibold text-blue-900 shrink-0 text-xs tracking-wide outline-none bg-transparent cursor-pointer uppercase">
+                     <option value="Rp">DISKON RP</option>
+                     <option value="%">DISKON %</option>
                    </select>
-                   <input type="text" value={discountType === 'Rp' ? formatRp(globalDiscount || 0) : (globalDiscount || '')} onChange={e => { const val = e.target.value.replace(/\D/g, ''); setGlobalDiscount(val ? parseInt(val, 10) : 0); }} className="border border-gray-400 bg-white px-1 py-0.5 text-right flex-1 min-w-0 outline-none font-bold text-sm shadow-inner text-black" placeholder={discountType === 'Rp' ? "Rp 0" : "0"} />
+                   <input type="text" value={discountType === 'Rp' ? formatRp(globalDiscount || 0) : (globalDiscount || '')} onChange={e => { const val = e.target.value.replace(/\D/g, ''); setGlobalDiscount(val ? parseInt(val, 10) : 0); }} className="border border-gray-400 bg-white px-1 leading-none text-right flex-1 min-w-0 h-full outline-none font-bold text-sm shadow-inner text-black" placeholder={discountType === 'Rp' ? "Rp 0" : "0"} />
                  </div>
                  </>
              )}
              
              {!isInputStockMode && (
                  <>
-                 <div className="flex items-center">
-                   <span className="w-[85px] font-semibold text-blue-900 shrink-0 text-xs">Tunai</span>
+                 <div className="flex items-center h-[26px]">
+                   <span className="w-[110px] font-semibold text-blue-900 shrink-0 text-xs tracking-wide">TUNAI</span>
                    <input 
+                      id="tunai-input"
                       type="text" 
                       disabled={totalBelanja < 0} 
                       value={amountPaid === "" ? "" : formatRp(Number(amountPaid) || 0)} 
@@ -788,13 +940,13 @@ export const POS = ({ currentTime }: { currentTime: Date }) => {
                          const val = e.target.value.replace(/\D/g, '');
                          setAmountPaid(val);
                       }} 
-                      className="border border-gray-400 bg-white px-1 py-0.5 text-right flex-1 min-w-0 font-bold outline-none focus:bg-yellow-50 text-sm shadow-inner disabled:bg-gray-300 text-black" 
+                      className="border border-gray-400 bg-white px-1 leading-none text-right flex-1 min-w-0 h-full font-bold outline-none focus:bg-yellow-50 text-sm shadow-inner disabled:bg-gray-300 text-black" 
                       placeholder="Rp 0" 
                    />
                  </div>
-                 <div className="flex items-center">
-                   <span className="w-[85px] font-semibold text-blue-900 shrink-0 text-xs">Kembalian</span>
-                   <input type="text" readOnly value={formatRp(kembalian > 0 ? kembalian : 0)} className="border border-gray-400 bg-white px-1 py-0.5 text-right flex-1 min-w-0 outline-none font-bold text-sm shadow-inner" />
+                 <div className="flex items-center h-[26px]">
+                   <span className="w-[110px] font-semibold text-blue-900 shrink-0 text-xs tracking-wide">KEMBALIAN</span>
+                   <input type="text" readOnly value={formatRp(kembalian > 0 ? kembalian : 0)} className="border border-gray-400 bg-white px-1 leading-none text-right flex-1 min-w-0 h-full outline-none font-bold text-sm shadow-inner" />
                  </div>
                  </>
              )}
@@ -839,20 +991,23 @@ export const POS = ({ currentTime }: { currentTime: Date }) => {
               <div className="flex gap-1.5">
                 <div className="flex flex-col gap-1 w-[120px]">
                   <button onClick={handleSimpan} className="border-2 border-gray-500 bg-gray-200 px-3 py-1.5 w-full hover:bg-gray-300 text-black font-bold shadow-sm text-xs">Simpan [F8]</button>
-                    <button onClick={handleCetakButton} className="border-2 border-gray-500 bg-gray-200 px-3 py-1.5 w-full hover:bg-gray-300 text-black font-bold shadow-sm text-xs">Cetak [F9]</button>
-                    <button onClick={resetKasirState} className="border-2 border-gray-500 bg-gray-200 px-3 py-1.5 w-full hover:bg-gray-300 text-black font-bold shadow-sm text-xs">Baru [F5]</button>
-                    <button onClick={() => setShowHistoryModal(true)} className="border-2 border-gray-500 bg-gray-200 px-3 py-1.5 w-full hover:bg-gray-300 text-black font-bold shadow-sm text-xs">Return</button>
-                    <button onClick={() => setShowBonModal(true)} className="border-2 border-gray-500 bg-gray-200 px-3 py-1.5 w-full hover:bg-gray-300 text-black font-bold shadow-sm text-xs text-red-700">Kasbon</button>
+                    <button onClick={handleCetakButton} disabled={cart.some(c => c.isReturn)} className={`border-2 border-gray-500 bg-gray-200 px-3 py-1.5 w-full text-black font-bold shadow-sm text-xs ${cart.some(c => c.isReturn) ? 'opacity-50 cursor-not-allowed' : 'hover:bg-gray-300'}`}>Cetak [F9]</button>
+                    <button onClick={handleResetBaru} className={`border-2 border-gray-500 bg-gray-200 px-3 py-1.5 w-full text-black font-bold shadow-sm text-xs ${cart.some(c => c.isReturn) ? 'opacity-50 hover:bg-red-200' : 'hover:bg-gray-300'}`}>Baru [F5]</button>
+                    <button onClick={() => setShowHistoryModal(true)} disabled={cart.some(c => c.isReturn)} className={`border-2 border-gray-500 bg-gray-200 px-3 py-1.5 w-full text-black font-bold shadow-sm text-xs ${cart.some(c => c.isReturn) ? 'opacity-50 cursor-not-allowed' : 'hover:bg-gray-300'}`}>Return</button>
+                    <button onClick={() => setShowBonModal(true)} disabled={cart.some(c => c.isReturn)} className={`border-2 border-gray-500 bg-gray-200 px-3 py-1.5 w-full text-black font-bold text-red-700 shadow-sm text-xs ${cart.some(c => c.isReturn) ? 'opacity-50 cursor-not-allowed' : 'hover:bg-gray-300'}`}>Kasbon</button>
                   </div>
                   <div className="flex flex-col gap-1 w-[130px]">
-                    <button onClick={() => setShowPiutangModal(true)} className="border-2 border-gray-500 bg-gray-200 px-3 py-1.5 w-full hover:bg-gray-300 text-black font-bold shadow-sm text-xs">Piutang [F2]</button>
-                    <button onClick={handleSavePending} className="border-2 border-gray-500 bg-gray-200 px-3 py-1.5 w-full hover:bg-gray-300 text-black font-bold shadow-sm text-xs">Pending [F3]</button>
-                    <button onClick={() => setShowPendingModal(true)} className="border-2 border-gray-500 bg-gray-200 px-3 py-1.5 w-full hover:bg-gray-300 text-black font-bold shadow-sm text-xs relative">
+                    <button onClick={() => setShowPiutangModal(true)} disabled={cart.some(c => c.isReturn)} className={`border-2 border-gray-500 bg-gray-200 px-3 py-1.5 w-full text-black font-bold shadow-sm text-xs relative ${cart.some(c => c.isReturn) ? 'opacity-50 cursor-not-allowed' : 'hover:bg-gray-300'}`}>
+                      Piutang [F2]
+                      {piutangData.length > 0 && <span className="absolute -top-1.5 -right-1.5 bg-red-600 text-white text-[10px] px-1.5 py-0.5 rounded-full shadow-lg">{piutangData.length}</span>}
+                    </button>
+                    <button onClick={handleSavePending} disabled={cart.some(c => c.isReturn)} className={`border-2 border-gray-500 bg-gray-200 px-3 py-1.5 w-full text-black font-bold shadow-sm text-xs ${cart.some(c => c.isReturn) ? 'opacity-50 cursor-not-allowed' : 'hover:bg-gray-300'}`}>Pending [F3]</button>
+                    <button onClick={() => setShowPendingModal(true)} disabled={cart.some(c => c.isReturn)} className={`border-2 border-gray-500 bg-gray-200 px-3 py-1.5 w-full text-black font-bold shadow-sm text-xs relative ${cart.some(c => c.isReturn) ? 'opacity-50 cursor-not-allowed' : 'hover:bg-gray-300'}`}>
                       Daftar Pnd [F4]
                       {pendingTransactions.length > 0 && <span className="absolute -top-1.5 -right-1.5 bg-red-600 text-white text-[10px] px-1.5 py-0.5 rounded-full shadow-lg">{pendingTransactions.length}</span>}
                     </button>
                     <button onClick={() => setIsBarcodeMode(!isBarcodeMode)} className={`border-2 border-gray-500 px-3 py-1.5 w-full font-bold shadow-sm text-xs text-white ${isBarcodeMode ? 'bg-green-600 hover:bg-green-700' : 'bg-red-600 hover:bg-red-700'}`}>Auto Scan</button>
-                    <button onClick={() => setIsPromoActive(!isPromoActive)} className={`border-2 border-gray-500 px-3 py-1.5 w-full font-bold shadow-sm text-xs text-white ${isPromoActive ? 'bg-green-600 hover:bg-green-700' : 'bg-red-600 hover:bg-red-700'}`}>Promo</button>
+                    <button onClick={() => setIsPromoActive(!isPromoActive)} disabled={cart.some(c => c.isReturn)} className={`border-2 border-gray-500 px-3 py-1.5 w-full font-bold shadow-sm text-xs text-white ${cart.some(c => c.isReturn) ? 'opacity-50 cursor-not-allowed bg-red-600' : (isPromoActive ? 'bg-green-600 hover:bg-green-700' : 'bg-red-600 hover:bg-red-700')}`}>Promo</button>
                   </div>
                 </div>
               </div>
@@ -966,6 +1121,76 @@ export const POS = ({ currentTime }: { currentTime: Date }) => {
                   </form>
               </div>
           </div>
+      )}
+
+      {/* Print Action Modal */}
+      {printActionModal && (
+        <div className="fixed inset-0 bg-black/60 z-[9999] flex items-center justify-center p-4 backdrop-blur-sm">
+          <div className="bg-[#ece9d8] border-2 border-gray-500 w-full max-w-md flex flex-col shadow-2xl">
+            <div className="bg-[#000040] text-white px-3 py-1.5 flex items-center justify-between cursor-default">
+              <span className="font-bold text-sm tracking-wide">PILIHAN CETAK</span>
+              <button onClick={() => setPrintActionModal(false)} className="text-white hover:text-red-400 font-bold px-1">X</button>
+            </div>
+            <div className="p-4 bg-white border border-gray-400 mx-2 my-2">
+              <p className="text-sm font-bold text-gray-800 text-center mb-4">Transaksi sudah divalidasi. Pilih metode pencetakan:</p>
+              
+              <div className="flex flex-col gap-4">
+                 <button onClick={() => { 
+                     setPrintActionModal(false); 
+                     processTransaction(true); 
+                 }} className="px-5 py-3 border-2 border-gray-500 bg-blue-100 hover:bg-blue-200 font-bold shadow-sm text-sm text-blue-900 border-b-4">
+                     🖨️ Cetak Pakai Nota (Printer)
+                 </button>
+
+                 <div className="border-2 border-gray-400 p-3 bg-green-50 shadow-inner">
+                    <p className="text-xs font-bold text-green-800 mb-2">📲 Cetak Online (Via WhatsApp)</p>
+                    <form onSubmit={(e) => {
+                         e.preventDefault();
+                         if (!waNumber) return setConfirmAction({message: 'Silakan masukkan nomor WhatsApp!', isAlert: true});
+                         setPrintActionModal(false);
+                         processTransaction(false);
+                         const dummyLink = 'https://navapos.com/nota/' + Date.now();
+                         const text = encodeURIComponent(`Halo, Terimakasih telah berbelanja.. Berikut link nota Anda: ${dummyLink}`);
+                         window.open(`https://web.whatsapp.com/send?phone=${waNumber.replace(/[^0-9]/g, '')}&text=${text}`, '_blank');
+                    }} className="flex flex-col gap-2">
+                        <input 
+                            type="text" 
+                            placeholder="Nomor WA (contoh: 0812...)" 
+                            value={waNumber} 
+                            onChange={(e) => setWaNumber(e.target.value)}
+                            className="p-1.5 border border-gray-400 outline-none focus:border-green-600 text-sm w-full"
+                        />
+                        <button type="submit" className="w-full py-1.5 border-2 border-gray-500 bg-green-600 text-white font-bold text-xs hover:bg-green-700">Kirim Link Nota Via WA</button>
+                    </form>
+                 </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Confirm Action Modal */}
+      {confirmAction && (
+        <div className="fixed inset-0 bg-black/60 z-[9999] flex items-center justify-center p-4">
+          <div className="bg-[#ece9d8] border-2 border-gray-500 w-full max-w-sm flex flex-col shadow-2xl">
+            <div className="bg-[#000040] text-white px-3 py-1.5 flex items-center justify-center cursor-default">
+              <span className="font-bold text-sm tracking-wide">{confirmAction.isAlert ? 'PERHATIAN' : 'KONFIRMASI'}</span>
+            </div>
+            <div className="p-6 bg-white border border-gray-400 mx-2 my-2 text-center">
+              <p className="text-sm font-bold text-gray-800 text-center mb-6">{confirmAction.message}</p>
+              <div className="flex justify-center gap-3">
+                {confirmAction.isAlert ? (
+                   <button onClick={() => { confirmAction.onConfirm && confirmAction.onConfirm(); setConfirmAction(null); }} className="px-5 py-2 border-2 border-blue-900 bg-blue-700 text-white hover:bg-blue-800 font-bold shadow-sm text-xs">OK, MENGERTI</button>
+                ) : (
+                   <>
+                     <button onClick={() => setConfirmAction(null)} className="px-5 py-2 border-2 border-gray-500 bg-gray-200 hover:bg-gray-300 font-bold shadow-sm text-xs">BATAL</button>
+                     <button onClick={() => { confirmAction.onConfirm && confirmAction.onConfirm(); setConfirmAction(null); }} className="px-5 py-2 border-2 border-blue-900 bg-blue-700 text-white hover:bg-blue-800 font-bold shadow-sm text-xs">YA, LANJUTKAN</button>
+                   </>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

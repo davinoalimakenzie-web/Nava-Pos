@@ -148,7 +148,7 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
   };
 
   // Cross-cutting states
-  const [pendingTransactions, setPendingTransactions] = useState<any[]>([]);
+  const [pendingTransactions, setPendingTransactions] = useSyncState<any[]>('pendingTransactions', [], storeSettings.syncEnabled);
 
   // POS specific global states
   const [cart, setCart] = useState<any[]>([]);

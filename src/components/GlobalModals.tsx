@@ -32,6 +32,9 @@ export const GlobalModals = () => {
     const [newEmpPos, setNewEmpPos] = useState('');
     const [newEmpBranch, setNewEmpBranch] = useState(storeSettings?.branches?.[0] || 'Kudus');
     const [authPassword, setAuthPassword] = useState('');
+    const [pendingSearch, setPendingSearch] = useState('');
+    const [selectedPendingId, setSelectedPendingId] = useState<string | null>(null);
+    const [showAllPending, setShowAllPending] = useState(false);
 
     const loadPendingTransaction = (pendingItem: any) => {
         setCart(pendingItem.items);
@@ -40,9 +43,25 @@ export const GlobalModals = () => {
         setShowPendingModal(false);
     };
 
-    const bayarPiutang = (id: string) => {
-        setPiutangData(piutangData.filter((p: any) => p.id !== id));
-        alert('Piutang dilunasi!');
+    const bayarPiutang = (p: any) => {
+        const itemPiutang = {
+          id: p.id,
+          code: 'PIUTANG',
+          name: `Pelunasan Piutang - ${p.customer}`,
+          price: p.sisa,
+          qty: 1,
+          isReturn: false,
+          isPiutangPayment: true,
+          piutangId: p.id,
+          originalPiutangData: p,
+          cartUniqueId: 'ITEM-' + Date.now() + Math.random()
+        };
+        const customer = customers.find((c: any) => c.name === p.customer);
+        if (customer) {
+            setSelectedCustomerId(customer.id);
+        }
+        setCart([itemPiutang]);
+        setShowPiutangModal(false);
     };
 
     const handleAddExpense = (e: React.FormEvent) => {
@@ -141,46 +160,96 @@ export const GlobalModals = () => {
                 </div>
             )}
 
-            {showPendingModal && (
-                <div className="fixed inset-0 bg-black/50 z-[80] flex items-center justify-center p-4 backdrop-blur-sm">
-                    <div className="bg-[#8fb4d9] border-2 border-gray-400 w-full max-w-2xl flex flex-col shadow-xl h-[70vh]">
-                        <div className="bg-[#000080] text-white px-2 py-1 flex items-center font-bold text-xs justify-between shrink-0">
-                        <span>Daftar Transaksi Pending</span>
-                        <button onClick={() => setShowPendingModal(false)} className="bg-gray-300 text-black px-1.5 font-bold hover:bg-red-500 hover:text-white border border-gray-400">X</button>
-                        </div>
-                        <div className="p-2 overflow-y-auto flex-1 text-black">
-                        {pendingTransactions.length === 0 ? (
-                            <div className="bg-white border border-gray-400 p-4 text-center text-sm">Tidak ada transaksi yang dipending.</div>
-                        ) : (
-                            <table className="w-full text-left bg-white border border-gray-400 border-collapse">
-                            <thead>
-                                <tr className="border-b-2 border-gray-400 bg-gray-100">
-                                <th className="p-2 border-r border-gray-300 font-bold">Waktu / ID</th>
-                                <th className="p-2 border-r border-gray-300 font-bold">Pelanggan</th>
-                                <th className="p-2 border-r border-gray-300 font-bold">Item</th>
-                                <th className="p-2 border-r border-gray-300 font-bold text-right">Total</th>
-                                <th className="p-2 font-bold text-center">Aksi</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {pendingTransactions.map((p: any) => (
-                                <tr key={p.id} className="border-b hover:bg-blue-50">
-                                    <td className="p-2 border-r border-gray-300">{p.time} / {p.id}</td>
-                                    <td className="p-2 border-r border-gray-300 font-bold">{p.customerName}</td>
-                                    <td className="p-2 border-r border-gray-300">{p.items.reduce((acc: number, item: any) => acc + item.qty, 0)} Pcs</td>
-                                    <td className="p-2 border-r border-gray-300 text-right font-bold text-blue-900">{formatRp(p.total)}</td>
-                                    <td className="p-2 text-center">
-                                    <button onClick={() => loadPendingTransaction(p)} className="border-2 border-gray-500 bg-gray-200 hover:bg-gray-300 px-3 py-1 font-bold shadow-sm">Lanjutkan</button>
-                                    </td>
-                                </tr>
-                                ))}
-                            </tbody>
-                            </table>
-                        )}
-                        </div>
-                    </div>
-                </div>
-            )}
+            {showPendingModal && (() => {
+                const filteredPendingTransactions = pendingTransactions.filter((p: any) => {
+                  const matchSearch = showAllPending || p.id.toLowerCase().includes(pendingSearch.toLowerCase()) || 
+                                     p.customerName.toLowerCase().includes(pendingSearch.toLowerCase());
+                  const matchBranch = p.sales?.includes(storeSettings?.activeBranch || 'Pusat');
+                  return matchSearch && matchBranch;
+                });
+                
+                const processSelectedPending = () => {
+                  if (selectedPendingId) {
+                    const found = pendingTransactions.find((p:any) => p.id === selectedPendingId);
+                    if (found) {
+                      loadPendingTransaction(found);
+                      setShowPendingModal(false);
+                    }
+                  }
+                };
+                
+                const handlePendingKeyDown = (e: React.KeyboardEvent) => {
+                  if (e.key === 'Enter') {
+                    processSelectedPending();
+                  } else if (e.key === 'Escape') {
+                    setShowPendingModal(false);
+                  }
+                };
+
+                return (
+                 <div className="fixed inset-0 bg-black/50 z-[80] flex items-center justify-center p-4 backdrop-blur-sm" onKeyDown={handlePendingKeyDown}>
+                     <div className="bg-[#ece9d8] border-2 border-gray-400 w-full max-w-4xl flex flex-col shadow-xl h-[70vh] rounded-md overflow-hidden">
+                         <div className="bg-white px-3 py-2 flex items-center justify-between shrink-0 border-b border-gray-300">
+                           <span className="text-sm">Daftar Transaksi Pending</span>
+                           <button onClick={() => setShowPendingModal(false)} className="text-black font-bold hover:bg-gray-200 px-1">X</button>
+                         </div>
+                         <div className="p-3 flex-1 flex flex-col gap-2 overflow-hidden bg-[#ece9d8]">
+                           <div className="bg-white border text-black border-gray-400 flex-1 overflow-auto rounded-sm relative">
+                             <table className="w-full text-left border-collapse text-xs">
+                             <thead className="sticky top-0 bg-white shadow-sm z-10">
+                                 <tr className="border-b border-gray-400">
+                                 <th className="p-1 px-2 border-r border-gray-300 font-normal">KODE PENDING</th>
+                                 <th className="p-1 px-2 border-r border-gray-300 font-normal">TANGGAL</th>
+                                 <th className="p-1 px-2 border-r border-gray-300 font-normal w-1/3">PELANGGAN</th>
+                                 <th className="p-1 px-2 border-gray-300 font-normal">SALES</th>
+                                 </tr>
+                             </thead>
+                             <tbody>
+                                 {filteredPendingTransactions.map((p: any) => (
+                                 <tr 
+                                   key={p.id} 
+                                   onClick={() => setSelectedPendingId(p.id)}
+                                   onDoubleClick={() => {
+                                     setSelectedPendingId(p.id);
+                                     setTimeout(() => {
+                                       loadPendingTransaction(p);
+                                       setShowPendingModal(false);
+                                     }, 10);
+                                   }}
+                                   className={`border-b cursor-pointer ${selectedPendingId === p.id ? 'bg-[#3399ff] text-white' : 'hover:bg-blue-50 text-black'}`}>
+                                     <td className={`p-1 px-2 border-r ${selectedPendingId === p.id ? 'border-blue-400' : 'border-gray-200'}`}>{p.id}</td>
+                                     <td className={`p-1 px-2 border-r ${selectedPendingId === p.id ? 'border-blue-400' : 'border-gray-200'}`}>{p.dateString || p.time} {p.time}</td>
+                                     <td className={`p-1 px-2 border-r ${selectedPendingId === p.id ? 'border-blue-400' : 'border-gray-200'}`}>{p.customerName}</td>
+                                     <td className={`p-1 px-2 ${selectedPendingId === p.id ? 'border-blue-400' : 'border-gray-200'}`}>{p.sales || '-'}</td>
+                                 </tr>
+                                 ))}
+                             </tbody>
+                             </table>
+                           </div>
+                           <div className="flex gap-2 items-center bg-[#8fb4d9] border border-gray-400 p-2 shrink-0">
+                               <span className="font-bold text-blue-900 text-sm whitespace-nowrap drop-shadow-sm">CARI ATAU TEKAN ENTER :</span>
+                               <input 
+                                  type="text" 
+                                  value={pendingSearch} 
+                                  onChange={(e) => setPendingSearch(e.target.value)} 
+                                  className="flex-1 bg-white border border-gray-400 px-2 text-black py-0.5 outline-none focus:border-blue-600"
+                                  autoFocus
+                               />
+                               <button onClick={processSelectedPending} className="border border-gray-400 bg-[#ece9d8] hover:bg-gray-200 px-3 py-0.5 text-black text-xs font-medium">Pilih, Enter Atau Dobel Klik</button>
+                               <button onClick={() => { setShowAllPending(false); setPendingSearch(''); }} className={`border border-gray-400 px-3 py-0.5 text-black text-xs font-medium bg-[#ece9d8] hover:bg-gray-200`}>Show All</button>
+                               <button onClick={() => {
+                                  if (selectedPendingId) {
+                                     setPendingTransactions(pendingTransactions.filter((pt:any) => pt.id !== selectedPendingId));
+                                     setSelectedPendingId(null);
+                                  }
+                               }} className="border border-gray-400 bg-[#ece9d8] hover:bg-gray-200 px-3 py-0.5 text-black text-xs font-medium">Hapus</button>
+                               <button onClick={() => setShowPendingModal(false)} className="border border-gray-400 bg-[#ece9d8] hover:bg-gray-200 px-3 py-0.5 text-black text-xs font-medium">Keluar (Esc)</button>
+                           </div>
+                         </div>
+                     </div>
+                 </div>
+                );
+            })()}
 
             {showPiutangModal && (
                 <div className="fixed inset-0 bg-black/50 z-[80] flex items-center justify-center p-4 backdrop-blur-sm">
@@ -211,7 +280,7 @@ export const GlobalModals = () => {
                                 <td className="p-2 border-r border-gray-300 text-right">{formatRp(p.total)}</td>
                                 <td className="p-2 border-r border-gray-300 text-right font-bold text-red-600 text-sm">{formatRp(p.sisa)}</td>
                                 <td className="p-2 text-center">
-                                <button onClick={() => bayarPiutang(p.id)} className="border-2 border-gray-500 bg-gray-200 hover:bg-gray-300 px-3 py-1 font-bold shadow-sm">Terima Cicilan/Lunas</button>
+                                <button onClick={() => bayarPiutang(p)} className="border-2 border-gray-500 bg-gray-200 hover:bg-gray-300 px-3 py-1 font-bold shadow-sm">Pelunasan</button>
                                 </td>
                             </tr>
                             ))}
