@@ -12,10 +12,22 @@ export const Sidebar = () => {
 
   return (
     <div 
-      onMouseEnter={() => setIsExpanded(true)}
-      onMouseLeave={() => setIsExpanded(false)}
       className={`relative flex flex-col min-h-screen shrink-0 shadow-2xl z-20 transition-all duration-300 ease-in-out bg-slate-900 text-white ${isExpanded ? 'w-[40%] sm:w-56' : 'w-16'}`}
     >
+      {/* Toggle Separator Line on the right */}
+      <div 
+        onClick={() => setIsExpanded(!isExpanded)}
+        className="absolute right-0 top-0 bottom-0 w-4 group cursor-pointer z-30"
+        title="Toggle Sidebar"
+      >
+        <div className="absolute right-0 top-0 bottom-0 w-[2px] bg-slate-700/50 group-hover:bg-blue-500 transition-colors"></div>
+        <button 
+          className="absolute top-1/2 right-0 -translate-y-1/2 w-4 h-12 bg-slate-800 border border-slate-600 rounded-l flex items-center justify-center text-slate-400 group-hover:bg-blue-600 group-hover:text-white group-hover:border-blue-500 transition-all shadow-md"
+        >
+          {isExpanded ? <ChevronLeft className="w-3 h-3 -ml-0.5" /> : <ChevronRight className="w-3 h-3 -ml-0.5" />}
+        </button>
+      </div>
+
       <div className={`p-4 border-b border-slate-700/50 sticky top-0 bg-slate-900 z-10 flex items-center ${isExpanded ? 'justify-start' : 'justify-center'} min-h-[64px]`}>
         <div className="flex items-center gap-3">
           <div className="bg-blue-500 p-1.5 rounded shrink-0"><ShoppingCart className="w-5 h-5 text-white" /></div>

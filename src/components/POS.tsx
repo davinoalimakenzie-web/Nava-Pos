@@ -25,7 +25,8 @@ export const POS = ({ currentTime }: { currentTime: Date }) => {
     setShowPendingModal, setShowPiutangModal, setShowPrintOptionsModal,
     setShowExpenseModal, setShowAddCustomerModal,
     setMasterDataTab, setPendingUser, setShowAuthModal, storeSettings,
-    appLogs, addLog, employees
+    appLogs, addLog, employees,
+    isInputStockMode, setIsInputStockMode
   } = useAppContext();
 
   const selectedCustomer = customers.find((c: any) => String(c.id) === String(selectedCustomerId));
@@ -44,7 +45,6 @@ export const POS = ({ currentTime }: { currentTime: Date }) => {
   const [bonAmount, setBonAmount] = useState('');
   const [bonReason, setBonReason] = useState('');
 
-  const [isInputStockMode, setIsInputStockMode] = useState(false);
   const [isBarcodeMode, setIsBarcodeMode] = useState(true);
   const [confirmAction, setConfirmAction] = useState<{message: string, isAlert?: boolean, onConfirm?: () => void} | null>(null);
   const [printActionModal, setPrintActionModal] = useState(false);
@@ -288,7 +288,7 @@ export const POS = ({ currentTime }: { currentTime: Date }) => {
 
   const processTransaction = (shouldPrint = false) => {
     const isPiutang = paymentMethod === 'Qriss/TF' || paymentMethod === 'DP' || paymentMethod === '1 Minggu';
-    const noFaktur = `FAK-${new Date().toISOString().slice(2, 10).replace(/-/g, '')}-${Math.floor(Math.random() * 10000).toString().padStart(4, '0')}`;
+    const noFaktur = `FAK-${(() => { const d = new Date(); return String(d.getFullYear()).slice(2) + String(d.getMonth()+1).padStart(2,'0') + String(d.getDate()).padStart(2,'0'); })()}-${Math.floor(Math.random() * 10000).toString().padStart(4, '0')}`;
     
     if (isInputStockMode) {
        const supplier = suppliers.find((s: any) => s.id.toString() === stockSupplierId);
@@ -318,7 +318,7 @@ export const POS = ({ currentTime }: { currentTime: Date }) => {
        const newTransaction = {
           id: purchaseFaktur,
           date: `${transactionDate} ${currentTime.toLocaleTimeString('id-ID')}`,
-          isoDate: new Date(transactionDate).toISOString(), 
+          isoDate: (() => { const [y,m,d] = transactionDate.split('-'); return new Date(parseInt(y), parseInt(m)-1, parseInt(d), currentTime.getHours(), currentTime.getMinutes(), currentTime.getSeconds()).toISOString(); })(), 
           customer: supplier?.name || 'Unknown', // Keep customer field for compatibility, or add supplier
           supplier: supplier?.name || 'Unknown',
           items: [...cart],
@@ -339,7 +339,7 @@ export const POS = ({ currentTime }: { currentTime: Date }) => {
            const newExpense = {
               id: 'EXP-' + Date.now(),
               date: `${transactionDate} ${currentTime.toLocaleTimeString('id-ID')}`,
-              isoDate: new Date(transactionDate).toISOString(),
+              isoDate: (() => { const [y,m,d] = transactionDate.split('-'); return new Date(parseInt(y), parseInt(m)-1, parseInt(d), currentTime.getHours(), currentTime.getMinutes(), currentTime.getSeconds()).toISOString(); })(),
               name: `Pembelian Stok ${purchaseFaktur}`,
               amount: finalTotalCost,
               cashier: user.name,
@@ -383,7 +383,7 @@ export const POS = ({ currentTime }: { currentTime: Date }) => {
         const piutangTransaction = {
           id: noFaktur.replace('FAK', 'PLN'),
           date: `${transactionDate} ${currentTime.toLocaleTimeString('id-ID')}`,
-          isoDate: new Date(transactionDate).toISOString(), 
+          isoDate: (() => { const [y,m,d] = transactionDate.split('-'); return new Date(parseInt(y), parseInt(m)-1, parseInt(d), currentTime.getHours(), currentTime.getMinutes(), currentTime.getSeconds()).toISOString(); })(), 
           customer: selectedCustomer?.name || piutangPaymentItem.name.replace('Pelunasan Piutang - ', ''),
           items: [...cart],
           total: paid, 
@@ -419,7 +419,7 @@ export const POS = ({ currentTime }: { currentTime: Date }) => {
     const newTransaction = {
       id: noFaktur,
       date: `${transactionDate} ${currentTime.toLocaleTimeString('id-ID')}`,
-      isoDate: new Date(transactionDate).toISOString(), 
+      isoDate: (() => { const [y,m,d] = transactionDate.split('-'); return new Date(parseInt(y), parseInt(m)-1, parseInt(d), currentTime.getHours(), currentTime.getMinutes(), currentTime.getSeconds()).toISOString(); })(), 
       customer: selectedCustomer.name,
       items: [...cart],
       total: totalBelanja, 

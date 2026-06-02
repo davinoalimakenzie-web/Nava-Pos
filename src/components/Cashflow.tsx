@@ -10,10 +10,11 @@ export const Cashflow = ({ currentTime }: { currentTime: Date }) => {
   const [cashflowTab, setCashflowTab] = useState('harian');
   const [cashflowHarianSubTab, setCashflowHarianSubTab] = useState('laporan');
   
+  const defaultDateStr = (() => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; })();
   const [filterUseStart, setFilterUseStart] = useState(true);
-  const [filterStartDate, setFilterStartDate] = useState(new Date().toISOString().split('T')[0]);
+  const [filterStartDate, setFilterStartDate] = useState(defaultDateStr);
   const [filterUseEnd, setFilterUseEnd] = useState(true);
-  const [filterEndDate, setFilterEndDate] = useState(new Date().toISOString().split('T')[0]);
+  const [filterEndDate, setFilterEndDate] = useState(defaultDateStr);
   const [filterBranch, setFilterBranch] = useState('Semua Cabang');
 
   const [filterPaymentMethod, setFilterPaymentMethod] = useState('Semua');
@@ -34,7 +35,8 @@ export const Cashflow = ({ currentTime }: { currentTime: Date }) => {
   
   const filteredTransactions = transactions.filter((t: any) => {
     if (t.type === 'PEMBELIAN') return false; // Exclude from income logic
-    if (filterBranch !== 'Semua Cabang' && (t.branch || 'Pusat') !== filterBranch) return false;
+    const txBranch = t.branch || (t.cashier?.includes('Pati') ? 'Pati' : 'Kudus');
+    if (filterBranch !== 'Semua Cabang' && txBranch !== filterBranch) return false;
     
     if (filterPaymentMethod === 'TUNAI' && t.method !== 'TUNAI') return false;
     if (filterPaymentMethod === 'NON-TUNAI' && t.method === 'TUNAI') return false;
@@ -43,19 +45,31 @@ export const Cashflow = ({ currentTime }: { currentTime: Date }) => {
 
     const tDate = new Date(t.isoDate || new Date().toISOString());
     tDate.setHours(0,0,0,0);
-    const start = new Date(filterStartDate); start.setHours(0,0,0,0);
-    const end = new Date(filterEndDate); end.setHours(0,0,0,0);
+    
+    // Safely parse YYYY-MM-DD to local date
+    const [sY, sM, sD] = filterStartDate.split('-');
+    const start = new Date(parseInt(sY), parseInt(sM) - 1, parseInt(sD), 0, 0, 0, 0);
+    
+    const [eY, eM, eD] = filterEndDate.split('-');
+    const end = new Date(parseInt(eY), parseInt(eM) - 1, parseInt(eD), 0, 0, 0, 0);
+
     if (filterUseStart && tDate < start) return false;
     if (filterUseEnd && tDate > end) return false;
     return true;
   });
 
   const filteredExpenses = expenses.filter((e: any) => {
-    if (filterBranch !== 'Semua Cabang' && (e.branch || 'Pusat') !== filterBranch) return false;
+    const exBranch = e.branch || (e.cashier?.includes('Pati') ? 'Pati' : 'Kudus');
+    if (filterBranch !== 'Semua Cabang' && exBranch !== filterBranch) return false;
     const eDate = new Date(e.isoDate || new Date().toISOString());
     eDate.setHours(0,0,0,0);
-    const start = new Date(filterStartDate); start.setHours(0,0,0,0);
-    const end = new Date(filterEndDate); end.setHours(0,0,0,0);
+    
+    const [sY, sM, sD] = filterStartDate.split('-');
+    const start = new Date(parseInt(sY), parseInt(sM) - 1, parseInt(sD), 0, 0, 0, 0);
+    
+    const [eY, eM, eD] = filterEndDate.split('-');
+    const end = new Date(parseInt(eY), parseInt(eM) - 1, parseInt(eD), 0, 0, 0, 0);
+
     if (filterUseStart && eDate < start) return false;
     if (filterUseEnd && eDate > end) return false;
     return true;

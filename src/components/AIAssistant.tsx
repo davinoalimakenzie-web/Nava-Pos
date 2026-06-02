@@ -1,12 +1,13 @@
-import React, { useState } from 'react';
-import { Bot, User, CheckCircle2, Package, FileText, Send, UploadCloud, MessageSquare } from 'lucide-react';
+import React, { useState, useRef } from 'react';
+import { Bot, User, CheckCircle2, Package, FileText, Send, UploadCloud, MessageSquare, Paperclip } from 'lucide-react';
 import { useAppContext } from '../context/AppContext';
 import { LegacyWindowHeader } from './LegacyWindowHeader';
 import { formatRp } from '../utils';
+import * as XLSX from 'xlsx';
 
 export const AIAssistant = ({ currentTime }: { currentTime: Date }) => {
-  const { orderData, inventory, setInventory, setActiveTab, setMasterDataTab, botMemory, setBotMemory } = useAppContext();
-  const [aiTab, setAiTab] = useState('dashboard');
+  const { orderData, inventory, setInventory, setActiveTab, setMasterDataTab, botMemory, setBotMemory, cart, setCart, setIsInputStockMode } = useAppContext();
+  const [aiTab, setAiTab] = useState('chat');
   const [isLoadingCs, setIsLoadingCs] = useState(false);
   
   // CS State
@@ -26,7 +27,28 @@ export const AIAssistant = ({ currentTime }: { currentTime: Date }) => {
 
   // Input Data State
   const [unstructuredText, setUnstructuredText] = useState('');
-  const [parsedResult, setParsedResult] = useState<any>(null);
+
+  // Generic AI Feature State
+  const [genResponses, setGenResponses] = useState<Record<string, string>>({});
+  const [isProcessingGen, setIsProcessingGen] = useState<Record<string, boolean>>({});
+
+  const handleRunAiFeature = async (featureKey: string, systemInstruction: string, promptText: string) => {
+    setIsProcessingGen(prev => ({...prev, [featureKey]: true}));
+    setGenResponses(prev => ({...prev, [featureKey]: ''}));
+    try {
+        const response = await fetch('/api/gemini', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ prompt: promptText, systemInstruction })
+        });
+        const data = await response.json();
+        setGenResponses(prev => ({...prev, [featureKey]: data.text || 'Gagal memproses data. Coba lagi.'}));
+    } catch (err: any) {
+        setGenResponses(prev => ({...prev, [featureKey]: 'Terjadi kesalahan: ' + err.message}));
+    } finally {
+        setIsProcessingGen(prev => ({...prev, [featureKey]: false}));
+    }
+  };
 
   const handleSendChat = async (e: React.FormEvent) => {
      e.preventDefault();
@@ -80,20 +102,43 @@ Silahkan jawab pelanggan dengan ramah, informatif, gunakan bahasa Indonesia. Jik
   };
 
   const [isParsing, setIsParsing] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+      const file = e.target.files?.[0];
+      if (!file) return;
+
+      const reader = new FileReader();
+      reader.onload = (evt) => {
+          try {
+              const bstr = evt.target?.result;
+              const wb = XLSX.read(bstr, { type: 'binary' });
+              const wsname = wb.SheetNames[0];
+              const ws = wb.Sheets[wsname];
+              const data = XLSX.utils.sheet_to_csv(ws);
+              
+              setUnstructuredText(prev => prev + '\n' + data);
+          } catch (err) {
+              alert('Gagal membaca file excel.');
+          }
+      };
+      reader.readAsBinaryString(file);
+  };
 
   const handleParseData = async () => {
       if (!unstructuredText.trim()) return;
       setIsParsing(true);
       
       try {
-          const sysInstr = `Kamu adalah bot Parsing Data Inventory POS. Tugasmu adalah mengekstrak intent untuk menambah stok barang.
+          const sysInstr = `Kamu adalah bot Parsing Data Inventory POS. Tugasmu adalah mengekstrak SEMUA intent untuk penambahan stok barang dari teks (bisa dari chat atau file CSV/Excel).
 Ini daftar item di database:
 ${inventory.map((i:any) => `ID:${i.id} | Nama:${i.name} | Kode:${i.code}`).join('\n')}
 
-Format balasamu WAJIB HANYA JSON SEPERTI INI:
-{"found": true/false, "itemId": number_or_null, "qtyToAdd": number_or_0, "message": "Pesan balasan ramah"}
-
-Jangan sertakan markdown \`\`\`json.`;
+Format balasamu WAJIB HANYA JSON ARRAY SEPERTI INI (jangan beri markdown \`\`\`json):
+[
+  {"itemId": number, "qtyToAdd": number}
+]
+Hanya kembalikan array JSON. Jangan ada teks lain. Ekstraklah sebanyak mungkin barang yang relevan. Jika tidak ada yang cocok kembalikan array kosong [].`;
 
           const response = await fetch('/api/gemini', {
              method: 'POST',
@@ -109,39 +154,41 @@ Jangan sertakan markdown \`\`\`json.`;
              throw new Error(data.error || "AI service unavailable");
           }
           let jsonStr = data.text.replace(/```json/g, '').replace(/```/g, '').trim();
-          const pData = JSON.parse(jsonStr);
+          const pDataArray = JSON.parse(jsonStr);
 
-          if (pData.found && pData.itemId && pData.qtyToAdd > 0) {
-              const matchedItem = inventory.find((i:any) => i.id === pData.itemId);
-              if (matchedItem) {
-                  setParsedResult({
-                      item: matchedItem,
-                      qtyToAdd: pData.qtyToAdd,
-                      message: pData.message || `Sistem mendeteksi penambahan stok untuk [${matchedItem.name}] sebanyak ${pData.qtyToAdd} Pcs.`
-                  });
+          if (Array.isArray(pDataArray) && pDataArray.length > 0) {
+              const itemsToAdd: any[] = [];
+              pDataArray.forEach((pData: any) => {
+                  const matchedItem = inventory.find((i:any) => i.id === pData.itemId);
+                  if (matchedItem && pData.qtyToAdd > 0) {
+                      itemsToAdd.push({
+                          ...matchedItem,
+                          qty: pData.qtyToAdd,
+                          price: matchedItem.supplierPrice || 0,
+                          isReturn: false,
+                          cartUniqueId: 'ITEM-' + Date.now() + Math.random()
+                      });
+                  }
+              });
+
+              if (itemsToAdd.length > 0) {
+                  // Switch to POS and put into cart
+                  setCart((prev: any[]) => [...prev, ...itemsToAdd]);
+                  setIsInputStockMode(true);
+                  setActiveTab('pos');
+                  setUnstructuredText('');
               } else {
-                  alert('Sistem salah mengenali ID item. Silakan coba deskripsi yang lebih spesifik.');
+                  alert('Tidak ada barang yang cocok dengan database master stock.');
               }
           } else {
-              alert(pData.message || 'Barang atau Qty tidak ditemukan. Pastikan nama barang sesuai.');
+              alert('Tidak ada data yang terdeteksi untuk ditambahkan.');
           }
       } catch (err: any) {
           console.error(err);
-          alert('Gagal menghubungi AI: ' + err.message);
+          alert('Gagal mengekstrak data JSON dari AI: ' + err.message);
       } finally {
           setIsParsing(false);
       }
-  };
-
-  const handleConfirmAddStock = () => {
-      if (!parsedResult) return;
-      const updatedInv = inventory.map((i: any) => 
-          i.id === parsedResult.item.id ? { ...i, stock: i.stock + parsedResult.qtyToAdd } : i
-      );
-      setInventory(updatedInv);
-      alert('Stok berhasil diperbarui melalui Smart Data Input!');
-      setParsedResult(null);
-      setUnstructuredText('');
   };
 
   return (
@@ -149,108 +196,19 @@ Jangan sertakan markdown \`\`\`json.`;
       <LegacyWindowHeader title="AI SMART ASSISTANT" currentTime={currentTime} />
       
       <div className="flex gap-1 shrink-0 bg-[#ece9d8] p-1 border-b border-gray-400 shadow-sm z-10 overflow-x-auto no-scrollbar">
-         <button onClick={() => setAiTab('dashboard')} className={`px-2.5 py-1 text-[10px] md:text-xs md:px-4 md:py-1.5 whitespace-nowrap shrink-0 border border-gray-500 font-bold hover:bg-white ${aiTab === 'dashboard' ? 'bg-white border-b-white text-blue-900' : 'bg-gray-200 text-black'}`}>Dashboard</button>
-         <button onClick={() => setAiTab('cs')} className={`px-2.5 py-1 text-[10px] md:text-xs md:px-4 md:py-1.5 whitespace-nowrap shrink-0 border border-gray-500 font-bold hover:bg-white ${aiTab === 'cs' ? 'bg-white border-b-white text-blue-900' : 'bg-gray-200 text-black'}`}>Bot WhatsApp CS</button>
+         <button onClick={() => setAiTab('chat')} className={`px-2.5 py-1 text-[10px] md:text-xs md:px-4 md:py-1.5 whitespace-nowrap shrink-0 border border-gray-500 font-bold hover:bg-white ${aiTab === 'chat' ? 'bg-white border-b-white text-blue-900' : 'bg-gray-200 text-black'}`}>AI Chat Assistant</button>
          <button onClick={() => setAiTab('input')} className={`px-2.5 py-1 text-[10px] md:text-xs md:px-4 md:py-1.5 whitespace-nowrap shrink-0 border border-gray-500 font-bold hover:bg-white ${aiTab === 'input' ? 'bg-white border-b-white text-blue-900' : 'bg-gray-200 text-black'}`}>Smart Data Input</button>
+         <button onClick={() => setAiTab('insight')} className={`px-2.5 py-1 text-[10px] md:text-xs md:px-4 md:py-1.5 whitespace-nowrap shrink-0 border border-gray-500 font-bold hover:bg-white ${aiTab === 'insight' ? 'bg-white border-b-white text-purple-900' : 'bg-gray-200 text-black'}`}>AI Insight</button>
+         <button onClick={() => setAiTab('forecast')} className={`px-2.5 py-1 text-[10px] md:text-xs md:px-4 md:py-1.5 whitespace-nowrap shrink-0 border border-gray-500 font-bold hover:bg-white ${aiTab === 'forecast' ? 'bg-white border-b-white text-indigo-900' : 'bg-gray-200 text-black'}`}>AI Forecast</button>
+         <button onClick={() => setAiTab('profit')} className={`px-2.5 py-1 text-[10px] md:text-xs md:px-4 md:py-1.5 whitespace-nowrap shrink-0 border border-gray-500 font-bold hover:bg-white ${aiTab === 'profit' ? 'bg-white border-b-white text-emerald-900' : 'bg-gray-200 text-black'}`}>Profit Analyzer</button>
+         <button onClick={() => setAiTab('promo')} className={`px-2.5 py-1 text-[10px] md:text-xs md:px-4 md:py-1.5 whitespace-nowrap shrink-0 border border-gray-500 font-bold hover:bg-white ${aiTab === 'promo' ? 'bg-white border-b-white text-rose-900' : 'bg-gray-200 text-black'}`}>Promo Generator</button>
+         <button onClick={() => setAiTab('consultant')} className={`px-2.5 py-1 text-[10px] md:text-xs md:px-4 md:py-1.5 whitespace-nowrap shrink-0 border border-gray-500 font-bold hover:bg-white ${aiTab === 'consultant' ? 'bg-white border-b-white text-cyan-900' : 'bg-gray-200 text-black'}`}>Business Consultant</button>
       </div>
 
       <div className="flex-1 overflow-y-auto bg-white p-6 text-black shadow-inner">
         <div className="max-w-6xl mx-auto w-full h-full flex flex-col">
           
-          {aiTab === 'dashboard' && (
-              <>
-                  <div className="flex items-center gap-3 mb-8 border-b pb-4">
-                    <div className="bg-blue-600 p-3 rounded-sm shadow border border-blue-800">
-                      <Bot className="w-8 h-8 text-white" />
-                    </div>
-                    <div>
-                      <h1 className="text-3xl font-bold tracking-tight text-blue-900">AI Smart Assistant</h1>
-                      <p className="text-gray-600 font-bold text-sm mt-1">Sistem Otomasi Cerdas Nava POS</p>
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                    <div className="bg-[#ece9d8] border border-gray-400 rounded-sm p-6 relative overflow-hidden group hover:bg-green-50 transition-colors shadow-sm">
-                      <div className="absolute top-0 right-0 p-4 font-bold opacity-10"><User className="w-24 h-24" /></div>
-                      <div className="flex items-center gap-2 text-green-700 mb-4 font-bold text-sm">
-                        <CheckCircle2 className="w-4 h-4" /> AI CHAT ASSISTANT
-                      </div>
-                      <h3 className="text-3xl font-bold mb-1 text-black">Aktif</h3>
-                      <p className="text-gray-600 text-sm mb-4">Integrasi WhatsApp API untuk merespon stok barang dan pertanyaan pelanggan secara instan.</p>
-                      <button onClick={() => setAiTab('cs')} className="bg-gray-200 border border-gray-400 hover:bg-gray-300 px-4 py-2 text-sm font-bold w-full text-black shadow-sm">Buka Fitur</button>
-                    </div>
-
-                    <div className="bg-[#ece9d8] border border-gray-400 rounded-sm p-6 relative overflow-hidden hover:bg-yellow-50 transition-colors shadow-sm">
-                      <div className="absolute top-0 right-0 p-4 font-bold opacity-10"><Package className="w-24 h-24" /></div>
-                      <div className="flex items-center gap-2 text-orange-600 mb-4 font-bold text-sm">
-                        <span className="w-4 h-4">✨</span> AI RESTOCK (AUTO-ORDER)
-                      </div>
-                      <h3 className="text-3xl font-bold mb-1 text-black">{orderData?.filter((o:any) => o.sisaStock <= 2).length} Deteksi</h3>
-                      <p className="text-gray-600 text-sm mb-4">Deteksi stok menipis lalu menyusun draf PO (Purchase Order) serta terhubung ke WA Supplier.</p>
-                      <button onClick={() => { setActiveTab('masterdata'); setMasterDataTab?.('order'); }} className="bg-blue-600 text-white border border-blue-800 hover:bg-blue-700 font-bold px-4 py-2 text-sm w-full shadow-sm">Lihat Draft PO & Kirim</button>
-                    </div>
-
-                    <div className="bg-[#ece9d8] border border-gray-400 rounded-sm p-6 relative overflow-hidden hover:bg-blue-50 transition-colors shadow-sm">
-                      <div className="absolute top-0 right-0 p-4 font-bold opacity-10"><FileText className="w-24 h-24" /></div>
-                      <div className="flex items-center gap-2 text-blue-700 mb-4 font-bold text-sm">
-                        <span className="w-4 h-4">✨</span> SMART DATA INPUT
-                      </div>
-                      <h3 className="text-xl font-bold mb-1 leading-tight text-black">Ekstraksi Cepat</h3>
-                      <p className="text-gray-600 text-sm mb-4">Input stok hanya dengan mengetik catatan kasar, otomatis mendeteksi barang dan jumlah.</p>
-                      <button onClick={() => setAiTab('input')} className="bg-blue-600 border border-blue-800 hover:bg-blue-700 text-white px-4 py-2 text-sm font-bold w-full mt-2 shadow-sm">Mulai Input</button>
-                    </div>
-
-                    {/* New Requested Features Below */}
-                    <div className="bg-[#ece9d8] border border-gray-400 rounded-sm p-6 relative overflow-hidden group hover:bg-purple-50 transition-colors shadow-sm opacity-80 hover:opacity-100">
-                      <div className="flex items-center gap-2 text-purple-700 mb-4 font-bold text-sm">
-                        <span className="w-4 h-4">✨</span> AI INSIGHT
-                      </div>
-                      <h3 className="text-xl font-bold mb-1 text-black">Rangkuman Tren</h3>
-                      <p className="text-gray-600 text-sm mb-4">Analisis perilaku pelanggan dan tren penjualan harian yang dikonversi menjadi laporan singkat.</p>
-                      <button onClick={() => alert('Fitur AI Insight segera hadir. Kami sedang meningkatkan model analitik!')} className="bg-gray-200 border border-gray-400 hover:bg-gray-300 px-4 py-2 text-sm font-bold w-full text-black shadow-sm">Segera Hadir</button>
-                    </div>
-
-                    <div className="bg-[#ece9d8] border border-gray-400 rounded-sm p-6 relative overflow-hidden group hover:bg-indigo-50 transition-colors shadow-sm opacity-80 hover:opacity-100">
-                      <div className="flex items-center gap-2 text-indigo-700 mb-4 font-bold text-sm">
-                        <span className="w-4 h-4">✨</span> AI FORECAST
-                      </div>
-                      <h3 className="text-xl font-bold mb-1 text-black">Prediksi Permintaan</h3>
-                      <p className="text-gray-600 text-sm mb-4">Proyeksi penjualan di bulan berikutnya berdasarkan data histori historis algoritma AI.</p>
-                      <button onClick={() => alert('Fitur AI Forecast segera hadir!')} className="bg-gray-200 border border-gray-400 hover:bg-gray-300 px-4 py-2 text-sm font-bold w-full text-black shadow-sm">Segera Hadir</button>
-                    </div>
-
-                    <div className="bg-[#ece9d8] border border-gray-400 rounded-sm p-6 relative overflow-hidden group hover:bg-emerald-50 transition-colors shadow-sm opacity-80 hover:opacity-100">
-                      <div className="flex items-center gap-2 text-emerald-700 mb-4 font-bold text-sm">
-                        <span className="w-4 h-4">✨</span> AI PROFIT ANALYZER
-                      </div>
-                      <h3 className="text-xl font-bold mb-1 text-black">Audit Margin</h3>
-                      <p className="text-gray-600 text-sm mb-4">Mendeteksi produk yang kurang profit atau overprice dengan saran otomatis.</p>
-                      <button onClick={() => alert('Fitur AI Profit Analyzer segera hadir!')} className="bg-gray-200 border border-gray-400 hover:bg-gray-300 px-4 py-2 text-sm font-bold w-full text-black shadow-sm">Segera Hadir</button>
-                    </div>
-
-                    <div className="bg-[#ece9d8] border border-gray-400 rounded-sm p-6 relative overflow-hidden group hover:bg-rose-50 transition-colors shadow-sm opacity-80 hover:opacity-100">
-                      <div className="flex items-center gap-2 text-rose-700 mb-4 font-bold text-sm">
-                        <span className="w-4 h-4">✨</span> AI PROMO GENERATOR
-                      </div>
-                      <h3 className="text-xl font-bold mb-1 text-black">Ide Bundling</h3>
-                      <p className="text-gray-600 text-sm mb-4">Menemukan dead-stock (barang tidak laku) dan membuat campaign promosi otomatis.</p>
-                      <button onClick={() => alert('Fitur AI Promo Generator segera hadir!')} className="bg-gray-200 border border-gray-400 hover:bg-gray-300 px-4 py-2 text-sm font-bold w-full text-black shadow-sm">Segera Hadir</button>
-                    </div>
-
-                    <div className="bg-[#ece9d8] border border-gray-400 rounded-sm p-6 relative overflow-hidden group hover:bg-cyan-50 transition-colors shadow-sm opacity-80 hover:opacity-100 md:col-span-2">
-                      <div className="flex items-center gap-2 text-cyan-700 mb-4 font-bold text-sm">
-                        <span className="w-4 h-4">✨</span> AI BUSINESS CONSULTANT
-                      </div>
-                      <h3 className="text-xl font-bold mb-1 text-black">Tanya Jawab Bisnis</h3>
-                      <p className="text-gray-600 text-sm mb-4">Integrasi langsung ke chatbot untuk menanyakan saran bisnis, strategi scaling, hingga pengelolaan karyawan berdasarkan performa toko Anda saat ini.</p>
-                      <button onClick={() => alert('Fitur AI Business Consultant segera hadir!')} className="bg-gray-200 border border-gray-400 hover:bg-gray-300 px-4 py-2 text-sm font-bold w-48 text-black shadow-sm">Segera Hadir</button>
-                    </div>
-
-                  </div>
-              </>
-          )}
-
-          {aiTab === 'cs' && (
+          {aiTab === 'chat' && (
               <div className="flex flex-col h-full items-center p-2">
                  <div className="w-full justify-between items-center bg-green-600 text-white p-3 font-bold rounded-t-lg shadow-md flex mb-0 border-x border-t border-green-800">
                      <span className="flex items-center gap-2"><MessageSquare className="w-5 h-5"/> WA CS API (Auto Reply)</span>
@@ -329,25 +287,141 @@ Jangan sertakan markdown \`\`\`json.`;
                     className="w-full border border-gray-400 p-3 outline-none text-sm mb-4 shadow-inner"
                  />
                  
-                 <div className="flex items-center gap-2">
+                 <div className="flex flex-wrap items-center gap-2">
                     <button onClick={handleParseData} disabled={isParsing} className={`text-white font-bold px-6 py-2 shadow-sm flex items-center gap-2 ${isParsing ? 'bg-gray-400' : 'bg-blue-600 border border-blue-800 hover:bg-blue-700'}`}>
-                       <UploadCloud className="w-4 h-4" /> {isParsing ? 'Memproses AI...' : 'Proses Ekstraksi Data'}
+                       <Bot className="w-4 h-4" /> {isParsing ? 'Memproses AI...' : 'Proses ke POS (Input Stock)'}
+                    </button>
+                    <input type="file" ref={fileInputRef} onChange={handleFileUpload} accept=".csv, .xlsx, .xls" className="hidden" />
+                    <button onClick={() => fileInputRef.current?.click()} className="text-blue-900 bg-white border border-blue-900 font-bold px-6 py-2 shadow-sm flex items-center gap-2 hover:bg-blue-50">
+                       <Paperclip className="w-4 h-4" /> Upload File Supliyer (Excel/CSV)
                     </button>
                     {unstructuredText && (
-                        <button onClick={() => {setUnstructuredText(''); setParsedResult(null);}} className="text-gray-600 px-4 font-bold">Reset</button>
+                        <button onClick={() => {setUnstructuredText('');}} className="text-gray-600 px-4 font-bold">Reset</button>
                     )}
                  </div>
+              </div>
+          )}
 
-                 {parsedResult && (
-                     <div className="mt-8 bg-green-50 border-2 border-green-500 p-4 shadow-sm animate-fade-in">
-                        <h3 className="font-bold text-green-800 text-lg mb-2">Hasil Ekstraksi Data:</h3>
-                        <p className="text-green-900 font-medium mb-4">{parsedResult.message}</p>
-                        <div className="flex gap-4">
-                           <button onClick={handleConfirmAddStock} className="bg-green-600 text-white font-bold px-4 py-2 hover:bg-green-700 shadow-sm">Konfirmasi Tambah Stok</button>
-                           <button onClick={() => setParsedResult(null)} className="bg-gray-200 border border-gray-500 px-4 py-2 font-bold hover:bg-gray-300">Batalkan</button>
-                        </div>
+          {aiTab === 'insight' && (
+              <div className="flex flex-col h-full bg-[#ece9d8] border border-gray-400 p-6 shadow-sm overflow-y-auto">
+                 <h2 className="text-xl font-bold text-purple-900 border-b border-gray-400 pb-2 mb-4 flex items-center gap-2">✨ AI Insight: Rangkuman Tren Penjualan</h2>
+                 <p className="text-gray-700 mb-6 text-sm font-medium">Buat rangkuman performa toko Anda (stok yang cepat habis, perilaku pelanggan, dsb) secara otomatis.</p>
+                 <button 
+                   onClick={() => handleRunAiFeature('insight', 'Kamu adalah konsultan bisnis data analitik.', 'Berdasarkan data toko POS biasa, buatkan 3 insight tren penjualan atau performa toko secara acak (anggap toko sedang laris). Format sebagai list profesional dalam bahasa Indonesia.')}
+                   disabled={isProcessingGen['insight']} 
+                   className="bg-purple-600 text-white font-bold px-6 py-3 hover:bg-purple-700 shadow-sm self-start mb-6"
+                 >
+                   {isProcessingGen['insight'] ? 'Menyusun Insight...' : 'Generate Insight Sekarang'}
+                 </button>
+                 {genResponses['insight'] && (
+                     <div className="bg-white p-4 border border-gray-300 shadow-sm">
+                       <h3 className="font-bold text-purple-900 mb-2">Laporan Analisis Tren:</h3>
+                       <div className="whitespace-pre-line text-sm text-gray-800">{genResponses['insight']}</div>
                      </div>
                  )}
+              </div>
+          )}
+
+          {aiTab === 'forecast' && (
+              <div className="flex flex-col h-full bg-[#ece9d8] border border-gray-400 p-6 shadow-sm overflow-y-auto">
+                 <h2 className="text-xl font-bold text-indigo-900 border-b border-gray-400 pb-2 mb-4 flex items-center gap-2">✨ AI Forecast: Prediksi Permintaan</h2>
+                 <p className="text-gray-700 mb-6 text-sm font-medium">Prediksi potensi barang yang akan paling dibutuhkan bulan depan menggunakan model AI.</p>
+                 <button 
+                   onClick={() => handleRunAiFeature('forecast', 'Kamu adalah mesin AI prediktif untuk manajemen supply chain.', 'Prediksikan 3 kategori barang POS (alat tulis, dll) yang permintaannya akan meledak bulan depan. Jelaskan alasannya singkat.')}
+                   disabled={isProcessingGen['forecast']} 
+                   className="bg-indigo-600 text-white font-bold px-6 py-3 hover:bg-indigo-700 shadow-sm self-start mb-6"
+                 >
+                   {isProcessingGen['forecast'] ? 'Menjalankan Prediksi...' : 'Jalankan Forecast AI'}
+                 </button>
+                 {genResponses['forecast'] && (
+                     <div className="bg-white p-4 border border-gray-300 shadow-sm">
+                       <h3 className="font-bold text-indigo-900 mb-2">Proyeksi Penjualan Bulan Depan:</h3>
+                       <div className="whitespace-pre-line text-sm text-gray-800">{genResponses['forecast']}</div>
+                     </div>
+                 )}
+              </div>
+          )}
+
+          {aiTab === 'profit' && (
+              <div className="flex flex-col h-full bg-[#ece9d8] border border-gray-400 p-6 shadow-sm overflow-y-auto">
+                 <h2 className="text-xl font-bold text-emerald-900 border-b border-gray-400 pb-2 mb-4 flex items-center gap-2">✨ AI Profit Analyzer</h2>
+                 <p className="text-gray-700 mb-6 text-sm font-medium">Dapatkan teguran cerdas tentang strategi harga dan margin Anda yang mungkin kurang efisien.</p>
+                 <button 
+                   onClick={() => handleRunAiFeature('profit', 'Kamu adalah auditor keuangan perusahaan ritel.', 'Buat simulasi laporan audit profit margin untuk toko kelontong POS. Soroti 2 masalah umum kebocoran margin dan sarankan strategi harga dinamis.')}
+                   disabled={isProcessingGen['profit']} 
+                   className="bg-emerald-600 text-white font-bold px-6 py-3 hover:bg-emerald-700 shadow-sm self-start mb-6"
+                 >
+                   {isProcessingGen['profit'] ? 'Audit Margin Sedang Berjalan...' : 'Mulai Audit Margin Harga'}
+                 </button>
+                 {genResponses['profit'] && (
+                     <div className="bg-white p-4 border border-gray-300 shadow-sm">
+                       <h3 className="font-bold text-emerald-900 mb-2">Laporan Rekomendasi Profit:</h3>
+                       <div className="whitespace-pre-line text-sm text-gray-800">{genResponses['profit']}</div>
+                     </div>
+                 )}
+              </div>
+          )}
+
+          {aiTab === 'promo' && (
+              <div className="flex flex-col h-full bg-[#ece9d8] border border-gray-400 p-6 shadow-sm overflow-y-auto">
+                 <h2 className="text-xl font-bold text-rose-900 border-b border-gray-400 pb-2 mb-4 flex items-center gap-2">✨ AI Promo Generator</h2>
+                 <p className="text-gray-700 mb-6 text-sm font-medium">Otomatis buat ide bundling / promosi untuk cuci gudang atau meningkatkan konversi pada pembeli.</p>
+                 <button 
+                   onClick={() => handleRunAiFeature('promo', 'Kamu adalah ahli marketing kreatif.', 'Saya punya toko buku & alat tulis. Buatkan 3 ide paket bundling kreatif beserta judul diskon yang catchy untuk hari libur nasional mendatang.')}
+                   disabled={isProcessingGen['promo']} 
+                   className="bg-rose-600 text-white font-bold px-6 py-3 hover:bg-rose-700 shadow-sm self-start mb-6"
+                 >
+                   {isProcessingGen['promo'] ? 'Menemukan Ide Promo...' : 'Generate Ide Bundling Promosi'}
+                 </button>
+                 {genResponses['promo'] && (
+                     <div className="bg-white p-4 border border-gray-300 shadow-sm">
+                       <h3 className="font-bold text-rose-900 mb-2">Daftar Ide Diskon & Bundling:</h3>
+                       <div className="whitespace-pre-line text-sm text-gray-800">{genResponses['promo']}</div>
+                     </div>
+                 )}
+              </div>
+          )}
+
+          {aiTab === 'consultant' && (
+              <div className="flex flex-col h-full bg-[#ece9d8] border border-gray-400 p-6 shadow-sm overflow-y-auto w-full">
+                 <h2 className="text-xl font-bold text-cyan-900 border-b border-gray-400 pb-2 mb-4 flex items-center gap-2">✨ AI Business Consultant</h2>
+                 <p className="text-gray-700 mb-4 text-sm font-medium">Sistem interaktif bagi Anda (Owner) untuk bertanya tentang strategi bisnis, scaling, dll.</p>
+                 <div className="bg-white border border-gray-400 p-4 mb-4 flex flex-col gap-2 relative shadow-inner min-h-[300px]">
+                    <div className="absolute inset-0 bg-cyan-50/50 pointer-events-none"></div>
+                    <div className="z-10 bg-cyan-100 p-3 rounded shadow-sm self-start max-w-[80%] border border-cyan-300">
+                        <p className="text-sm font-bold text-cyan-900">Konsultan AI:</p>
+                        <p className="text-sm">Halo! Ada pertanyaan strategis soal tata kelola toko Anda hari ini? (Misal: "Bagaimana cara menangani karyawan yang kinerjanya menurun?")</p>
+                    </div>
+                    {genResponses['consultant'] && (
+                        <div className="z-10 bg-white p-3 rounded shadow-sm self-start max-w-[90%] border border-cyan-400 mt-8">
+                            <p className="text-sm font-bold text-cyan-900 mb-1">Rekomendasi Konsultan:</p>
+                            <div className="whitespace-pre-line text-sm">{genResponses['consultant']}</div>
+                        </div>
+                    )}
+                 </div>
+                 <div className="flex gap-2">
+                    <input 
+                      type="text" 
+                      id="consultant_prompt"
+                      placeholder="Ketik pertanyaan bisnis yang spesifik..." 
+                      className="flex-1 p-2 border border-gray-400 outline-none w-full shadow-inner"
+                      onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                              handleRunAiFeature('consultant', 'Kamu adalah konsultan bisnis ritel senior yang sangat bijak dan praktikal.', (e.target as any).value);
+                          }
+                      }}
+                    />
+                    <button 
+                      onClick={() => {
+                        const input = document.getElementById('consultant_prompt') as HTMLInputElement;
+                        if (input.value) handleRunAiFeature('consultant', 'Kamu adalah konsultan bisnis ritel senior yang sangat bijak dan praktikal.', input.value);
+                      }}
+                      disabled={isProcessingGen['consultant']}
+                      className="bg-cyan-600 text-white font-bold px-6 py-2 hover:bg-cyan-700 shadow-sm"
+                    >
+                      {isProcessingGen['consultant'] ? 'Berpikir...' : 'Tanya Konsultan'}
+                    </button>
+                 </div>
               </div>
           )}
 

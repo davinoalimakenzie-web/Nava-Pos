@@ -80,7 +80,7 @@ export const Dashboard = ({ currentTime }: { currentTime: Date }) => {
   const [dailyAiTipLoading, setDailyAiTipLoading] = useState(false);
 
   const fetchDailyTip = async (forceRefresh = false) => {
-    const today = new Date().toISOString().split('T')[0];
+    const d = new Date(); const today = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
     const cachedTipKey = `POS_dailyAiTip_${today}`;
     
     if (!forceRefresh) {
@@ -423,7 +423,7 @@ export const Dashboard = ({ currentTime }: { currentTime: Date }) => {
   const weeklyGoalOffset = weeklyGoalCircumference - (weeklyGoalProgress / 100) * weeklyGoalCircumference;
 
   const [hasCelebrated, setHasCelebrated] = useState(() => {
-    return localStorage.getItem('POS_celebratedDate') === new Date().toISOString().split('T')[0];
+    const d = new Date(); return localStorage.getItem('POS_celebratedDate') === `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
   });
   const [showGoalToast, setShowGoalToast] = useState(false);
 
@@ -436,7 +436,7 @@ export const Dashboard = ({ currentTime }: { currentTime: Date }) => {
              colors: ['#00a651', '#f59e0b', '#3b82f6', '#ec4899']
          });
          setHasCelebrated(true);
-         localStorage.setItem('POS_celebratedDate', new Date().toISOString().split('T')[0]);
+         const d = new Date(); localStorage.setItem('POS_celebratedDate', `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`);
          setShowGoalToast(true);
          setTimeout(() => setShowGoalToast(false), 5000);
      }

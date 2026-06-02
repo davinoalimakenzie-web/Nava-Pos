@@ -16,7 +16,7 @@ import {
 
 const AppContext = createContext<any>(null);
 
-const DUMMY_VERSION = "3";
+const DUMMY_VERSION = "4";
 
 function useSyncState<T>(key: string, initial: T, syncEnabled: boolean) {
   const [state, setState] = useState<T>(() => {
@@ -173,6 +173,7 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
 
   // Tab states
   const [masterDataTab, setMasterDataTab] = useState('stock');
+  const [isInputStockMode, setIsInputStockMode] = useState(false);
 
   return (
     <AppContext.Provider value={{
@@ -209,7 +210,8 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
       supplierReturns, setSupplierReturns,
       botMemory, setBotMemory,
       storeSettings, setStoreSettings,
-      appLogs, addLog
+      appLogs, addLog,
+      isInputStockMode, setIsInputStockMode
     }}>
       {children}
     </AppContext.Provider>
