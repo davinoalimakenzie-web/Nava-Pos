@@ -182,6 +182,49 @@ export const POS = ({ currentTime }: { currentTime: Date }) => {
   const totalBelanja = (totalBelanjaBaru - totalNilaiRetur) - calculatedDiscount;
   const kembalian = amountPaid ? parseInt(amountPaid) - totalBelanja : (totalBelanja < 0 ? Math.abs(totalBelanja) : 0);
 
+  const handlePromoToggle = () => {
+      if (isPromoActive) {
+          setIsPromoActive(false);
+          setGlobalDiscount(0);
+          return;
+      }
+
+      if (!selectedCustomer) {
+          setConfirmAction({message: 'Pilih pelanggan terlebih dahulu untuk mengecek promo!', isAlert: true});
+          return;
+      }
+
+      const currentMonth = new Date().getMonth();
+      const currentYear = new Date().getFullYear();
+      
+      const monthlyTotal = transactions.filter((t: any) => {
+          if (t.customer !== selectedCustomer.name) return false;
+          if (t.id.includes('PLN') || t.method === 'RETUR') return false; 
+          const tDate = new Date(t.isoDate || t.date);
+          return tDate.getMonth() === currentMonth && tDate.getFullYear() === currentYear;
+      }).reduce((sum: number, t: any) => sum + (t.total || 0), 0);
+
+      const totalBelanjaBaru = cart.filter((c: any) => !c.isReturn).reduce((total, item) => total + (item.price * item.qty), 0);
+      const totalNilaiRetur = cart.filter((c: any) => c.isReturn).reduce((total, item) => total + (item.price * item.qty), 0);
+      const currentCartTotal = totalBelanjaBaru - totalNilaiRetur;
+      const combinedTotal = monthlyTotal + currentCartTotal;
+      
+      if (combinedTotal >= 5000000) {
+          setConfirmAction({
+              message: `Pelanggan mencapai pembelian Rp ${combinedTotal.toLocaleString('id-ID')} bulan ini! Cashback promo Rp 250.000 otomatis diaktifkan. (Wajib dibelanjakan barang!)`,
+              isAlert: true
+          });
+          setIsPromoActive(true);
+          setDiscountType('Rp');
+          setGlobalDiscount(250000);
+      } else {
+          setConfirmAction({
+              message: `Total belanja pelanggan ini baru mencapai Rp ${combinedTotal.toLocaleString('id-ID')} bulan ini (Syarat Rp 5.000.000). Promo belum aktif.`,
+              isAlert: true
+          });
+      }
+  };
+
   const handleAddBon = (e: React.FormEvent) => {
     e.preventDefault();
     if (!bonEmployee || !bonAmount || !bonReason || !bonBranch) return setConfirmAction({message: 'Semua isian Bon wajib diisi!', isAlert: true});
@@ -418,6 +461,14 @@ export const POS = ({ currentTime }: { currentTime: Date }) => {
     // Validasi Pembayaran Tunai
     const paid = amountPaid ? parseInt(amountPaid) : 0;
     const isPiutang = paymentMethod === 'Qriss/TF' || paymentMethod === 'DP' || paymentMethod === '1 Minggu';
+
+    if (isPromoActive && (totalBelanjaBaru - totalNilaiRetur) < 250000) {
+        return setConfirmAction({
+            message: 'Pencairan cashback belum mencapai Rp 250.000! Tambahkan barang hingga nominal belanja mencapai Rp 250.000, karena Cashback promo tidak bisa diuangkan.',
+            isAlert: true
+        });
+    }
+
     if (isPiutangPayment && paid <= 0) {
         return setConfirmAction({
             message: `Pembayaran pelunasan tidak valid. Silakan isi nominal Tunai terlebih dahulu sebagai syarat wajib pelunasan.`,
@@ -447,6 +498,14 @@ export const POS = ({ currentTime }: { currentTime: Date }) => {
     // Validasi Pembayaran Tunai
     const paid = amountPaid ? parseInt(amountPaid) : 0;
     const isPiutang = paymentMethod === 'Qriss/TF' || paymentMethod === 'DP' || paymentMethod === '1 Minggu';
+
+    if (isPromoActive && (totalBelanjaBaru - totalNilaiRetur) < 250000) {
+        return setConfirmAction({
+            message: 'Pencairan cashback belum mencapai Rp 250.000! Tambahkan barang hingga nominal belanja mencapai Rp 250.000, karena Cashback promo tidak bisa diuangkan.',
+            isAlert: true
+        });
+    }
+
     if (isPiutangPayment && paid <= 0) {
         return setConfirmAction({
             message: `Pembayaran pelunasan tidak valid. Silakan isi nominal Tunai terlebih dahulu sebagai syarat wajib pelunasan.`,
@@ -526,6 +585,33 @@ export const POS = ({ currentTime }: { currentTime: Date }) => {
       resetKasirState();
     }
   };
+
+  useEffect(() => {
+    if (selectedCustomer) {
+      const currentMonth = new Date().getMonth();
+      const currentYear = new Date().getFullYear();
+      
+      const monthlyTotal = transactions.filter((t: any) => {
+          if (t.customer !== selectedCustomer.name) return false;
+          if (t.id.includes('PLN') || t.method === 'RETUR') return false; 
+          const tDate = new Date(t.isoDate || t.date);
+          return tDate.getMonth() === currentMonth && tDate.getFullYear() === currentYear;
+      }).reduce((sum: number, t: any) => sum + (t.total || 0), 0);
+
+      const totalBelanjaBaru = cart.filter((c: any) => !c.isReturn).reduce((total, item) => total + (item.price * item.qty), 0);
+      const totalNilaiRetur = cart.filter((c: any) => c.isReturn).reduce((total, item) => total + (item.price * item.qty), 0);
+      const currentCartTotal = totalBelanjaBaru - totalNilaiRetur;
+      const combinedTotal = monthlyTotal + currentCartTotal;
+
+      if (combinedTotal >= 5000000) {
+          if (discountType !== 'Rp' || globalDiscount !== 250000) {
+             setIsPromoActive(true);
+             setDiscountType('Rp');
+             setGlobalDiscount(250000);
+          }
+      }
+    }
+  }, [selectedCustomerId, cart, transactions]);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -1007,7 +1093,7 @@ export const POS = ({ currentTime }: { currentTime: Date }) => {
                       {pendingTransactions.length > 0 && <span className="absolute -top-1.5 -right-1.5 bg-red-600 text-white text-[10px] px-1.5 py-0.5 rounded-full shadow-lg">{pendingTransactions.length}</span>}
                     </button>
                     <button onClick={() => setIsBarcodeMode(!isBarcodeMode)} className={`border-2 border-gray-500 px-3 py-1.5 w-full font-bold shadow-sm text-xs text-white ${isBarcodeMode ? 'bg-green-600 hover:bg-green-700' : 'bg-red-600 hover:bg-red-700'}`}>Auto Scan</button>
-                    <button onClick={() => setIsPromoActive(!isPromoActive)} disabled={cart.some(c => c.isReturn)} className={`border-2 border-gray-500 px-3 py-1.5 w-full font-bold shadow-sm text-xs text-white ${cart.some(c => c.isReturn) ? 'opacity-50 cursor-not-allowed bg-red-600' : (isPromoActive ? 'bg-green-600 hover:bg-green-700' : 'bg-red-600 hover:bg-red-700')}`}>Promo</button>
+                    <button onClick={handlePromoToggle} disabled={cart.some(c => c.isReturn)} className={`border-2 border-gray-500 px-3 py-1.5 w-full font-bold shadow-sm text-xs text-white ${cart.some(c => c.isReturn) ? 'opacity-50 cursor-not-allowed bg-red-600' : (isPromoActive ? 'bg-green-600 hover:bg-green-700' : 'bg-red-600 hover:bg-red-700')}`}>Promo</button>
                   </div>
                 </div>
               </div>
@@ -1111,7 +1197,7 @@ export const POS = ({ currentTime }: { currentTime: Date }) => {
                          <input required type="text" value={bonReason} onChange={e => setBonReason(e.target.value)} className="border border-gray-400 p-2 outline-none" placeholder="Cth: Pinjam uang makan" />
 
                          <label className="text-sm font-bold text-gray-700 mt-2">Nominal (Rp)</label>
-                         <input required type="text" value={bonAmount === "" ? "" : formatRp(Number(bonAmount) || 0)} onChange={e => { const val = e.target.value.replace(/\D/g, ''); setBonAmount(val); }} className="border border-gray-400 p-2 outline-none font-bold" placeholder="Rp 0" />
+                         <input required type="text" value={bonAmount === "" ? "" : formatRp(Number(bonAmount) || 0)} onChange={e => { const val = e.target.value.replace(/\D/g, ''); setBonAmount(val); }} className="border border-gray-400 p-2 outline-none font-bold text-right" placeholder="Rp 0" />
                       </div>
                       
                       <div className="flex justify-end gap-2 text-sm mt-6">

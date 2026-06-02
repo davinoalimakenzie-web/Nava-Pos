@@ -5,7 +5,7 @@ import { LegacyWindowHeader } from './LegacyWindowHeader';
 import { formatRp, formatDateDisplay, calculateJatuhTempo } from '../utils';
 
 export const Cashflow = ({ currentTime }: { currentTime: Date }) => {
-  const { transactions, expenses, setExpenses, storeSettings, setActiveTab, cart, setCart } = useAppContext();
+  const { transactions, expenses, setExpenses, storeSettings, setActiveTab, setMasterDataTab, cart, setCart, customers } = useAppContext();
   
   const [cashflowTab, setCashflowTab] = useState('harian');
   const [cashflowHarianSubTab, setCashflowHarianSubTab] = useState('laporan');
@@ -18,6 +18,19 @@ export const Cashflow = ({ currentTime }: { currentTime: Date }) => {
 
   const [filterPaymentMethod, setFilterPaymentMethod] = useState('Semua');
   const [searchNota, setSearchNota] = useState('');
+
+  // Promo Calculation
+  const currentMonthIdx = new Date().getMonth();
+  const currentYearVal = new Date().getFullYear();
+  const customerPromoData = (customers || []).map((c: any) => {
+    const total = transactions.filter((t: any) => {
+      if (t.customer !== c.name) return false;
+      if (t.id.includes('PLN') || t.method === 'RETUR') return false;
+      const tDate = new Date(t.isoDate || t.date);
+      return tDate.getMonth() === currentMonthIdx && tDate.getFullYear() === currentYearVal;
+    }).reduce((sum: number, t: any) => sum + (t.total || 0), 0);
+    return { name: c.name, total, memberType: c.level === 2 ? 'Grosir' : 'Ecer', phone: c.phone || '-' };
+  }).filter((c: any) => c.total > 0).sort((a: any, b: any) => b.total - a.total);
   
   const filteredTransactions = transactions.filter((t: any) => {
     if (t.type === 'PEMBELIAN') return false; // Exclude from income logic
@@ -92,9 +105,10 @@ export const Cashflow = ({ currentTime }: { currentTime: Date }) => {
       <LegacyWindowHeader title="CASHFLOW & KEUANGAN" currentTime={currentTime} />
       
       {/* Cashflow Top Tabs */}
-      <div className="flex gap-1 shrink-0 bg-[#ece9d8] p-1 border-b border-gray-400 shadow-sm z-10">
-         <button onClick={() => setCashflowTab('harian')} className={`px-4 py-1.5 border border-gray-500 font-bold hover:bg-white ${cashflowTab === 'harian' ? 'bg-white border-b-white text-blue-900' : 'bg-gray-200 text-black'}`}>Cashflow Harian</button>
-         <button onClick={() => setCashflowTab('bulanan')} className={`px-4 py-1.5 border border-gray-500 font-bold hover:bg-white ${cashflowTab === 'bulanan' ? 'bg-white border-b-white text-blue-900' : 'bg-gray-200 text-black'}`}>Cashflow Bulanan</button>
+      <div className="flex gap-1 shrink-0 bg-[#ece9d8] p-1 border-b border-gray-400 shadow-sm z-10 overflow-x-auto no-scrollbar">
+         <button onClick={() => setCashflowTab('harian')} className={`px-2.5 py-1 text-[10px] md:text-xs md:px-4 md:py-1.5 whitespace-nowrap shrink-0 border border-gray-500 font-bold hover:bg-white ${cashflowTab === 'harian' ? 'bg-white border-b-white text-blue-900' : 'bg-gray-200 text-black'}`}>Cashflow Harian</button>
+         <button onClick={() => setCashflowTab('bulanan')} className={`px-2.5 py-1 text-[10px] md:text-xs md:px-4 md:py-1.5 whitespace-nowrap shrink-0 border border-gray-500 font-bold hover:bg-white ${cashflowTab === 'bulanan' ? 'bg-white border-b-white text-blue-900' : 'bg-gray-200 text-black'}`}>Cashflow Bulanan</button>
+         <button onClick={() => setCashflowTab('promo')} className={`px-2.5 py-1 text-[10px] md:text-xs md:px-4 md:py-1.5 whitespace-nowrap shrink-0 border border-gray-500 font-bold hover:bg-white ${cashflowTab === 'promo' ? 'bg-white border-b-white text-blue-900' : 'bg-gray-200 text-black'}`}>Promo</button>
       </div>
 
       {/* Header Filter Baru (Sesuai Gambar) - Global for Both Tabs */}
@@ -149,7 +163,7 @@ export const Cashflow = ({ currentTime }: { currentTime: Date }) => {
                    <button className="bg-white text-black px-4 font-bold text-[13px] border border-gray-300 rounded-sm shadow-sm hover:bg-gray-200 h-[28px]">CARI</button>
                 </div>
               </>
-            ) : (
+            ) : cashflowTab === 'bulanan' ? (
                 <button onClick={() => {
                    const rows = [
                        ['Bulan', 'Omset Total', 'Tunai Masuk', 'Non-Tunai / Piutang', 'Total Pengeluaran', 'Saldo Akhir Tunai (Laci)'],
@@ -172,6 +186,10 @@ export const Cashflow = ({ currentTime }: { currentTime: Date }) => {
                    document.body.removeChild(link);
                }} className="bg-white text-black hover:bg-gray-200 font-bold px-4 shadow-sm border border-gray-300 rounded-sm text-[13px] h-[28px] w-full">
                    Export CSV
+               </button>
+            ) : (
+                <button onClick={() => { setMasterDataTab('pelanggan'); setActiveTab('masterdata'); }} className="bg-white text-black hover:bg-gray-200 font-bold px-4 shadow-sm border border-gray-300 rounded-sm text-[13px] h-[28px] w-full">
+                   Pelanggan
                </button>
             )}
          </div>
@@ -367,6 +385,52 @@ export const Cashflow = ({ currentTime }: { currentTime: Date }) => {
                          <td className="p-3 text-right font-bold text-black border-l-2 bg-gray-50">{formatRp(m.incomeCash - m.expenses)}</td>
                       </tr>
                    ))
+                 )}
+               </tbody>
+             </table>
+             </div>
+         </div>
+      )}
+
+      {/* TAB: PROMO */}
+      {cashflowTab === 'promo' && (
+         <div className="flex-1 flex flex-col overflow-hidden">
+             <div className="bg-yellow-100 p-2 border-b border-yellow-300 text-yellow-900 shadow-sm text-sm shrink-0">
+                <p><strong>Info Promo:</strong> Menampilkan total belanja pelanggan bulan ini. Pelanggan yang mencapai omzet Rp 5.000.000 berhak mendapatkan cashback 5% (potongan yang wajib dibelanjakan). Promo aktif ketika kasir menekan tombol "Promo" saat bertransaksi dengan pelanggan tersebut.</p>
+             </div>
+             <div className="flex-1 bg-white border border-gray-400 m-[2px] shadow-inner flex flex-col overflow-auto">
+             <table className="w-full text-left border-collapse whitespace-nowrap">
+               <thead className="bg-[#ece9d8] sticky top-0 border-b-2 border-gray-400 font-bold text-blue-900 shadow-sm z-10 text-sm">
+                 <tr>
+                    <th className="p-3 border-r border-gray-300">Nama Pelanggan</th>
+                    <th className="p-3 border-r border-gray-300">No. WA</th>
+                    <th className="p-3 border-r border-gray-300">Tipe Pelanggan</th>
+                    <th className="p-3 border-r border-gray-300 text-right">Total Transaksi Bulan Ini</th>
+                    <th className="p-3 text-center">Status Promo</th>
+                 </tr>
+               </thead>
+               <tbody className="text-sm">
+                 {customerPromoData.length === 0 ? (
+                   <tr><td colSpan={5} className="text-center p-10 font-bold text-gray-500">Belum ada transaksi bulan ini.</td></tr>
+                 ) : (
+                   customerPromoData.map((c: any, idx: number) => {
+                      const isEligible = c.total >= 5000000;
+                      return (
+                      <tr key={idx} className={`border-b border-gray-200 cursor-pointer text-black ${isEligible ? 'bg-green-50 hover:bg-green-100' : 'hover:bg-blue-50'}`}>
+                         <td className="p-3 border-r border-gray-300 font-bold">{c.name}</td>
+                         <td className="p-3 border-r border-gray-300">{c.phone}</td>
+                         <td className="p-3 border-r border-gray-300">{c.memberType}</td>
+                         <td className="p-3 border-r border-gray-300 text-right font-bold text-blue-800">{formatRp(c.total)}</td>
+                         <td className="p-3 text-center font-bold">
+                             {isEligible ? (
+                                <span className="bg-green-600 text-white px-2 py-1 rounded text-xs shadow-sm">Memenuhi Syarat 5 Juta</span>
+                             ) : (
+                                <span className="text-gray-500">Belum Memenuhi</span>
+                             )}
+                         </td>
+                      </tr>
+                      );
+                   })
                  )}
                </tbody>
              </table>

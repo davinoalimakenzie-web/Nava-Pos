@@ -45,14 +45,14 @@ export const SettingsPanel = ({ currentTime }: { currentTime: Date }) => {
     <div className="flex-1 flex flex-col bg-[#8fb4d9] border border-[#8fb4d9] overflow-hidden">
       <LegacyWindowHeader title="PENGATURAN SISTEM" currentTime={currentTime} />
       
-      <div className="flex gap-1 shrink-0 bg-[#ece9d8] p-1 border-b border-gray-400 shadow-sm z-10">
-         <button onClick={() => setSettingTab('print')} className={`px-4 py-1.5 border border-gray-500 font-bold hover:bg-white ${settingTab === 'print' ? 'bg-white border-b-white text-blue-900' : 'bg-gray-200 text-black'}`}>Setting Print (Invoice)</button>
-         <button onClick={() => setSettingTab('scanner')} className={`px-4 py-1.5 border border-gray-500 font-bold hover:bg-white ${settingTab === 'scanner' ? 'bg-white border-b-white text-blue-900' : 'bg-gray-200 text-black'}`}>Scanner Barcode</button>
-         <button onClick={() => setSettingTab('sync')} className={`px-4 py-1.5 border border-gray-500 font-bold hover:bg-white ${settingTab === 'sync' ? 'bg-white border-b-white text-blue-900' : 'bg-gray-200 text-black'}`}>Sinkronisasi</button>
-         <button onClick={() => setSettingTab('margins')} className={`px-4 py-1.5 border border-gray-500 font-bold hover:bg-white ${settingTab === 'margins' ? 'bg-white border-b-white text-blue-900' : 'bg-gray-200 text-black'}`}>Setting Margin Harga</button>
-         <button onClick={() => setSettingTab('backup')} className={`px-4 py-1.5 border border-gray-500 font-bold hover:bg-white ${settingTab === 'backup' ? 'bg-white border-b-white text-blue-900' : 'bg-gray-200 text-black'}`}>Backup & Restore</button>
+      <div className="flex gap-1 shrink-0 bg-[#ece9d8] p-1 border-b border-gray-400 shadow-sm z-10 overflow-x-auto no-scrollbar">
+         <button onClick={() => setSettingTab('print')} className={`px-2.5 py-1 text-[10px] md:text-xs md:px-4 md:py-1.5 whitespace-nowrap shrink-0 border border-gray-500 font-bold hover:bg-white ${settingTab === 'print' ? 'bg-white border-b-white text-blue-900' : 'bg-gray-200 text-black'}`}>Setting Print (Invoice)</button>
+         <button onClick={() => setSettingTab('scanner')} className={`px-2.5 py-1 text-[10px] md:text-xs md:px-4 md:py-1.5 whitespace-nowrap shrink-0 border border-gray-500 font-bold hover:bg-white ${settingTab === 'scanner' ? 'bg-white border-b-white text-blue-900' : 'bg-gray-200 text-black'}`}>Scanner Barcode</button>
+         <button onClick={() => setSettingTab('sync')} className={`px-2.5 py-1 text-[10px] md:text-xs md:px-4 md:py-1.5 whitespace-nowrap shrink-0 border border-gray-500 font-bold hover:bg-white ${settingTab === 'sync' ? 'bg-white border-b-white text-blue-900' : 'bg-gray-200 text-black'}`}>Sinkronisasi</button>
+         <button onClick={() => setSettingTab('margins')} className={`px-2.5 py-1 text-[10px] md:text-xs md:px-4 md:py-1.5 whitespace-nowrap shrink-0 border border-gray-500 font-bold hover:bg-white ${settingTab === 'margins' ? 'bg-white border-b-white text-blue-900' : 'bg-gray-200 text-black'}`}>Setting Margin Harga</button>
+         <button onClick={() => setSettingTab('backup')} className={`px-2.5 py-1 text-[10px] md:text-xs md:px-4 md:py-1.5 whitespace-nowrap shrink-0 border border-gray-500 font-bold hover:bg-white ${settingTab === 'backup' ? 'bg-white border-b-white text-blue-900' : 'bg-gray-200 text-black'}`}>Backup & Restore</button>
          {(user?.role === 'owner' || user?.role === 'admin') && (
-             <button onClick={() => setSettingTab('akun')} className={`px-4 py-1.5 border border-gray-500 font-bold hover:bg-white ${settingTab === 'akun' ? 'bg-white border-b-white text-blue-900' : 'bg-gray-200 text-black'}`}>Akun Login & Hak Akses</button>
+             <button onClick={() => setSettingTab('akun')} className={`px-2.5 py-1 text-[10px] md:text-xs md:px-4 md:py-1.5 whitespace-nowrap shrink-0 border border-gray-500 font-bold hover:bg-white ${settingTab === 'akun' ? 'bg-white border-b-white text-blue-900' : 'bg-gray-200 text-black'}`}>Akun Login & Hak Akses</button>
          )}
       </div>
 
@@ -65,19 +65,20 @@ export const SettingsPanel = ({ currentTime }: { currentTime: Date }) => {
                     <h2 className="text-xl font-bold text-blue-900">Pengaturan Margin Harga Barang Baru</h2>
                  </div>
                  <div className="text-gray-600 mb-4 text-sm max-w-lg">
-                    Atur nilai persentase default untuk Harga Level 1 dan Level 2. Persentase ini akan digunakan untuk menghitung otomatis harga jual saat menginput stok baru berdasarkan kategori barang. Jika kategori tidak diatur, maka nilai UMUM akan digunakan.
+                    Atur nilai persentase default untuk Harga Level 1, Level 2, dan Level 3. Persentase ini akan digunakan untuk menghitung otomatis harga jual saat menginput stok baru berdasarkan kategori barang. Jika kategori tidak diatur, maka nilai UMUM akan digunakan.
                  </div>
-                 <table className="w-full max-w-lg border-collapse text-left text-sm mb-4">
+                 <table className="w-full max-w-2xl border-collapse text-left text-sm mb-4">
                     <thead>
                       <tr className="bg-gray-100 border-y border-gray-300">
                         <th className="p-2">Kategori</th>
-                        <th className="p-2 w-32">Level 1 (%)</th>
-                        <th className="p-2 w-32">Level 2 (%)</th>
+                        <th className="p-2 w-28">Level 1 (%)</th>
+                        <th className="p-2 w-28">Level 2 (%)</th>
+                        <th className="p-2 w-28">Level 3 (%)</th>
                       </tr>
                     </thead>
                     <tbody>
-                      {Object.keys(storeSettings.margins || { UMUM: {level1: 75, level2: 15} }).map(cat => {
-                        const currentMargins = storeSettings.margins || { UMUM: {level1: 75, level2: 15} };
+                      {Object.keys(storeSettings.margins || { UMUM: {level1: 75, level2: 15, level3: 10} }).map(cat => {
+                        const currentMargins = storeSettings.margins || { UMUM: {level1: 75, level2: 15, level3: 10} };
                         return (
                         <tr key={cat} className="border-b border-gray-200">
                           <td className="p-2 font-bold">{cat}</td>
@@ -97,6 +98,14 @@ export const SettingsPanel = ({ currentTime }: { currentTime: Date }) => {
                               onChange={e => setStoreSettings({...storeSettings, margins: {...(storeSettings.margins||{}), [cat]: {...(currentMargins[cat]||{}), level2: parseInt(e.target.value)||0}}})}
                             />
                           </td>
+                          <td className="p-2">
+                            <input 
+                              type="number" 
+                              className="border border-gray-400 p-1 w-full" 
+                              value={currentMargins[cat]?.level3 || 0} 
+                              onChange={e => setStoreSettings({...storeSettings, margins: {...(storeSettings.margins||{}), [cat]: {...(currentMargins[cat]||{}), level3: parseInt(e.target.value)||0}}})}
+                            />
+                          </td>
                         </tr>
                       )})}
                     </tbody>
@@ -108,12 +117,13 @@ export const SettingsPanel = ({ currentTime }: { currentTime: Date }) => {
                      const cat = formData.get('category') as string;
                      const lv1 = parseInt(formData.get('level1') as string) || 0;
                      const lv2 = parseInt(formData.get('level2') as string) || 0;
+                     const lv3 = parseInt(formData.get('level3') as string) || 0;
                      if (!cat) return;
-                     setStoreSettings({...storeSettings, margins: {...(storeSettings.margins||{}), [cat.toUpperCase()]: {level1: lv1, level2: lv2}}});
+                     setStoreSettings({...storeSettings, margins: {...(storeSettings.margins||{}), [cat.toUpperCase()]: {level1: lv1, level2: lv2, level3: lv3}}});
                      addLog('SETTING_MARGIN', `Kategori margin baru: ${cat.toUpperCase()}`);
                      e.currentTarget.reset();
-                 }} className="flex gap-2 items-end bg-gray-50 border border-gray-300 p-3 max-w-lg">
-                    <div className="flex flex-col gap-1 w-1/3">
+                 }} className="flex gap-2 items-end bg-gray-50 border border-gray-300 p-3 max-w-2xl">
+                    <div className="flex flex-col gap-1 w-1/4">
                       <label className="text-xs font-bold">Kategori Baru:</label>
                       <input name="category" required className="border border-gray-400 p-2" placeholder="Cth: OBAT" />
                     </div>
@@ -124,6 +134,10 @@ export const SettingsPanel = ({ currentTime }: { currentTime: Date }) => {
                     <div className="flex flex-col gap-1 w-[80px]">
                       <label className="text-xs font-bold">Lvl 2 (%):</label>
                       <input name="level2" type="number" required className="border border-gray-400 p-2" defaultValue="10" />
+                    </div>
+                    <div className="flex flex-col gap-1 w-[80px]">
+                      <label className="text-xs font-bold">Lvl 3 (%):</label>
+                      <input name="level3" type="number" required className="border border-gray-400 p-2" defaultValue="5" />
                     </div>
                     <button type="submit" className="bg-green-600 text-white font-bold px-4 py-2 hover:bg-green-700">Tambah</button>
                  </form>
@@ -329,17 +343,17 @@ export const SettingsPanel = ({ currentTime }: { currentTime: Date }) => {
            )}
 
            {settingTab === 'backup' && (
-            <div className="absolute inset-0 overflow-auto p-6 bg-[#ece9d8] text-black">
+            <div className="flex flex-col bg-[#ece9d8] text-black p-4 md:p-6 -m-6 border border-gray-400">
               {/* Retro Panel Header */}
-              <div className="bg-[#000080] text-white px-3 py-1.5 flex items-center font-bold text-xs justify-between mb-4 shadow border border-gray-400">
-                <span className="flex items-center gap-2">
-                  <Database className="w-4 h-4 text-amber-400" /> RECOVERY & DATABASE MAINTENANCE CENTER (PIN: ACTIVE)
+              <div className="bg-[#000080] text-white px-3 py-1.5 flex flex-wrap items-center font-bold text-[10px] md:text-xs justify-between mb-4 shadow border border-gray-400">
+                <span className="flex items-center gap-2 whitespace-nowrap">
+                  <Database className="w-4 h-4 text-amber-400 shrink-0" /> RECOVERY & DATABASE MAINTENANCE CENTER (PIN: ACTIVE)
                 </span>
                 <span className="text-[10px] font-mono text-gray-300">SYSTEM RECOVERY ENG. v2.1</span>
               </div>
 
               {/* Grid 1: Database Size Summary */}
-              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-2 mb-6">
+              <div className="flex gap-2 mb-6 overflow-x-auto no-scrollbar pb-1">
                 {[
                   { label: 'Total Barang (SKU)', count: inventory?.length || 0, color: 'text-blue-900 border-blue-300 bg-blue-50/50' },
                   { label: 'Mitra Pelanggan', count: customers?.length || 0, color: 'text-green-800 border-green-300 bg-green-50/50' },
@@ -348,9 +362,9 @@ export const SettingsPanel = ({ currentTime }: { currentTime: Date }) => {
                   { label: 'Pos Pengeluaran', count: expenses?.length || 0, color: 'text-rose-800 border-rose-300 bg-rose-50/50' },
                   { label: 'Staff Karyawan', count: employees?.length || 0, color: 'text-teal-800 border-teal-300 bg-teal-50/50' },
                 ].map((item, idx) => (
-                  <div key={idx} className={`p-2.5 border border-gray-400 bg-white shadow-sm flex flex-col justify-between ${item.color}`}>
-                    <p className="text-[10px] font-bold uppercase tracking-tight leading-none text-gray-500 mb-2">{item.label}</p>
-                    <p className="text-xl font-black font-mono tracking-tight leading-none mt-auto">{item.count}</p>
+                  <div key={idx} className={`p-2.5 border border-gray-400 bg-white shadow-sm flex flex-col justify-between min-h-[70px] shrink-0 min-w-[120px] md:min-w-[150px] ${item.color}`}>
+                    <p className="text-[10px] md:text-xs font-bold uppercase tracking-tight text-gray-500 mb-1 break-words">{item.label}</p>
+                    <p className="text-xl md:text-2xl font-black font-mono tracking-tight leading-none mt-auto">{item.count}</p>
                   </div>
                 ))}
               </div>
@@ -360,8 +374,8 @@ export const SettingsPanel = ({ currentTime }: { currentTime: Date }) => {
                 
                 {/* 1. LOCAL SNAPSHOTS PANEL - Left (7 cols) */}
                 <div className="lg:col-span-7 bg-white border border-gray-400 shadow-sm flex flex-col min-h-[350px]">
-                  <div className="bg-gray-400 text-black px-3 py-1.5 font-bold text-xs flex items-center justify-between border-b border-gray-400">
-                    <span className="flex items-center gap-1.5"><History className="w-3.5 h-3.5" /> Snapshot Database Browser (Otomatis & Cepat)</span>
+                  <div className="bg-gray-400 text-black px-3 py-1.5 font-bold text-xs flex flex-wrap gap-2 items-center justify-between border-b border-gray-400">
+                    <span className="flex items-center gap-1.5 min-w-0"><History className="w-3.5 h-3.5 shrink-0" /> <span className="truncate">Snapshot DB Lokal (Max 10)</span></span>
                     <button 
                       onClick={() => {
                         const desc = prompt('Masukkan keterangan singkat untuk snapshot ini:\n(Contoh: "Sebelum Update Harga Mei", "Keadaan Jam 12 Siang")');
@@ -399,7 +413,7 @@ export const SettingsPanel = ({ currentTime }: { currentTime: Date }) => {
                   <div className="p-3 bg-blue-50 border-b border-gray-300 text-xs text-blue-950 font-medium">
                     💡 <b>Snapshot Lokal</b> menyimpan replika database saat ini di dalam penampung internal browser Anda secara langsung tanpa internet. Sangat disarankan untuk membuat snapshot baru sebelum mengubah harga massal atau menghapus transaksi.
                   </div>
-                  <div className="p-3 flex-1 overflow-auto max-h-[310px]">
+                  <div className="p-3 flex-1 overflow-x-auto max-h-[310px] w-full">
                     {snapshots.length === 0 ? (
                       <div className="h-40 flex flex-col items-center justify-center border border-dashed border-gray-300 bg-gray-50 gap-2 p-4 text-center">
                         <History className="w-8 h-8 text-gray-400 stroke-[1.5]" />
@@ -407,16 +421,17 @@ export const SettingsPanel = ({ currentTime }: { currentTime: Date }) => {
                         <p className="text-[10px] text-gray-400 max-w-xs">Tekan tombol di kanan atas untuk membuat checkpoint instan dalam 1 detik.</p>
                       </div>
                     ) : (
-                      <table className="w-full text-left text-xs border-collapse">
-                        <thead>
-                          <tr className="bg-slate-100 border-b-2 border-gray-400">
-                            <th className="p-2 font-bold text-gray-700">Nama Checkpoint</th>
-                            <th className="p-2 font-bold text-gray-700">Waktu Simpan</th>
-                            <th className="p-2 font-bold text-gray-700">Rincian Data</th>
-                            <th className="p-2 font-bold text-gray-700 text-center">Aksi</th>
-                          </tr>
-                        </thead>
-                        <tbody>
+                      <div className="min-w-[550px]">
+                        <table className="w-full text-left text-xs border-collapse">
+                          <thead>
+                            <tr className="bg-slate-100 border-b-2 border-gray-400">
+                              <th className="p-2 font-bold text-gray-700 whitespace-nowrap">Nama Checkpoint</th>
+                              <th className="p-2 font-bold text-gray-700 whitespace-nowrap">Waktu Simpan</th>
+                              <th className="p-2 font-bold text-gray-700 whitespace-nowrap">Rincian Data</th>
+                              <th className="p-2 font-bold text-gray-700 text-center whitespace-nowrap">Aksi</th>
+                            </tr>
+                          </thead>
+                          <tbody>
                           {snapshots.map((snap) => (
                             <tr key={snap.id} className="border-b border-gray-200 hover:bg-slate-50">
                               <td className="p-2 font-bold text-blue-900">{snap.label}</td>
@@ -427,7 +442,7 @@ export const SettingsPanel = ({ currentTime }: { currentTime: Date }) => {
                                 📦 {snap.meta?.inventory || 0} SKU | 🧾 {snap.meta?.transactions || 0} Nota | 👥 {snap.meta?.customers || 0} Pelanggan
                               </td>
                               <td className="p-2">
-                                <div className="flex justify-center gap-1.5">
+                                <div className="flex flex-col md:flex-row justify-center gap-1">
                                   <button 
                                     onClick={() => {
                                       if (!window.confirm(`PERINGATAN KRITIKAL!\n\nApakah Anda yakin ingin memulihkan (Restore) database ke Checkpoint "${snap.label}"?\n\nSemua perubahan data transaksi, stok, dan pelanggan saat ini yang dilakukan SETELAH waktu checkpoint ini akan digantikan seluruhnya.`)) return;
@@ -451,7 +466,7 @@ export const SettingsPanel = ({ currentTime }: { currentTime: Date }) => {
                                       addLog('RESTORE_DATA', `Restore database ke checkpoint: ${snap.label}`);
                                       alert(`Berhasil! Database dipulihkan sepenuhnya ke checkpoint: ${snap.label}`);
                                     }} 
-                                    className="bg-blue-600 hover:bg-blue-700 text-white font-bold px-2 py-1 text-[10px]"
+                                    className="bg-blue-600 hover:bg-blue-700 text-white font-bold px-1.5 py-1 text-[10px] w-full max-w-[60px]"
                                   >
                                     Restore
                                   </button>
@@ -467,7 +482,7 @@ export const SettingsPanel = ({ currentTime }: { currentTime: Date }) => {
                                       a.click();
                                       URL.revokeObjectURL(url);
                                     }} 
-                                    className="bg-purple-100 hover:bg-purple-200 text-purple-800 border border-purple-300 font-bold px-1.5 py-1 text-[10px]"
+                                    className="bg-purple-100 hover:bg-purple-200 text-purple-800 border border-purple-300 font-bold px-1.5 py-1 text-[10px] w-full max-w-[60px]"
                                     title="Unduh file JSON"
                                   >
                                     Unduh
@@ -479,7 +494,7 @@ export const SettingsPanel = ({ currentTime }: { currentTime: Date }) => {
                                       setSnapshots(updated);
                                       localStorage.setItem('POS_Snapshots', JSON.stringify(updated));
                                     }} 
-                                    className="text-red-600 hover:text-red-800 p-1 bg-red-50 hover:bg-red-100"
+                                    className="text-red-600 hover:text-red-800 p-1 bg-red-50 hover:bg-red-100 w-full max-w-[30px]"
                                     title="Hapus"
                                   >
                                     <Trash2 className="w-3.5 h-3.5 mx-auto" />
@@ -488,8 +503,9 @@ export const SettingsPanel = ({ currentTime }: { currentTime: Date }) => {
                               </td>
                             </tr>
                           ))}
-                        </tbody>
-                      </table>
+                          </tbody>
+                        </table>
+                      </div>
                     )}
                   </div>
                 </div>

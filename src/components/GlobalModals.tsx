@@ -418,8 +418,9 @@ export const GlobalModals = () => {
                         <input type="text" required value={newCustomerPhone} onChange={(e) => setNewCustomerPhone(e.target.value)} className="w-full p-1.5 border border-gray-400 mb-2 outline-none focus:border-blue-600" />
                         <label className="block mb-1">Level Harga:</label>
                         <select value={newCustomerLevel} onChange={(e) => setNewCustomerLevel(e.target.value)} className="w-full p-1.5 border border-gray-400 mb-4 outline-none focus:border-blue-600">
-                        <option value={1}>Level 1 (Umum)</option>
+                        <option value={1}>Level 1 (NON member)</option>
                         <option value={2}>Level 2 (Grosir)</option>
+                        <option value={3}>Level 3 (Affiliate/Expo)</option>
                         </select>
                         <div className="flex justify-end gap-2">
                         <button type="button" onClick={() => setShowAddCustomerModal(false)} className="px-4 py-1.5 border-2 border-gray-500 bg-gray-200 hover:bg-gray-300 font-bold">Batal</button>

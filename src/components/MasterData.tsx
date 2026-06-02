@@ -40,13 +40,13 @@ export const MasterData = ({ currentTime }: { currentTime: Date }) => {
       <LegacyWindowHeader title="MASTER DATA" currentTime={currentTime} />
       
       {/* Master Data Top Tabs */}
-      <div className="flex flex-wrap gap-1 shrink-0 bg-[#ece9d8] p-1 border-b border-gray-400 shadow-sm z-10">
-         <button onClick={() => setMasterDataTab('stock')} className={`px-3 py-1.5 border border-gray-500 font-bold hover:bg-white ${masterDataTab === 'stock' ? 'bg-white border-b-white text-blue-900' : 'bg-gray-200 text-black'}`}>Master Stock</button>
-         <button onClick={() => setMasterDataTab('opname')} className={`px-3 py-1.5 border border-gray-500 font-bold hover:bg-white ${masterDataTab === 'opname' ? 'bg-white border-b-white text-blue-900' : 'bg-gray-200 text-black'}`}>Stock Opname</button>
-         <button onClick={() => setMasterDataTab('order')} className={`px-3 py-1.5 border border-gray-500 font-bold hover:bg-white ${masterDataTab === 'order' ? 'bg-white border-b-white text-blue-900' : 'bg-gray-200 text-black'}`}>Order Stock</button>
-         <button onClick={() => setMasterDataTab('return')} className={`px-3 py-1.5 border border-gray-500 font-bold hover:bg-white ${masterDataTab === 'return' ? 'bg-white border-b-white text-blue-900' : 'bg-gray-200 text-black'}`}>Stock Return</button>
-         <button onClick={() => setMasterDataTab('pelanggan')} className={`px-3 py-1.5 border border-gray-500 font-bold hover:bg-white ${masterDataTab === 'pelanggan' ? 'bg-white border-b-white text-blue-900' : 'bg-gray-200 text-black'}`}>Data Pelanggan</button>
-         <button onClick={() => setMasterDataTab('supliyer')} className={`px-3 py-1.5 border border-gray-500 font-bold hover:bg-white ${masterDataTab === 'supliyer' ? 'bg-white border-b-white text-blue-900' : 'bg-gray-200 text-black'}`}>Data Supliyer</button>
+      <div className="flex gap-1 shrink-0 bg-[#ece9d8] p-1 border-b border-gray-400 shadow-sm z-10 overflow-x-auto no-scrollbar">
+         <button onClick={() => setMasterDataTab('stock')} className={`px-2.5 py-1 text-[10px] md:text-xs md:px-4 md:py-1.5 whitespace-nowrap shrink-0 border border-gray-500 font-bold hover:bg-white ${masterDataTab === 'stock' ? 'bg-white border-b-white text-blue-900' : 'bg-gray-200 text-black'}`}>Master Stock</button>
+         <button onClick={() => setMasterDataTab('opname')} className={`px-2.5 py-1 text-[10px] md:text-xs md:px-4 md:py-1.5 whitespace-nowrap shrink-0 border border-gray-500 font-bold hover:bg-white ${masterDataTab === 'opname' ? 'bg-white border-b-white text-blue-900' : 'bg-gray-200 text-black'}`}>Stock Opname</button>
+         <button onClick={() => setMasterDataTab('order')} className={`px-2.5 py-1 text-[10px] md:text-xs md:px-4 md:py-1.5 whitespace-nowrap shrink-0 border border-gray-500 font-bold hover:bg-white ${masterDataTab === 'order' ? 'bg-white border-b-white text-blue-900' : 'bg-gray-200 text-black'}`}>Order Stock</button>
+         <button onClick={() => setMasterDataTab('return')} className={`px-2.5 py-1 text-[10px] md:text-xs md:px-4 md:py-1.5 whitespace-nowrap shrink-0 border border-gray-500 font-bold hover:bg-white ${masterDataTab === 'return' ? 'bg-white border-b-white text-blue-900' : 'bg-gray-200 text-black'}`}>Stock Return</button>
+         <button onClick={() => setMasterDataTab('pelanggan')} className={`px-2.5 py-1 text-[10px] md:text-xs md:px-4 md:py-1.5 whitespace-nowrap shrink-0 border border-gray-500 font-bold hover:bg-white ${masterDataTab === 'pelanggan' ? 'bg-white border-b-white text-blue-900' : 'bg-gray-200 text-black'}`}>Data Pelanggan</button>
+         <button onClick={() => setMasterDataTab('supliyer')} className={`px-2.5 py-1 text-[10px] md:text-xs md:px-4 md:py-1.5 whitespace-nowrap shrink-0 border border-gray-500 font-bold hover:bg-white ${masterDataTab === 'supliyer' ? 'bg-white border-b-white text-blue-900' : 'bg-gray-200 text-black'}`}>Data Supliyer</button>
       </div>
 
       <div className="p-2 flex flex-col h-full gap-2 overflow-y-auto">
@@ -280,12 +280,12 @@ export const MasterData = ({ currentTime }: { currentTime: Date }) => {
               </div>
               <table className="w-full text-left border-collapse whitespace-nowrap">
                 <thead className="bg-slate-50 border-b-2 border-gray-400 font-normal">
-                  <tr><th className="p-2 border-r border-gray-300 w-16 text-center">ID</th><th className="p-2 border-r border-gray-300">Nama Pelanggan</th><th className="p-2 border-r border-gray-300 text-center">Level Harga</th><th className="p-2 text-center">Aksi</th></tr>
+                  <tr><th className="p-2 border-r border-gray-300 w-16 text-center">ID</th><th className="p-2 border-r border-gray-300">Nama Pelanggan</th><th className="p-2 border-r border-gray-300">No. Telp / WA</th><th className="p-2 border-r border-gray-300 text-center">Level Harga</th><th className="p-2 text-center">Aksi</th></tr>
                 </thead>
                 <tbody>
                   {customers.map((c: any) => (
                     <tr key={c.id} className="border-b border-gray-200 hover:bg-blue-50">
-                      <td className="p-2 border-r border-gray-300 text-center font-mono text-gray-500">#{c.id}</td><td className="p-2 border-r border-gray-300 font-bold">{c.name}</td><td className="p-2 border-r border-gray-300 text-center">Level {c.level}</td><td className="p-2 text-center"><button className="px-2 text-blue-700 font-bold hover:underline">Edit</button></td>
+                      <td className="p-2 border-r border-gray-300 text-center font-mono text-gray-500">#{c.id}</td><td className="p-2 border-r border-gray-300 font-bold">{c.name}</td><td className="p-2 border-r border-gray-300">{c.phone || '-'}</td><td className="p-2 border-r border-gray-300 text-center">Level {c.level} {c.level == 1 ? '(NON member)' : ''}</td><td className="p-2 text-center"><button className="px-2 text-blue-700 font-bold hover:underline">Edit</button></td>
                     </tr>
                   ))}
                 </tbody>

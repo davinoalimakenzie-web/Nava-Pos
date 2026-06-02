@@ -148,10 +148,10 @@ Jangan sertakan markdown \`\`\`json.`;
     <div className="flex-1 flex flex-col bg-[#8fb4d9] border border-[#8fb4d9] overflow-hidden">
       <LegacyWindowHeader title="AI SMART ASSISTANT" currentTime={currentTime} />
       
-      <div className="flex gap-1 shrink-0 bg-[#ece9d8] p-1 border-b border-gray-400 shadow-sm z-10">
-         <button onClick={() => setAiTab('dashboard')} className={`px-4 py-1.5 border border-gray-500 font-bold hover:bg-white ${aiTab === 'dashboard' ? 'bg-white border-b-white text-blue-900' : 'bg-gray-200 text-black'}`}>Dashboard</button>
-         <button onClick={() => setAiTab('cs')} className={`px-4 py-1.5 border border-gray-500 font-bold hover:bg-white ${aiTab === 'cs' ? 'bg-white border-b-white text-blue-900' : 'bg-gray-200 text-black'}`}>Bot WhatsApp CS</button>
-         <button onClick={() => setAiTab('input')} className={`px-4 py-1.5 border border-gray-500 font-bold hover:bg-white ${aiTab === 'input' ? 'bg-white border-b-white text-blue-900' : 'bg-gray-200 text-black'}`}>Smart Data Input</button>
+      <div className="flex gap-1 shrink-0 bg-[#ece9d8] p-1 border-b border-gray-400 shadow-sm z-10 overflow-x-auto no-scrollbar">
+         <button onClick={() => setAiTab('dashboard')} className={`px-2.5 py-1 text-[10px] md:text-xs md:px-4 md:py-1.5 whitespace-nowrap shrink-0 border border-gray-500 font-bold hover:bg-white ${aiTab === 'dashboard' ? 'bg-white border-b-white text-blue-900' : 'bg-gray-200 text-black'}`}>Dashboard</button>
+         <button onClick={() => setAiTab('cs')} className={`px-2.5 py-1 text-[10px] md:text-xs md:px-4 md:py-1.5 whitespace-nowrap shrink-0 border border-gray-500 font-bold hover:bg-white ${aiTab === 'cs' ? 'bg-white border-b-white text-blue-900' : 'bg-gray-200 text-black'}`}>Bot WhatsApp CS</button>
+         <button onClick={() => setAiTab('input')} className={`px-2.5 py-1 text-[10px] md:text-xs md:px-4 md:py-1.5 whitespace-nowrap shrink-0 border border-gray-500 font-bold hover:bg-white ${aiTab === 'input' ? 'bg-white border-b-white text-blue-900' : 'bg-gray-200 text-black'}`}>Smart Data Input</button>
       </div>
 
       <div className="flex-1 overflow-y-auto bg-white p-6 text-black shadow-inner">
@@ -173,17 +173,17 @@ Jangan sertakan markdown \`\`\`json.`;
                     <div className="bg-[#ece9d8] border border-gray-400 rounded-sm p-6 relative overflow-hidden group hover:bg-green-50 transition-colors shadow-sm">
                       <div className="absolute top-0 right-0 p-4 font-bold opacity-10"><User className="w-24 h-24" /></div>
                       <div className="flex items-center gap-2 text-green-700 mb-4 font-bold text-sm">
-                        <CheckCircle2 className="w-4 h-4" /> BOT WHATSAPP CS
+                        <CheckCircle2 className="w-4 h-4" /> AI CHAT ASSISTANT
                       </div>
                       <h3 className="text-3xl font-bold mb-1 text-black">Aktif</h3>
-                      <p className="text-gray-600 text-sm mb-4">Integrasi WhatsApp API untuk merespon stok barang dan jam operasional via chat secara instan.</p>
-                      <button onClick={() => setAiTab('cs')} className="bg-gray-200 border border-gray-400 hover:bg-gray-300 px-4 py-2 text-sm font-bold w-full text-black shadow-sm">Uji Coba Bot</button>
+                      <p className="text-gray-600 text-sm mb-4">Integrasi WhatsApp API untuk merespon stok barang dan pertanyaan pelanggan secara instan.</p>
+                      <button onClick={() => setAiTab('cs')} className="bg-gray-200 border border-gray-400 hover:bg-gray-300 px-4 py-2 text-sm font-bold w-full text-black shadow-sm">Buka Fitur</button>
                     </div>
 
                     <div className="bg-[#ece9d8] border border-gray-400 rounded-sm p-6 relative overflow-hidden hover:bg-yellow-50 transition-colors shadow-sm">
                       <div className="absolute top-0 right-0 p-4 font-bold opacity-10"><Package className="w-24 h-24" /></div>
                       <div className="flex items-center gap-2 text-orange-600 mb-4 font-bold text-sm">
-                        <span className="w-4 h-4">✨</span> AI AUTO-ORDER & SUPPLIER
+                        <span className="w-4 h-4">✨</span> AI RESTOCK (AUTO-ORDER)
                       </div>
                       <h3 className="text-3xl font-bold mb-1 text-black">{orderData?.filter((o:any) => o.sisaStock <= 2).length} Deteksi</h3>
                       <p className="text-gray-600 text-sm mb-4">Deteksi stok menipis lalu menyusun draf PO (Purchase Order) serta terhubung ke WA Supplier.</p>
@@ -195,10 +195,57 @@ Jangan sertakan markdown \`\`\`json.`;
                       <div className="flex items-center gap-2 text-blue-700 mb-4 font-bold text-sm">
                         <span className="w-4 h-4">✨</span> SMART DATA INPUT
                       </div>
-                      <h3 className="text-xl font-bold mb-1 leading-tight text-black">Ekstraksi Teks ke Data</h3>
-                      <p className="text-gray-600 text-sm mb-4">Input stok hanya dengan mengetik catatan kasar, sistem otomatis mendeteksi barang dan jumlah.</p>
+                      <h3 className="text-xl font-bold mb-1 leading-tight text-black">Ekstraksi Cepat</h3>
+                      <p className="text-gray-600 text-sm mb-4">Input stok hanya dengan mengetik catatan kasar, otomatis mendeteksi barang dan jumlah.</p>
                       <button onClick={() => setAiTab('input')} className="bg-blue-600 border border-blue-800 hover:bg-blue-700 text-white px-4 py-2 text-sm font-bold w-full mt-2 shadow-sm">Mulai Input</button>
                     </div>
+
+                    {/* New Requested Features Below */}
+                    <div className="bg-[#ece9d8] border border-gray-400 rounded-sm p-6 relative overflow-hidden group hover:bg-purple-50 transition-colors shadow-sm opacity-80 hover:opacity-100">
+                      <div className="flex items-center gap-2 text-purple-700 mb-4 font-bold text-sm">
+                        <span className="w-4 h-4">✨</span> AI INSIGHT
+                      </div>
+                      <h3 className="text-xl font-bold mb-1 text-black">Rangkuman Tren</h3>
+                      <p className="text-gray-600 text-sm mb-4">Analisis perilaku pelanggan dan tren penjualan harian yang dikonversi menjadi laporan singkat.</p>
+                      <button onClick={() => alert('Fitur AI Insight segera hadir. Kami sedang meningkatkan model analitik!')} className="bg-gray-200 border border-gray-400 hover:bg-gray-300 px-4 py-2 text-sm font-bold w-full text-black shadow-sm">Segera Hadir</button>
+                    </div>
+
+                    <div className="bg-[#ece9d8] border border-gray-400 rounded-sm p-6 relative overflow-hidden group hover:bg-indigo-50 transition-colors shadow-sm opacity-80 hover:opacity-100">
+                      <div className="flex items-center gap-2 text-indigo-700 mb-4 font-bold text-sm">
+                        <span className="w-4 h-4">✨</span> AI FORECAST
+                      </div>
+                      <h3 className="text-xl font-bold mb-1 text-black">Prediksi Permintaan</h3>
+                      <p className="text-gray-600 text-sm mb-4">Proyeksi penjualan di bulan berikutnya berdasarkan data histori historis algoritma AI.</p>
+                      <button onClick={() => alert('Fitur AI Forecast segera hadir!')} className="bg-gray-200 border border-gray-400 hover:bg-gray-300 px-4 py-2 text-sm font-bold w-full text-black shadow-sm">Segera Hadir</button>
+                    </div>
+
+                    <div className="bg-[#ece9d8] border border-gray-400 rounded-sm p-6 relative overflow-hidden group hover:bg-emerald-50 transition-colors shadow-sm opacity-80 hover:opacity-100">
+                      <div className="flex items-center gap-2 text-emerald-700 mb-4 font-bold text-sm">
+                        <span className="w-4 h-4">✨</span> AI PROFIT ANALYZER
+                      </div>
+                      <h3 className="text-xl font-bold mb-1 text-black">Audit Margin</h3>
+                      <p className="text-gray-600 text-sm mb-4">Mendeteksi produk yang kurang profit atau overprice dengan saran otomatis.</p>
+                      <button onClick={() => alert('Fitur AI Profit Analyzer segera hadir!')} className="bg-gray-200 border border-gray-400 hover:bg-gray-300 px-4 py-2 text-sm font-bold w-full text-black shadow-sm">Segera Hadir</button>
+                    </div>
+
+                    <div className="bg-[#ece9d8] border border-gray-400 rounded-sm p-6 relative overflow-hidden group hover:bg-rose-50 transition-colors shadow-sm opacity-80 hover:opacity-100">
+                      <div className="flex items-center gap-2 text-rose-700 mb-4 font-bold text-sm">
+                        <span className="w-4 h-4">✨</span> AI PROMO GENERATOR
+                      </div>
+                      <h3 className="text-xl font-bold mb-1 text-black">Ide Bundling</h3>
+                      <p className="text-gray-600 text-sm mb-4">Menemukan dead-stock (barang tidak laku) dan membuat campaign promosi otomatis.</p>
+                      <button onClick={() => alert('Fitur AI Promo Generator segera hadir!')} className="bg-gray-200 border border-gray-400 hover:bg-gray-300 px-4 py-2 text-sm font-bold w-full text-black shadow-sm">Segera Hadir</button>
+                    </div>
+
+                    <div className="bg-[#ece9d8] border border-gray-400 rounded-sm p-6 relative overflow-hidden group hover:bg-cyan-50 transition-colors shadow-sm opacity-80 hover:opacity-100 md:col-span-2">
+                      <div className="flex items-center gap-2 text-cyan-700 mb-4 font-bold text-sm">
+                        <span className="w-4 h-4">✨</span> AI BUSINESS CONSULTANT
+                      </div>
+                      <h3 className="text-xl font-bold mb-1 text-black">Tanya Jawab Bisnis</h3>
+                      <p className="text-gray-600 text-sm mb-4">Integrasi langsung ke chatbot untuk menanyakan saran bisnis, strategi scaling, hingga pengelolaan karyawan berdasarkan performa toko Anda saat ini.</p>
+                      <button onClick={() => alert('Fitur AI Business Consultant segera hadir!')} className="bg-gray-200 border border-gray-400 hover:bg-gray-300 px-4 py-2 text-sm font-bold w-48 text-black shadow-sm">Segera Hadir</button>
+                    </div>
+
                   </div>
               </>
           )}
