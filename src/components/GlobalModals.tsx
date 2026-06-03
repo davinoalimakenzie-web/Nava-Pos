@@ -19,11 +19,13 @@ export const GlobalModals = () => {
         inventory, suppliers, orderData, supplierReturns, transactions,
         appUsers, attendances, leaveRequests,
         setInventory, setTransactions, setOrderData,
-        appLogs, addLog
+        appLogs, addLog,
+        wallets, setWallets
     } = useAppContext();
 
     const [newExpenseName, setNewExpenseName] = useState('');
     const [newExpenseAmount, setNewExpenseAmount] = useState('');
+    const [expenseWallet, setExpenseWallet] = useState('Dana Laci');
     const [newCustomerName, setNewCustomerName] = useState('');
     const [newCustomerAddress, setNewCustomerAddress] = useState('');
     const [newCustomerPhone, setNewCustomerPhone] = useState('');
@@ -66,20 +68,39 @@ export const GlobalModals = () => {
 
     const handleAddExpense = (e: React.FormEvent) => {
         e.preventDefault();
+        const amt = parseInt(newExpenseAmount);
+        
+        if (expenseWallet === 'Dana Laci' && (wallets?.danaLaci || 0) < amt) {
+            alert('Peringatan: Saldo Dana Laci tidak mencukupi!');
+            return;
+        } else if (expenseWallet === 'Dana Bebas' && (wallets?.danaBebas || 0) < amt) {
+            alert('Peringatan: Saldo Dana Bebas tidak mencukupi!');
+            return;
+        }
+
         const expense = {
             id: 'EXP-' + Date.now(),
             date: `${transactionDate} ${new Date().toLocaleTimeString('id-ID')}`,
             isoDate: new Date(transactionDate).toISOString(),
             name: newExpenseName,
-            amount: parseInt(newExpenseAmount),
+            amount: amt,
             cashier: user.name,
-            branch: storeSettings.activeBranch || 'Pusat'
+            branch: user?.branch || storeSettings.activeBranch || 'Pusat',
+            wallet: expenseWallet
         };
         setExpenses([expense, ...expenses]);
-        addLog('PENGELUARAN', `Rp ${expense.amount.toLocaleString('id-ID')} untuk ${expense.name}`);
+        addLog('PENGELUARAN', `Rp ${expense.amount.toLocaleString('id-ID')} untuk ${expense.name} (dari ${expenseWallet})`);
+        
+        if (expenseWallet === 'Dana Laci') {
+            setWallets((prev: any) => ({...prev, danaLaci: (prev?.danaLaci || 0) - amt}));
+        } else {
+            setWallets((prev: any) => ({...prev, danaBebas: (prev?.danaBebas || 0) - amt}));
+        }
+
         setNewExpenseName('');
         setNewExpenseAmount('');
         setShowExpenseModal(false);
+        setExpenseWallet('Dana Laci');
         alert('Pengeluaran berhasil dicatat!');
     };
 
@@ -296,11 +317,21 @@ export const GlobalModals = () => {
                 <div className="fixed inset-0 bg-black/50 z-[100] flex items-center justify-center p-4 backdrop-blur-sm">
                 <div className="bg-[#ece9d8] border-2 border-gray-400 w-full max-w-sm flex flex-col shadow-xl">
                     <div className="bg-[#000080] text-white px-2 py-1 flex items-center font-bold text-xs justify-between">
-                    <span>Input Pengeluaran Laci</span>
+                    <span>Input Pengeluaran</span>
                     <button onClick={() => setShowExpenseModal(false)} className="bg-gray-300 text-black px-1.5 font-bold hover:bg-red-500 hover:text-white border border-gray-400">X</button>
                     </div>
                     <div className="p-4 text-black text-sm">
                     <form onSubmit={handleAddExpense}>
+                        <label className="block mb-1 font-bold text-xs">Sumber Dana:</label>
+                        <select 
+                           value={expenseWallet} 
+                           onChange={(e) => setExpenseWallet(e.target.value)}
+                           className="w-full p-2 border border-gray-400 mb-3 outline-none focus:border-blue-600 bg-white"
+                        >
+                           <option value="Dana Laci">Dana Laci (Operasional Harian Toko)</option>
+                           <option value="Dana Bebas">Dana Bebas (Gaji, Supplier, Prive)</option>
+                        </select>
+                        
                         <label className="block mb-1">Keterangan Pengeluaran:</label>
                         <input 
                         type="text" required value={newExpenseName} onChange={(e) => setNewExpenseName(e.target.value)}
@@ -389,7 +420,7 @@ export const GlobalModals = () => {
                         </div>
                         <div className="w-full flex justify-between mt-1">
                             <span>Bayar:</span>
-                            <span>{transactions[0].paid.toLocaleString('id-ID')}</span>
+                            <span>{(transactions[0].paid || transactions[0].amountPaid || 0).toLocaleString('id-ID')}</span>
                         </div>
                         <div className="w-full flex justify-between mb-2">
                             <span>Kembali:</span>

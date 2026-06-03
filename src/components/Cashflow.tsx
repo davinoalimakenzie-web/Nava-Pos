@@ -4,8 +4,10 @@ import { useAppContext } from '../context/AppContext';
 import { LegacyWindowHeader } from './LegacyWindowHeader';
 import { formatRp, formatDateDisplay, calculateJatuhTempo } from '../utils';
 
+import { AiCashflowBot } from './AiCashflowBot';
+
 export const Cashflow = ({ currentTime }: { currentTime: Date }) => {
-  const { transactions, expenses, setExpenses, storeSettings, setActiveTab, setMasterDataTab, cart, setCart, customers } = useAppContext();
+    const { transactions, expenses, setExpenses, storeSettings, setActiveTab, setMasterDataTab, cart, setCart, customers, wallets, setWallets } = useAppContext();
   
   const [cashflowTab, setCashflowTab] = useState('harian');
   const [cashflowHarianSubTab, setCashflowHarianSubTab] = useState('laporan');
@@ -56,6 +58,13 @@ export const Cashflow = ({ currentTime }: { currentTime: Date }) => {
     if (filterUseStart && tDate < start) return false;
     if (filterUseEnd && tDate > end) return false;
     return true;
+  });
+
+  console.log("Cashflow filtering:", {
+    filterBranch, filterStartDate, filterEndDate,
+    allTrxCount: transactions.length,
+    filteredCount: filteredTransactions.length,
+    retursInFiltered: filteredTransactions.filter((t: any) => t.returTotal > 0 || (t.items && t.items.some((i: any) => i.isReturn))).length
   });
 
   const filteredExpenses = expenses.filter((e: any) => {
@@ -148,6 +157,7 @@ export const Cashflow = ({ currentTime }: { currentTime: Date }) => {
                <option value="laporan">Laporan Transaksi</option>
                <option value="pengeluaran">Pengeluaran</option>
                <option value="return">Return</option>
+               <option value="ai_cashflow">Asisten AI Cashflow</option>
             </select>
          </div>
          {/* Cabang (Status) */}
@@ -217,23 +227,23 @@ export const Cashflow = ({ currentTime }: { currentTime: Date }) => {
           {/* Box Rangkuman */}
           <div className="flex gap-[2px] shrink-0">
             <div className="bg-white border border-gray-400 p-2 flex-1 shadow-sm">
-              <p className="text-gray-800 font-bold mb-1 text-[13px]">Total Omset</p>
-              <div className="text-[15px] font-bold text-black">{formatRp(uangMasukCash + uangKeluarNonTunai)}</div>
+              <p className="text-gray-800 font-bold mb-1 text-[13px]">Dana Bebas</p>
+              <div className="text-[15px] font-bold text-black">{formatRp(wallets?.danaBebas || 0)}</div>
             </div>
             <div className="bg-white border border-gray-400 p-2 flex-1 shadow-sm">
-              <p className="text-gray-800 font-bold mb-1 text-[13px]">Total Retur</p>
+              <p className="text-gray-800 font-bold mb-1 text-[13px]">Dana Laci</p>
+              <div className="text-[15px] font-bold text-black">{formatRp(wallets?.danaLaci || 0)}</div>
+            </div>
+            <div className="bg-white border border-gray-400 p-2 flex-1 shadow-sm">
+              <p className="text-gray-800 font-bold mb-1 text-[13px]">Total Retur (Harian)</p>
               <div className="text-[15px] font-bold text-black">{formatRp(returTunaiTotal + returNonTunaiTotal)}</div>
             </div>
             <div className="bg-white border border-gray-400 p-2 flex-1 shadow-sm">
-              <p className="text-gray-800 font-bold mb-1 text-[13px]">CASH Laci (+)</p>
-              <div className="text-[15px] font-bold text-black">{formatRp(uangMasukCash)}</div>
-            </div>
-            <div className="bg-white border border-gray-400 p-2 flex-1 shadow-sm">
-              <p className="text-gray-800 font-bold mb-1 text-[13px]">Piutang/Non-Tunai</p>
+              <p className="text-gray-800 font-bold mb-1 text-[13px]">Piutang/Non-Tunai (Harian)</p>
               <div className="text-[15px] font-bold text-black">{formatRp(uangKeluarNonTunai)}</div>
             </div>
             <div className="bg-white border border-gray-400 p-2 flex-1 shadow-sm">
-              <p className="text-gray-800 font-bold mb-1 text-[13px]">Pengeluaran (-)</p>
+              <p className="text-gray-800 font-bold mb-1 text-[13px]">Pengeluaran (-) Harian</p>
               <div className="text-[15px] font-bold text-black">{formatRp(totalPengeluaran)}</div>
             </div>
           </div>
@@ -267,10 +277,10 @@ export const Cashflow = ({ currentTime }: { currentTime: Date }) => {
                            className="border-b border-gray-200 hover:bg-blue-100 cursor-pointer text-black"
                            title="Klik 2x untuk membuka faktur di mode Retur"
                            onDoubleClick={() => {
-                               const returnItems = trx.items.map((item: any) => ({
+                               const returnItems = (trx.items || []).map((item: any) => ({
                                    ...item,
-                                   qty: -item.qty,
-                                   originalQty: item.qty,
+                                   qty: Math.abs(item.qty),
+                                   originalQty: Math.abs(item.qty),
                                    isReturn: true,
                                    originalTrxId: trx.id,
                                    originalItemId: item.id
@@ -281,7 +291,7 @@ export const Cashflow = ({ currentTime }: { currentTime: Date }) => {
                          >
                            <td className="p-3 border-r border-gray-300">{trx.date.split(' ')[0]}</td>
                            <td className="p-3 border-r border-gray-300 font-mono font-bold text-blue-800">{trx.id}</td>
-                           <td className="p-3 border-r border-gray-300 text-center font-bold">{trx.items.reduce((sum: number, i: any) => sum + i.qty, 0)}</td>
+                           <td className="p-3 border-r border-gray-300 text-center font-bold">{(trx.items || []).reduce((sum: number, i: any) => sum + i.qty, 0)}</td>
                            <td className="p-3 border-r border-gray-300">{trx.customer}</td>
                            <td className="p-3 border-r border-gray-300 text-center">
                              <span className={trx.method === 'TUNAI' ? 'text-green-700 font-bold' : 'text-orange-600 font-bold'}>{trx.method}</span>
@@ -311,7 +321,8 @@ export const Cashflow = ({ currentTime }: { currentTime: Date }) => {
                     <thead className="bg-[#ece9d8] sticky top-0 border-b-2 border-gray-400 font-bold text-red-800 shadow-sm z-10 text-sm">
                       <tr>
                         <th className="p-3 border-r border-gray-300 w-1/4">Waktu / ID</th>
-                        <th className="p-3 border-r border-gray-300 w-1/2">Keterangan Pengeluaran</th>
+                        <th className="p-3 border-r border-gray-300 w-1/3">Keterangan Pengeluaran</th>
+                        <th className="p-3 border-r border-gray-300 text-center">Sumber Dana</th>
                         <th className="p-3 border-r border-gray-300 text-center">User (Kasir)</th>
                         <th className="p-3 text-right">Nominal Pengeluaran</th>
                       </tr>
@@ -321,6 +332,7 @@ export const Cashflow = ({ currentTime }: { currentTime: Date }) => {
                          <tr key={exp.id} className="border-b border-gray-200 hover:bg-red-50 text-black">
                             <td className="p-3 border-r border-gray-300">{exp.date} <span className="text-gray-400 font-mono">({exp.id})</span></td>
                             <td className="p-3 border-r border-gray-300 font-bold">{exp.name}</td>
+                            <td className="p-3 border-r border-gray-300 text-center font-bold text-xs">{exp.wallet || 'Dana Laci'}</td>
                             <td className="p-3 border-r border-gray-300 text-center">{exp.cashier}</td>
                             <td className={`p-3 text-right font-bold ${exp.amount < 0 ? 'text-teal-600' : 'text-red-600'}`}>
                               {exp.amount < 0 ? '+' : '-'}{formatRp(Math.abs(exp.amount))}
@@ -352,8 +364,8 @@ export const Cashflow = ({ currentTime }: { currentTime: Date }) => {
                             <td className="p-3 border-r border-gray-300">{trx.date} <span className="text-gray-400 font-mono">({trx.id})</span></td>
                             <td className="p-3 border-r border-gray-300 font-bold">{trx.customer}</td>
                             <td className="p-3 border-r border-gray-300 text-sm">
-                               {trx.items.filter((i: any) => i.isReturn).map((item: any, idx: number) => (
-                                 <div key={idx}>- {item.name.replace('(Retur) ', '')} ({item.qty} pcs)</div>
+                               {(trx.items || []).filter((i: any) => i.isReturn).map((item: any, idx: number) => (
+                                 <div key={idx}>- {item.name?.replace('(Retur) ', '')} ({item.qty} pcs)</div>
                                ))}
                             </td>
                             <td className="p-3 text-right font-bold text-red-600">
@@ -364,6 +376,12 @@ export const Cashflow = ({ currentTime }: { currentTime: Date }) => {
                     </tbody>
                   </table>
                 )}
+              </div>
+            )}
+
+            {cashflowHarianSubTab === 'ai_cashflow' && (
+              <div className="flex flex-col h-full absolute inset-0">
+                 <AiCashflowBot />
               </div>
             )}
           </div>

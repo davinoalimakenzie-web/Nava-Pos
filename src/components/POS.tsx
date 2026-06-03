@@ -26,7 +26,8 @@ export const POS = ({ currentTime }: { currentTime: Date }) => {
     setShowExpenseModal, setShowAddCustomerModal,
     setMasterDataTab, setPendingUser, setShowAuthModal, storeSettings,
     appLogs, addLog, employees,
-    isInputStockMode, setIsInputStockMode
+    isInputStockMode, setIsInputStockMode,
+    wallets, setWallets
   } = useAppContext();
 
   const selectedCustomer = customers.find((c: any) => String(c.id) === String(selectedCustomerId));
@@ -293,6 +294,12 @@ export const POS = ({ currentTime }: { currentTime: Date }) => {
     if (isInputStockMode) {
        const supplier = suppliers.find((s: any) => s.id.toString() === stockSupplierId);
        const finalTotalCost = totalBelanjaBaru - (totalBelanjaBaru * stockDiscount / 100);
+
+       if (stockDiscount < 100 && finalTotalCost > 0) {
+           if ((wallets?.danaBebas || 0) < finalTotalCost) {
+               return setConfirmAction({message: 'Saldo Dana Bebas tidak mencukupi untuk pembelian stok ini!', isAlert: true});
+           }
+       }
        
        let currentInv = JSON.parse(JSON.stringify(inventory));
        let newInvItems: any[] = [];
@@ -331,7 +338,7 @@ export const POS = ({ currentTime }: { currentTime: Date }) => {
           method: paymentMethod,
           sisa: 0,
           returTotal: 0,
-          branch: storeSettings.activeBranch || 'Pusat',
+          branch: user?.branch || storeSettings.activeBranch || 'Pusat',
           note: transactionNote
        };
 
@@ -343,9 +350,11 @@ export const POS = ({ currentTime }: { currentTime: Date }) => {
               name: `Pembelian Stok ${purchaseFaktur}`,
               amount: finalTotalCost,
               cashier: user.name,
-              branch: storeSettings.activeBranch || 'Pusat'
+              branch: user?.branch || storeSettings.activeBranch || 'Pusat',
+              wallet: 'Dana Bebas'
            };
            setExpenses([newExpense, ...expenses]);
+           setWallets((prev: any) => ({ ...prev, danaBebas: (prev?.danaBebas || 0) - finalTotalCost }));
        }
 
        setInventory([...newInvItems, ...currentInv]);
@@ -395,13 +404,17 @@ export const POS = ({ currentTime }: { currentTime: Date }) => {
           sisa: 0,
           returTotal: 0,
           globalDiscount: 0,
-          branch: storeSettings.activeBranch || 'Pusat',
+          branch: user?.branch || storeSettings.activeBranch || 'Pusat',
           note: `Pelunasan piutang ${piutangPaymentItem.piutangId}`
         };
         
         setTransactions([piutangTransaction, ...transactions]);
         addLog('PELUNASAN_PIUTANG', `Transaksi ${piutangTransaction.id} sebesar Rp ${piutangTransaction.total.toLocaleString('id-ID')}`);
         
+        if (paymentMethod !== 'Qriss/TF') {
+            setWallets((prev: any) => ({ ...prev, danaLaci: (prev?.danaLaci || 0) + paid }));
+        }
+
         resetKasirState();
         if (shouldPrint) {
            setTimeout(() => window.print(), 200);
@@ -431,7 +444,7 @@ export const POS = ({ currentTime }: { currentTime: Date }) => {
       sisa: finalType === 'PIUTANG' ? (sisaTagihan > 0 ? sisaTagihan : totalBelanja) : 0,
       returTotal: totalNilaiRetur,
       globalDiscount: calculatedDiscount,
-      branch: storeSettings.activeBranch || 'Pusat',
+      branch: user?.branch || storeSettings.activeBranch || 'Pusat',
       note: transactionNote
     };
 
@@ -444,6 +457,13 @@ export const POS = ({ currentTime }: { currentTime: Date }) => {
       if (shouldPrint) {
           setTimeout(() => window.print(), 200);
       }
+    }
+    
+    if (paymentMethod !== 'Qriss/TF') {
+       const cashReceived = finalType === 'PIUTANG' ? paid : (paid - kembalian);
+       if (cashReceived > 0) {
+           setWallets((prev: any) => ({ ...prev, danaLaci: (prev?.danaLaci || 0) + cashReceived }));
+       }
     }
 
     updateStockAndSave(newTransaction);

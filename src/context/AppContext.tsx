@@ -10,13 +10,15 @@ import {
   initialOrderData,
   initialEmployees,
   initialAttendances,
+  initialPendingTransactions,
+  initialLeaveRequests,
   defaultDate,
   initialUsers
 } from '../data';
 
 const AppContext = createContext<any>(null);
 
-const DUMMY_VERSION = "4";
+const DUMMY_VERSION = "15";
 
 function useSyncState<T>(key: string, initial: T, syncEnabled: boolean) {
   const [state, setState] = useState<T>(() => {
@@ -119,11 +121,12 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
   }, [storeSettings]);
 
   const [appUsers, setAppUsers] = useSyncState<any[]>('appUsers', initialUsers, storeSettings.syncEnabled);
+  const [wallets, setWallets] = useSyncState<any>('wallets', { danaLaci: 1242406, danaBebas: 86905291, lastClosedDate: '' }, storeSettings.syncEnabled);
   const [inventory, setInventory] = useSyncState<any[]>('inventory', initialInventory, storeSettings.syncEnabled);
   const [customers, setCustomers] = useSyncState<any[]>('customers', initialCustomers, storeSettings.syncEnabled);
   const [employees, setEmployees] = useSyncState<any[]>('employees', initialEmployees, storeSettings.syncEnabled);
   const [attendances, setAttendances] = useSyncState<any[]>('attendances', initialAttendances, storeSettings.syncEnabled);
-  const [leaveRequests, setLeaveRequests] = useSyncState<any[]>('leaveRequests', [], storeSettings.syncEnabled);
+  const [leaveRequests, setLeaveRequests] = useSyncState<any[]>('leaveRequests', initialLeaveRequests, storeSettings.syncEnabled);
   const [transactions, setTransactions] = useSyncState<any[]>('transactions', initialTransactions, storeSettings.syncEnabled);
   const [expenses, setExpenses] = useSyncState<any[]>('expenses', initialExpenses, storeSettings.syncEnabled);
   const [piutangData, setPiutangData] = useSyncState<any[]>('piutang', initialPiutang, storeSettings.syncEnabled);
@@ -148,7 +151,7 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
   };
 
   // Cross-cutting states
-  const [pendingTransactions, setPendingTransactions] = useSyncState<any[]>('pendingTransactions', [], storeSettings.syncEnabled);
+  const [pendingTransactions, setPendingTransactions] = useSyncState<any[]>('pendingTransactions', initialPendingTransactions, storeSettings.syncEnabled);
 
   // POS specific global states
   const [cart, setCart] = useState<any[]>([]);
@@ -179,6 +182,7 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
     <AppContext.Provider value={{
       user, setUser,
       activeTab, setActiveTab,
+      wallets, setWallets,
       appUsers, setAppUsers,
       inventory, setInventory,
       customers, setCustomers,
