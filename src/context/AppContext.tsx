@@ -131,6 +131,8 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
   const [expenses, setExpenses] = useSyncState<any[]>('expenses', initialExpenses, storeSettings.syncEnabled);
   const [piutangData, setPiutangData] = useSyncState<any[]>('piutang', initialPiutang, storeSettings.syncEnabled);
   const [orderData, setOrderData] = useSyncState<any[]>('order', initialOrderData, storeSettings.syncEnabled);
+  const [hutangSupplier, setHutangSupplier] = useSyncState<any[]>('hutangSupplier', [], storeSettings.syncEnabled);
+  const [kewajibanLain, setKewajibanLain] = useSyncState<any[]>('kewajibanLain', [], storeSettings.syncEnabled);
 
   const [suppliers, setSuppliers] = useSyncState<any[]>('suppliers', [
     { id: 1, name: 'PT Surya Gemilang', contact: '08123456789', address: 'Jl. Rungkut 1' }
@@ -193,6 +195,8 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
       expenses, setExpenses,
       piutangData, setPiutangData,
       orderData, setOrderData,
+      hutangSupplier, setHutangSupplier,
+      kewajibanLain, setKewajibanLain,
       pendingTransactions, setPendingTransactions,
       cart, setCart,
       amountPaid, setAmountPaid,

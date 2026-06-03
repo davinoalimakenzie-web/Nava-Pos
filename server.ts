@@ -50,12 +50,17 @@ async function startServer() {
       
       res.json({ text: response.text });
     } catch (error: any) {
-      console.error(error);
       const isUnavailable = error?.message?.includes("503") || error?.status === 503 || error?.message?.includes("UNAVAILABLE");
-      res.status(isUnavailable ? 503 : 500).json({ 
-        error: isUnavailable 
-          ? "Sistem AI sedang sibuk, mohon coba beberapa saat lagi." 
-          : error.message 
+      const isQuotaExceeded = error?.message?.includes("429") || error?.status === 429 || error?.message?.includes("quota");
+      
+      let errorMessage = error.message;
+      if (isUnavailable) errorMessage = "Sistem AI sedang sibuk, mohon coba beberapa saat lagi.";
+      if (isQuotaExceeded) errorMessage = "Kuota harian AI (Gratis) Anda telah habis, mohon cek tagihan Anda, atau tunggu beberapa saat.";
+
+      console.warn("Gemini API Status:", errorMessage || error.message);
+
+      res.status(isQuotaExceeded ? 429 : (isUnavailable ? 503 : 500)).json({ 
+        error: errorMessage
       });
     }
   });

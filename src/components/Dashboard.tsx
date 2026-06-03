@@ -44,7 +44,10 @@ const CustomMonthlyTooltip = ({ active, payload, label }: any) => {
 };
 
 export const Dashboard = ({ currentTime }: { currentTime: Date }) => {
-  const { transactions, expenses, inventory, setActiveTab } = useAppContext();
+  const { 
+    transactions, expenses, inventory, wallets,
+    hutangSupplier, kewajibanLain, setActiveTab 
+  } = useAppContext();
 
   const [notificationsEnabled, setNotificationsEnabled] = useState(() => {
     return localStorage.getItem('POS_stockNotifications') === 'true';
@@ -74,6 +77,57 @@ export const Dashboard = ({ currentTime }: { currentTime: Date }) => {
   const [forecastLoading, setForecastLoading] = useState(false);
   const [forecastAiText, setForecastAiText] = useState("");
   const [hasFetchedForecast, setHasFetchedForecast] = useState(false);
+
+  // AI Cashflow Monitor
+  const [cashflowLoading, setCashflowLoading] = useState(false);
+  const [cashflowAiText, setCashflowAiText] = useState("");
+  const [hasFetchedCashflow, setHasFetchedCashflow] = useState(false);
+
+  const fetchAiCashflowMonitor = async () => {
+      setCashflowLoading(true);
+      try {
+          const saldoDanaLaci = wallets?.danaLaci || 0;
+          const hSupplier = (hutangSupplier || []).filter((h: any) => h.sisa_hutang > 0);
+          const tKasbon = expenses.filter((e: any) => e.isBon && e.status !== 'lunas');
+          const kLain = (kewajibanLain || []).filter((k: any) => k.status === 'aktif');
+          
+          const prompt = `Lakukan analisis Cashflow berdasarkan data berikut:
+          - Saldo Dana Laci (Real-time): Rp${saldoDanaLaci}
+          - Total Hutang Supplier Aktif: Rp${hSupplier.reduce((sum: number, h: any) => sum + h.sisa_hutang, 0)} (${hSupplier.length} nota)
+          - Rincian Hutang: ${JSON.stringify(hSupplier.map((h: any) => ({ supplier: h.supplier_nama, sisa: h.sisa_hutang, jatuh_tempo: h.tanggal_jatuh_tempo })))}
+          - Total Kasbon Karyawan: Rp${tKasbon.reduce((sum: number, e: any) => sum + e.amount, 0)}
+          - Kewajiban Lain (Aktif): Rp${kLain.reduce((sum: number, k: any) => sum + k.nilai, 0)}
+          
+          Tampilkan dalam 4 poin peluru (Markdown ringan diperbolehkan):
+          1. Status kesehatan cashflow saat ini
+          2. Prediksi kemampuan bayar hutang yang akan jatuh tempo
+          3. Peringatan dini jika ada risiko kekurangan dana
+          4. Rekomendasi tindakan konkret`;
+          
+          const response = await fetch('/api/gemini', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ prompt })
+          });
+          const data = await response.json();
+          if (!response.ok) throw new Error(data.error || "Gagal menghubungi AI");
+          if (data.text) {
+              setCashflowAiText(data.text);
+          }
+      } catch (err: any) {
+          console.warn("Gagal analisa cashflow", err.message);
+          setCashflowAiText("Terjadi kesalahan: " + (err.message || "Gagal memproses analisis cashflow."));
+      } finally {
+          setHasFetchedCashflow(true);
+          setCashflowLoading(false);
+      }
+  };
+
+  useEffect(() => {
+     if (wallets?.danaLaci !== undefined && !hasFetchedCashflow) {
+         fetchAiCashflowMonitor();
+     }
+  }, [wallets, hutangSupplier, expenses, kewajibanLain]);
 
   // Daily Sales Tip Logic
   const [dailyAiTip, setDailyAiTip] = useState("");
@@ -107,14 +161,14 @@ export const Dashboard = ({ currentTime }: { currentTime: Date }) => {
         body: JSON.stringify({ prompt }),
       });
       const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "Gagal menghubungi AI");
       if (data.text) {
            setDailyAiTip(data.text);
            localStorage.setItem(cachedTipKey, data.text);
       }
-    } catch (err) {
-      console.error("Failed to fetch daily AI tip", err);
-      // Removed fallback so users see there's an error if needed, but keeping fallback is fine
-      setDailyAiTip("Sapa pelanggan dengan senyuman hari ini, tawari produk bundle untuk naikkan penjualan!");
+    } catch (err: any) {
+      console.warn("Failed to fetch daily AI tip", err.message);
+      setDailyAiTip("Error: " + (err.message || "Gagal memuat tips harian."));
     } finally {
       setDailyAiTipLoading(false);
     }
@@ -145,12 +199,13 @@ export const Dashboard = ({ currentTime }: { currentTime: Date }) => {
           body: JSON.stringify({ prompt }),
         });
         const data = await response.json();
+        if (!response.ok) throw new Error(data.error || "Gagal menghubungi AI");
         if (data.text) {
              setForecastAiText(data.text);
         }
-    } catch (err) {
-        console.error("Failed to fetch AI forecast", err);
-        setForecastAiText("Gagal memuat prediksi AI.");
+    } catch (err: any) {
+        console.warn("Failed to fetch AI forecast", err.message);
+        setForecastAiText("Gagal memuat prediksi AI: " + (err.message || "sistem sibuk."));
     } finally {
         setHasFetchedForecast(true);
         setForecastLoading(false);
@@ -442,9 +497,46 @@ export const Dashboard = ({ currentTime }: { currentTime: Date }) => {
      }
   }, [dailyGoalProgress, cashFlowToday.income, hasCelebrated]);
 
+  // Formula Inti Dana Bebas
+  const saldoDanaLaci = wallets?.danaLaci || 0;
+  const saldoDanaBebasKeseluruhan = wallets?.danaBebas || 0;
+  const totalHutangSupplierAktif = (hutangSupplier || []).filter((h: any) => h.sisa_hutang > 0).reduce((sum: number, h: any) => sum + h.sisa_hutang, 0);
+  const totalKasbonAktif = expenses.filter((e: any) => e.isBon && e.status !== 'lunas').reduce((sum: number, e: any) => sum + e.amount, 0);
+  const totalKewajibanLain = (kewajibanLain || []).filter((k: any) => k.status === 'aktif').reduce((sum: number, k: any) => sum + k.nilai, 0);
+  
+  const danaBebasReal = saldoDanaBebasKeseluruhan - totalHutangSupplierAktif - totalKasbonAktif - totalKewajibanLain;
+
+  const danaBebasStatus = danaBebasReal > (0.5 * saldoDanaBebasKeseluruhan) ? 'Aman' : (danaBebasReal >= (0.2 * saldoDanaBebasKeseluruhan) ? 'Waspada' : 'Bahaya');
+
+  // AI Early Warning Logic
+  const todayDate = new Date();
+  todayDate.setHours(0,0,0,0);
+  const hutangMendesak = (hutangSupplier || []).filter((h: any) => {
+      if (h.sisa_hutang <= 0) return false;
+      const jtDate = new Date(h.tanggal_jatuh_tempo);
+      const diffTime = jtDate.getTime() - todayDate.getTime();
+      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+      return diffDays <= 14;
+  });
+  const totalHutangMendesak = hutangMendesak.reduce((sum, h) => sum + h.sisa_hutang, 0);
+  const isKrisisDana = danaBebasReal < totalHutangMendesak;
+
   return (
     <div className="flex-1 flex flex-col bg-[#8fb4d9] border border-[#8fb4d9] overflow-hidden relative">
       <LegacyWindowHeader title="DASHBOARD & STATISTIK" currentTime={currentTime} />
+      
+      {isKrisisDana && (
+         <div className="bg-red-600 text-white p-3 shadow-md flex flex-col gap-1 z-40 border-b-4 border-red-800">
+            <div className="flex items-center gap-2 font-bold text-lg">
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-alert-triangle animate-pulse"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg>
+                PERINGATAN DINI KEUANGAN (AI WARNING)
+            </div>
+            <p className="text-sm">
+                Dana Bebas Anda saat ini (<strong className="text-xl px-1">{formatRp(danaBebasReal)}</strong>) tidak cukup untuk menutupi Hutang yang akan jatuh tempo dalam 14 hari ke depan (<strong className="text-xl px-1">{formatRp(totalHutangMendesak)}</strong>).
+            </p>
+            <p className="text-xs italic opacity-90 mt-1">Kekurangan Dana: {formatRp(Math.abs(danaBebasReal - totalHutangMendesak))}</p>
+         </div>
+      )}
       
       <AnimatePresence>
         {showGoalToast && (
@@ -487,6 +579,104 @@ export const Dashboard = ({ currentTime }: { currentTime: Date }) => {
 
       <div className="p-2 flex flex-col gap-4 overflow-y-auto h-full text-black">
         
+        {/* FITUR 1: WIDGET DANA BEBAS DOMINAN */}
+        <div className="bg-white border-4 border-blue-900 shadow-lg p-6 relative">
+             <div className="absolute top-0 right-0 p-4 opacity-5">
+                 <svg xmlns="http://www.w3.org/2000/svg" width="120" height="120" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-pie-chart"><path d="M21.21 15.89A10 10 0 1 1 8 2.83"/><path d="M22 12A10 10 0 0 0 12 2v10z"/></svg>
+             </div>
+             <h2 className="text-xl font-bold text-gray-700 uppercase tracking-wide border-b-2 border-gray-200 pb-2 mb-4">Indikator Kesehatan Keuangan (Dana Bebas)</h2>
+             
+             <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 relative z-10">
+                 <div className="flex flex-col gap-1 border-r-2 border-gray-200 pr-4">
+                     <span className="text-sm font-bold text-gray-500 uppercase">Total Dana Bebas (Keseluruhan)</span>
+                     <span className="text-2xl font-black text-gray-900">{formatRp(saldoDanaBebasKeseluruhan)}</span>
+                 </div>
+                 <div className="flex flex-col gap-1 border-r-2 border-gray-200 px-4">
+                     <span className="text-sm font-bold text-red-600 uppercase flex items-center gap-1">
+                        (-) Hutang Aktif
+                     </span>
+                     <span className="text-2xl font-black text-red-700">{formatRp(totalHutangSupplierAktif)}</span>
+                 </div>
+                 <div className="flex flex-col gap-1 border-r-2 border-gray-200 px-4">
+                     <span className="text-sm font-bold text-orange-600 uppercase flex items-center gap-1">
+                        (-) Kasbon Karyawan
+                     </span>
+                     <span className="text-2xl font-black text-orange-700">{formatRp(totalKasbonAktif)}</span>
+                 </div>
+                 <div className="flex flex-col gap-1 pl-4 items-end justify-center bg-blue-50 border border-blue-200 p-3 rounded-lg shadow-inner">
+                     <span className="text-sm font-bold text-blue-800 uppercase">Dana Bebas Tersedia</span>
+                     <span className={`text-4xl font-black ${danaBebasReal < 0 ? 'text-red-700' : 'text-blue-900'}`}>{formatRp(danaBebasReal)}</span>
+                     <div className={`mt-2 text-xs font-bold px-3 py-1 bg-white border-2 inline-block rounded-full uppercase
+                          ${danaBebasStatus === 'Aman' ? 'text-green-700 border-green-600' : (danaBebasStatus === 'Waspada' ? 'text-yellow-700 border-yellow-600' : 'text-red-700 border-red-600')}
+                     `}>
+                         Status: {danaBebasStatus}
+                     </div>
+                 </div>
+             </div>
+        </div>
+
+        {/* FITUR 3: WIDGET JATUH TEMPO (Jika ada) */}
+        {(hutangSupplier || []).filter((h: any) => h.sisa_hutang > 0).length > 0 && (
+            <div className="bg-white border text-black border-gray-400 p-4 shadow-sm flex flex-col">
+                <h3 className="font-bold text-lg text-red-800 mb-3 border-b pb-2 flex items-center gap-2">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-calendar-clock"><path d="M21 7.5V6a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h3.5"/><path d="M16 2v4"/><path d="M8 2v4"/><path d="M3 10h5"/><path d="M17.5 17.5 16 16.25V14"/><circle cx="16" cy="16" r="6"/></svg>
+                    Jadwal Jatuh Tempo Supplier
+                </h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
+                    {hutangSupplier.filter((h: any) => h.sisa_hutang > 0).sort((a: any, b: any) => new Date(a.tanggal_jatuh_tempo).getTime() - new Date(b.tanggal_jatuh_tempo).getTime()).map((h: any) => {
+                        const jtDate = new Date(h.tanggal_jatuh_tempo);
+                        const diffTime = jtDate.getTime() - todayDate.getTime();
+                        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+                        
+                        let statusColor = '';
+                        let bgColor = '';
+                        if (diffDays < 0) { statusColor = 'text-red-800'; bgColor = 'bg-red-100 border-red-400'; }
+                        else if (diffDays <= 7) { statusColor = 'text-orange-800'; bgColor = 'bg-orange-100 border-orange-400'; }
+                        else if (diffDays <= 14) { statusColor = 'text-yellow-800'; bgColor = 'bg-yellow-100 border-yellow-400'; }
+                        else { statusColor = 'text-green-800'; bgColor = 'bg-green-100 border-green-400'; }
+
+                        return (
+                            <div key={h.id} className={`border p-3 flex flex-col gap-1 cursor-pointer transition-transform hover:-translate-y-1 ${bgColor}`}>
+                                <div className="text-xs font-bold text-gray-500">{h.tanggal_jatuh_tempo.split('T')[0]} ({diffDays < 0 ? `Terlambat ${Math.abs(diffDays)} hari` : `${diffDays} hari lagi`})</div>
+                                <div className="font-bold text-sm truncate uppercase">{h.supplier_nama}</div>
+                                <div className="text-xs text-gray-600 bg-white border border-gray-300 px-1 font-mono">{h.nomor_nota}</div>
+                                <div className={`text-lg font-black mt-2 ${statusColor}`}>{formatRp(h.sisa_hutang)}</div>
+                            </div>
+                        );
+                    })}
+                </div>
+            </div>
+        )}
+
+        {/* FITUR 4: AI CASHFLOW MONITOR CARDS */}
+        <div className="bg-gradient-to-r from-blue-900 to-blue-800 text-white border-2 border-yellow-500 p-4 shadow-lg flex flex-col rounded-sm">
+             <div className="flex justify-between items-center mb-3 pb-2 border-b border-blue-700">
+                 <h3 className="font-bold text-lg text-yellow-400 flex items-center gap-2">
+                     <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-bot"><path d="M12 8V4H8"/><rect width="16" height="12" x="4" y="8" rx="2"/><path d="M2 14h2"/><path d="M20 14h2"/><path d="M15 13v2"/><path d="M9 13v2"/></svg>
+                     AI Cashflow Monitor
+                 </h3>
+                 <button onClick={fetchAiCashflowMonitor} disabled={cashflowLoading} className="text-xs px-2 py-1 bg-white text-blue-900 font-bold border border-yellow-500 shadow-sm disabled:opacity-50 hover:bg-yellow-100 transition flex items-center gap-1">
+                     {cashflowLoading ? <RefreshCw className="w-3 h-3 animate-spin"/> : <RefreshCw className="w-3 h-3"/>}
+                     Refresh Analisis
+                 </button>
+             </div>
+             
+             <div className="text-sm font-medium leading-relaxed min-h-[80px]">
+                 {cashflowLoading ? (
+                     <div className="flex flex-col items-center justify-center p-4">
+                         <div className="w-6 h-6 border-4 border-yellow-400 border-t-transparent rounded-full animate-spin"></div>
+                         <p className="mt-2 text-blue-200 text-xs">AI sedang menganalisis kesehatan cashflow...</p>
+                     </div>
+                 ) : cashflowAiText ? (
+                     <div className="whitespace-pre-wrap markdown-body text-blue-50">
+                         {React.createElement('div', { dangerouslySetInnerHTML: { __html: cashflowAiText.replace(/\*\*(.*?)\*\*/g, '<strong class="text-white">$1</strong>').replace(/\*(.*?)\*/g, '<em>$1</em>').replace(/\n/g, '<br/>') } })}
+                     </div>
+                 ) : (
+                     <p className="text-blue-200">Belum ada analisis. Klik Refresh Analisis.</p>
+                 )}
+             </div>
+        </div>
+
         {/* TOP ROW STATS */}
         <div className="grid grid-cols-2 lg:grid-cols-5 gap-4 shrink-0">
             <motion.div 

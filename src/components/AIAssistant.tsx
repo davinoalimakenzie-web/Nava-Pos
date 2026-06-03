@@ -42,6 +42,7 @@ export const AIAssistant = ({ currentTime }: { currentTime: Date }) => {
             body: JSON.stringify({ prompt: promptText, systemInstruction })
         });
         const data = await response.json();
+        if (!response.ok) throw new Error(data.error || "Gagal menghubungi AI");
         setGenResponses(prev => ({...prev, [featureKey]: data.text || 'Gagal memproses data. Coba lagi.'}));
     } catch (err: any) {
         setGenResponses(prev => ({...prev, [featureKey]: 'Terjadi kesalahan: ' + err.message}));
@@ -83,6 +84,7 @@ Silahkan jawab pelanggan dengan ramah, informatif, gunakan bahasa Indonesia. Jik
          });
 
          const data = await response.json();
+         if (!response.ok) throw new Error(data.error || "Gagal menghubungi AI");
          let botReply = data.text || 'Maaf, terjadi kesalahan saat memproses pesan.';
 
          setChatLogsByPhone(prev => ({
@@ -90,7 +92,7 @@ Silahkan jawab pelanggan dengan ramah, informatif, gunakan bahasa Indonesia. Jik
             [csPhoneNumber]: [...newLogs, { role: 'bot', text: botReply }]
          }));
      } catch (err: any) {
-         console.error(err);
+         console.warn("AI Assistant Error:", err.message);
          alert('Gagal menghubungi AI Server: ' + err.message);
          setChatLogsByPhone(prev => ({
             ...prev,
@@ -150,8 +152,9 @@ Hanya kembalikan array JSON. Jangan ada teks lain. Ekstraklah sebanyak mungkin b
           });
 
           const data = await response.json();
+          if (!response.ok) throw new Error(data.error || "AI service unavailable");
           if (!data.text) {
-             throw new Error(data.error || "AI service unavailable");
+             throw new Error("AI service unavailable");
           }
           let jsonStr = data.text.replace(/```json/g, '').replace(/```/g, '').trim();
           const pDataArray = JSON.parse(jsonStr);
@@ -184,7 +187,7 @@ Hanya kembalikan array JSON. Jangan ada teks lain. Ekstraklah sebanyak mungkin b
               alert('Tidak ada data yang terdeteksi untuk ditambahkan.');
           }
       } catch (err: any) {
-          console.error(err);
+          console.warn("JSON Extraction Error:", err.message);
           alert('Gagal mengekstrak data JSON dari AI: ' + err.message);
       } finally {
           setIsParsing(false);

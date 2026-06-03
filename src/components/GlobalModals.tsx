@@ -25,6 +25,7 @@ export const GlobalModals = () => {
 
     const [newExpenseName, setNewExpenseName] = useState('');
     const [newExpenseAmount, setNewExpenseAmount] = useState('');
+    const [expenseType, setExpenseType] = useState('Harian');
     const [expenseWallet, setExpenseWallet] = useState('Dana Laci');
     const [newCustomerName, setNewCustomerName] = useState('');
     const [newCustomerAddress, setNewCustomerAddress] = useState('');
@@ -322,14 +323,26 @@ export const GlobalModals = () => {
                     </div>
                     <div className="p-4 text-black text-sm">
                     <form onSubmit={handleAddExpense}>
-                        <label className="block mb-1 font-bold text-xs">Sumber Dana:</label>
+                        <label className="block mb-1 font-bold text-xs">Sifat Pengeluaran:</label>
                         <select 
-                           value={expenseWallet} 
-                           onChange={(e) => setExpenseWallet(e.target.value)}
+                           value={expenseType} 
+                           onChange={(e) => {
+                               setExpenseType(e.target.value);
+                               setExpenseWallet(e.target.value === 'Harian' ? 'Dana Laci' : 'Dana Bebas');
+                           }}
                            className="w-full p-2 border border-gray-400 mb-3 outline-none focus:border-blue-600 bg-white"
                         >
-                           <option value="Dana Laci">Dana Laci (Operasional Harian Toko)</option>
-                           <option value="Dana Bebas">Dana Bebas (Gaji, Supplier, Prive)</option>
+                           <option value="Harian">Harian (Kasbon, Operasional, ATK, dll)</option>
+                           <option value="Bulanan">Bulanan (Gaji, Prive, Bayar Supplier)</option>
+                        </select>
+                        <label className="block mb-1 font-bold text-xs">Sumber Dana (Otomatis):</label>
+                        <select 
+                           value={expenseWallet} 
+                           disabled
+                           className="w-full p-2 border border-gray-400 mb-3 outline-none bg-gray-200 text-gray-700"
+                        >
+                           <option value="Dana Laci">Dana Laci</option>
+                           <option value="Dana Bebas">Dana Bebas</option>
                         </select>
                         
                         <label className="block mb-1">Keterangan Pengeluaran:</label>

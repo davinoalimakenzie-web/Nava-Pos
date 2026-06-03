@@ -77,8 +77,8 @@ Jangan berikan tag [AKSI_SISTEM] jika pengguna hanya bertanya atau jika kamu MEN
                 body: JSON.stringify({ prompt: fullPrompt, systemInstruction: systemPrompt })
             });
 
-            if (!res.ok) throw new Error('API Error');
             const data = await res.json();
+            if (!res.ok) throw new Error(data.error || 'API Error');
             
             let aiText = data.text;
             let actionProcessed = false;
@@ -113,9 +113,9 @@ Jangan berikan tag [AKSI_SISTEM] jika pengguna hanya bertanya atau jika kamu MEN
 
             setMessages(prev => [...prev, { role: 'model', text: aiText.trim() }]);
 
-        } catch (error) {
-            console.error(error);
-            setMessages(prev => [...prev, { role: 'model', text: 'Maaf, sistem AI sedang sibuk. Silakan coba lagi.' }]);
+        } catch (error: any) {
+            console.warn("AI Cashflow Bot Error:", error.message);
+            setMessages(prev => [...prev, { role: 'model', text: 'Maaf, terjadi kesalahan: ' + (error.message || 'sistem AI sedang sibuk. Silakan coba lagi.') }]);
         } finally {
             setLoading(false);
         }

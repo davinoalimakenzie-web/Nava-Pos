@@ -132,92 +132,94 @@ export const Cashflow = ({ currentTime }: { currentTime: Date }) => {
          <button onClick={() => setCashflowTab('harian')} className={`px-2.5 py-1 text-[10px] md:text-xs md:px-4 md:py-1.5 whitespace-nowrap shrink-0 border border-gray-500 font-bold hover:bg-white ${cashflowTab === 'harian' ? 'bg-white border-b-white text-blue-900' : 'bg-gray-200 text-black'}`}>Cashflow Harian</button>
          <button onClick={() => setCashflowTab('bulanan')} className={`px-2.5 py-1 text-[10px] md:text-xs md:px-4 md:py-1.5 whitespace-nowrap shrink-0 border border-gray-500 font-bold hover:bg-white ${cashflowTab === 'bulanan' ? 'bg-white border-b-white text-blue-900' : 'bg-gray-200 text-black'}`}>Cashflow Bulanan</button>
          <button onClick={() => setCashflowTab('promo')} className={`px-2.5 py-1 text-[10px] md:text-xs md:px-4 md:py-1.5 whitespace-nowrap shrink-0 border border-gray-500 font-bold hover:bg-white ${cashflowTab === 'promo' ? 'bg-white border-b-white text-blue-900' : 'bg-gray-200 text-black'}`}>Promo</button>
+         <button onClick={() => setCashflowTab('ai_cashflow')} className={`px-2.5 py-1 text-[10px] md:text-xs md:px-4 md:py-1.5 whitespace-nowrap shrink-0 border border-gray-500 font-bold hover:bg-white ${cashflowTab === 'ai_cashflow' ? 'bg-white border-b-white text-blue-900' : 'bg-gray-200 text-black'}`}>Asisten AI Cashflow</button>
       </div>
 
       {/* Header Filter Baru (Sesuai Gambar) - Global for Both Tabs */}
-      <div className="bg-[#000040] p-1.5 flex items-end gap-2 shrink-0 shadow-sm border-b border-[#000030]">
-         {/* Dari Tanggal */}
-         <div className="flex flex-col gap-0.5 text-white flex-1">
-            <label className="text-[12px] font-medium">Dari Tanggal</label>
-            <div className="flex items-center bg-white px-1 rounded-sm h-[28px]">
-               <input type="date" value={filterStartDate} onChange={e => { setFilterStartDate(e.target.value); setFilterUseStart(true); }} className="text-black outline-none w-full font-medium text-[13px] bg-transparent" />
-            </div>
-         </div>
-         {/* Sampai Tanggal */}
-         <div className="flex flex-col gap-0.5 text-white flex-1">
-            <label className="text-[12px] font-medium">Sampai Tanggal</label>
-            <div className="flex items-center bg-white px-1 rounded-sm h-[28px]">
-               <input type="date" value={filterEndDate} onChange={e => { setFilterEndDate(e.target.value); setFilterUseEnd(true); }} className="text-black outline-none w-full font-medium text-[13px] bg-transparent" />
-            </div>
-         </div>
-         {/* Jenis (Teknisi) */}
-         <div className="flex flex-col gap-0.5 text-white flex-1">
-            <label className="text-[12px] font-medium">Jenis</label>
-            <select value={cashflowHarianSubTab} onChange={e => setCashflowHarianSubTab(e.target.value)} className="bg-white text-black outline-none px-1 w-full font-medium text-[13px] rounded-sm h-[28px]">
-               <option value="laporan">Laporan Transaksi</option>
-               <option value="pengeluaran">Pengeluaran</option>
-               <option value="return">Return</option>
-               <option value="ai_cashflow">Asisten AI Cashflow</option>
-            </select>
-         </div>
-         {/* Cabang (Status) */}
-         <div className="flex flex-col gap-0.5 text-white flex-1">
-            <label className="text-[12px] font-medium">Cabang</label>
-            <select value={filterBranch} onChange={e => setFilterBranch(e.target.value)} className="bg-white text-black outline-none px-1 w-full font-medium text-[13px] rounded-sm h-[28px]">
-               <option value="Semua Cabang">Semua Cabang</option>
-               {(storeSettings.branches || ['Pusat']).map((b: string) => <option key={b} value={b}>{b}</option>)}
-            </select>
-         </div>
-         {/* Tunai / Non Tunai (Cash/TF) */}
-         <div className="flex flex-col gap-0.5 text-white flex-1">
-            <label className="text-[12px] font-medium">Tunai / Non Tunai</label>
-            <select value={filterPaymentMethod} onChange={e => setFilterPaymentMethod(e.target.value)} className="bg-white text-black outline-none px-1 w-full font-medium text-[13px] rounded-sm h-[28px]">
-               <option value="Semua">Semua</option>
-               <option value="TUNAI">Tunai</option>
-               <option value="NON-TUNAI">Non Tunai</option>
-            </select>
-         </div>
-         {/* No Nota & Search / Export CSV */}
-         <div className="flex flex-col gap-0.5 text-white flex-1 justify-end">
-            {cashflowTab === 'harian' ? (
-              <>
-                <label className="text-[12px] font-medium">No. Nota</label>
-                <div className="flex items-center gap-1">
-                   <input type="text" value={searchNota} onChange={e => setSearchNota(e.target.value)} className="bg-white text-black px-2 w-full font-medium text-[13px] outline-none rounded-sm h-[28px]" />
-                   <button className="bg-white text-black px-4 font-bold text-[13px] border border-gray-300 rounded-sm shadow-sm hover:bg-gray-200 h-[28px]">CARI</button>
-                </div>
-              </>
-            ) : cashflowTab === 'bulanan' ? (
-                <button onClick={() => {
-                   const rows = [
-                       ['Bulan', 'Omset Total', 'Tunai Masuk', 'Non-Tunai / Piutang', 'Total Pengeluaran', 'Saldo Akhir Tunai (Laci)'],
-                       ...monthlyCashflow.map((m: any) => [
-                           m.month, 
-                           (m.incomeTotal).toString(), 
-                           (m.incomeCash).toString(), 
-                           (m.incomeNonCash).toString(), 
-                           (m.expenses).toString(), 
-                           (m.incomeCash - m.expenses).toString()
-                       ])
-                   ];
-                   const csvContent = "data:text/csv;charset=utf-8," + rows.map(e => e.join(",")).join("\n");
-                   const encodedUri = encodeURI(csvContent);
-                   const link = document.createElement("a");
-                   link.setAttribute("href", encodedUri);
-                   link.setAttribute("download", `laporan_bulanan_${new Date().getTime()}.csv`);
-                   document.body.appendChild(link);
-                   link.click();
-                   document.body.removeChild(link);
-               }} className="bg-white text-black hover:bg-gray-200 font-bold px-4 shadow-sm border border-gray-300 rounded-sm text-[13px] h-[28px] w-full">
-                   Export CSV
-               </button>
-            ) : (
-                <button onClick={() => { setMasterDataTab('pelanggan'); setActiveTab('masterdata'); }} className="bg-white text-black hover:bg-gray-200 font-bold px-4 shadow-sm border border-gray-300 rounded-sm text-[13px] h-[28px] w-full">
-                   Pelanggan
-               </button>
-            )}
-         </div>
-      </div>
+      {(cashflowTab === 'harian' || cashflowTab === 'bulanan') && (
+        <div className="bg-[#000040] p-1.5 flex items-end gap-2 shrink-0 shadow-sm border-b border-[#000030]">
+           {/* Dari Tanggal */}
+           <div className="flex flex-col gap-0.5 text-white flex-1">
+              <label className="text-[12px] font-medium">Dari Tanggal</label>
+              <div className="flex items-center bg-white px-1 rounded-sm h-[28px]">
+                 <input type="date" value={filterStartDate} onChange={e => { setFilterStartDate(e.target.value); setFilterUseStart(true); }} className="text-black outline-none w-full font-medium text-[13px] bg-transparent" />
+              </div>
+           </div>
+           {/* Sampai Tanggal */}
+           <div className="flex flex-col gap-0.5 text-white flex-1">
+              <label className="text-[12px] font-medium">Sampai Tanggal</label>
+              <div className="flex items-center bg-white px-1 rounded-sm h-[28px]">
+                 <input type="date" value={filterEndDate} onChange={e => { setFilterEndDate(e.target.value); setFilterUseEnd(true); }} className="text-black outline-none w-full font-medium text-[13px] bg-transparent" />
+              </div>
+           </div>
+           {/* Jenis (Teknisi) */}
+           <div className="flex flex-col gap-0.5 text-white flex-1">
+              <label className="text-[12px] font-medium">Jenis</label>
+              <select value={cashflowHarianSubTab} onChange={e => setCashflowHarianSubTab(e.target.value)} className="bg-white text-black outline-none px-1 w-full font-medium text-[13px] rounded-sm h-[28px]">
+                 <option value="laporan">Laporan Transaksi</option>
+                 <option value="pengeluaran">Pengeluaran</option>
+                 <option value="return">Return</option>
+              </select>
+           </div>
+           {/* Cabang (Status) */}
+           <div className="flex flex-col gap-0.5 text-white flex-1">
+              <label className="text-[12px] font-medium">Cabang</label>
+              <select value={filterBranch} onChange={e => setFilterBranch(e.target.value)} className="bg-white text-black outline-none px-1 w-full font-medium text-[13px] rounded-sm h-[28px]">
+                 <option value="Semua Cabang">Semua Cabang</option>
+                 {(storeSettings.branches || ['Pusat']).map((b: string) => <option key={b} value={b}>{b}</option>)}
+              </select>
+           </div>
+           {/* Tunai / Non Tunai (Cash/TF) */}
+           <div className="flex flex-col gap-0.5 text-white flex-1">
+              <label className="text-[12px] font-medium">Tunai / Non Tunai</label>
+              <select value={filterPaymentMethod} onChange={e => setFilterPaymentMethod(e.target.value)} className="bg-white text-black outline-none px-1 w-full font-medium text-[13px] rounded-sm h-[28px]">
+                 <option value="Semua">Semua</option>
+                 <option value="TUNAI">Tunai</option>
+                 <option value="NON-TUNAI">Non Tunai</option>
+              </select>
+           </div>
+           {/* No Nota & Search / Export CSV */}
+           <div className="flex flex-col gap-0.5 text-white flex-1 justify-end">
+              {cashflowTab === 'harian' ? (
+                <>
+                  <label className="text-[12px] font-medium">No. Nota</label>
+                  <div className="flex items-center gap-1">
+                     <input type="text" value={searchNota} onChange={e => setSearchNota(e.target.value)} className="bg-white text-black px-2 w-full font-medium text-[13px] outline-none rounded-sm h-[28px]" />
+                     <button className="bg-white text-black px-4 font-bold text-[13px] border border-gray-300 rounded-sm shadow-sm hover:bg-gray-200 h-[28px]">CARI</button>
+                  </div>
+                </>
+              ) : cashflowTab === 'bulanan' ? (
+                  <button onClick={() => {
+                     const rows = [
+                         ['Bulan', 'Omset Total', 'Tunai Masuk', 'Non-Tunai / Piutang', 'Total Pengeluaran', 'Saldo Akhir Tunai (Laci)'],
+                         ...monthlyCashflow.map((m: any) => [
+                             m.month, 
+                             (m.incomeTotal).toString(), 
+                             (m.incomeCash).toString(), 
+                             (m.incomeNonCash).toString(), 
+                             (m.expenses).toString(), 
+                             (m.incomeCash - m.expenses).toString()
+                         ])
+                     ];
+                     const csvContent = "data:text/csv;charset=utf-8," + rows.map(e => e.join(",")).join("\n");
+                     const encodedUri = encodeURI(csvContent);
+                     const link = document.createElement("a");
+                     link.setAttribute("href", encodedUri);
+                     link.setAttribute("download", `laporan_bulanan_${new Date().getTime()}.csv`);
+                     document.body.appendChild(link);
+                     link.click();
+                     document.body.removeChild(link);
+                 }} className="bg-white text-black hover:bg-gray-200 font-bold px-4 shadow-sm border border-gray-300 rounded-sm text-[13px] h-[28px] w-full">
+                     Export CSV
+                 </button>
+              ) : (
+                  <button onClick={() => { setMasterDataTab('pelanggan'); setActiveTab('masterdata'); }} className="bg-white text-black hover:bg-gray-200 font-bold px-4 shadow-sm border border-gray-300 rounded-sm text-[13px] h-[28px] w-full">
+                     Pelanggan
+                 </button>
+              )}
+           </div>
+        </div>
+      )}
 
       {/* TAB: CASHFLOW HARIAN */}
       {cashflowTab === 'harian' && (
@@ -379,13 +381,14 @@ export const Cashflow = ({ currentTime }: { currentTime: Date }) => {
               </div>
             )}
 
-            {cashflowHarianSubTab === 'ai_cashflow' && (
-              <div className="flex flex-col h-full absolute inset-0">
-                 <AiCashflowBot />
-              </div>
-            )}
           </div>
         </div>
+      )}
+
+      {cashflowTab === 'ai_cashflow' && (
+          <div className="flex-1 flex flex-col overflow-hidden relative bg-[#ece9d8]">
+             <AiCashflowBot />
+          </div>
       )}
 
       {/* TAB: CASHFLOW BULANAN (DUMMY) */}
