@@ -12,7 +12,7 @@ export const Sidebar = () => {
 
   return (
     <div 
-      className={`relative flex flex-col min-h-screen shrink-0 shadow-2xl z-20 transition-all duration-300 ease-in-out bg-slate-900 text-white ${isExpanded ? 'w-[40%] sm:w-56' : 'w-16'}`}
+      className={`relative flex flex-col h-full shrink-0 shadow-2xl z-20 transition-all duration-300 ease-in-out bg-slate-900 text-white ${isExpanded ? 'w-[40%] sm:w-56' : 'w-16'}`}
     >
       {/* Toggle Separator Line on the right */}
       <div 

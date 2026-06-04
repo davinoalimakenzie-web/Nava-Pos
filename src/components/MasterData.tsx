@@ -265,7 +265,8 @@ export const MasterData = ({ currentTime }: { currentTime: Date }) => {
                              <td className="p-2 border-r border-gray-300 font-mono font-bold text-red-700">{r.id}</td>
                              <td className="p-2 border-r border-gray-300">{r.date}</td>
                              <td className="p-2 border-r border-gray-300">{r.supplierName}</td>
-                             <td className="p-2 border-r border-gray-300">{r.itemName}</td><td className="p-2 border-r border-gray-300 text-gray-600">{r.kendala || '-'}</td>
+                             <td className="p-2 border-r border-gray-300">{r.itemName}</td>
+                             <td className="p-2 border-r border-gray-300 text-gray-600 whitespace-normal min-w-[200px]">{r.kendala || '-'}</td>
                              <td className="p-2 border-r border-gray-300 text-center font-bold text-red-600">-{r.qty} Pcs</td>
                              <td className="p-2 text-center">
                                  <select value={r.status} onChange={e => {
