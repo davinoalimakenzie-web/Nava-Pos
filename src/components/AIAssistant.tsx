@@ -7,7 +7,7 @@ import * as XLSX from 'xlsx';
 
 export const AIAssistant = ({ currentTime }: { currentTime: Date }) => {
   const { orderData, inventory, setInventory, setActiveTab, setMasterDataTab, botMemory, setBotMemory, cart, setCart, setIsInputStockMode } = useAppContext();
-  const [aiTab, setAiTab] = useState('chat');
+  const [aiTab, setAiTab] = useState('input');
   const [isLoadingCs, setIsLoadingCs] = useState(false);
   
   // CS State
@@ -199,83 +199,15 @@ Hanya kembalikan array JSON. Jangan ada teks lain. Ekstraklah sebanyak mungkin b
       <LegacyWindowHeader title="AI SMART ASSISTANT" currentTime={currentTime} />
       
       <div className="flex gap-1 shrink-0 bg-[#ece9d8] p-1 border-b border-gray-400 shadow-sm z-10 overflow-x-auto no-scrollbar">
-         <button onClick={() => setAiTab('chat')} className={`px-2.5 py-1 text-[10px] md:text-xs md:px-4 md:py-1.5 whitespace-nowrap shrink-0 border border-gray-500 font-bold hover:bg-white ${aiTab === 'chat' ? 'bg-white border-b-white text-blue-900' : 'bg-gray-200 text-black'}`}>AI Chat Assistant</button>
          <button onClick={() => setAiTab('input')} className={`px-2.5 py-1 text-[10px] md:text-xs md:px-4 md:py-1.5 whitespace-nowrap shrink-0 border border-gray-500 font-bold hover:bg-white ${aiTab === 'input' ? 'bg-white border-b-white text-blue-900' : 'bg-gray-200 text-black'}`}>Smart Data Input</button>
          <button onClick={() => setAiTab('insight')} className={`px-2.5 py-1 text-[10px] md:text-xs md:px-4 md:py-1.5 whitespace-nowrap shrink-0 border border-gray-500 font-bold hover:bg-white ${aiTab === 'insight' ? 'bg-white border-b-white text-purple-900' : 'bg-gray-200 text-black'}`}>AI Insight</button>
          <button onClick={() => setAiTab('forecast')} className={`px-2.5 py-1 text-[10px] md:text-xs md:px-4 md:py-1.5 whitespace-nowrap shrink-0 border border-gray-500 font-bold hover:bg-white ${aiTab === 'forecast' ? 'bg-white border-b-white text-indigo-900' : 'bg-gray-200 text-black'}`}>AI Forecast</button>
          <button onClick={() => setAiTab('profit')} className={`px-2.5 py-1 text-[10px] md:text-xs md:px-4 md:py-1.5 whitespace-nowrap shrink-0 border border-gray-500 font-bold hover:bg-white ${aiTab === 'profit' ? 'bg-white border-b-white text-emerald-900' : 'bg-gray-200 text-black'}`}>Profit Analyzer</button>
-         <button onClick={() => setAiTab('promo')} className={`px-2.5 py-1 text-[10px] md:text-xs md:px-4 md:py-1.5 whitespace-nowrap shrink-0 border border-gray-500 font-bold hover:bg-white ${aiTab === 'promo' ? 'bg-white border-b-white text-rose-900' : 'bg-gray-200 text-black'}`}>Promo Generator</button>
-         <button onClick={() => setAiTab('consultant')} className={`px-2.5 py-1 text-[10px] md:text-xs md:px-4 md:py-1.5 whitespace-nowrap shrink-0 border border-gray-500 font-bold hover:bg-white ${aiTab === 'consultant' ? 'bg-white border-b-white text-cyan-900' : 'bg-gray-200 text-black'}`}>Business Consultant</button>
       </div>
 
       <div className="flex-1 overflow-y-auto bg-white p-6 text-black shadow-inner">
         <div className="max-w-6xl mx-auto w-full h-full flex flex-col">
           
-          {aiTab === 'chat' && (
-              <div className="flex flex-col h-full items-center p-2">
-                 <div className="w-full justify-between items-center bg-green-600 text-white p-3 font-bold rounded-t-lg shadow-md flex mb-0 border-x border-t border-green-800">
-                     <span className="flex items-center gap-2"><MessageSquare className="w-5 h-5"/> WA CS API (Auto Reply)</span>
-                     <div className="flex gap-4 items-center">
-                         <button onClick={() => { setTempMemory(botMemory); setIsEditingMemory(true); }} className="px-3 py-1 bg-white text-green-700 font-bold rounded shadow-sm hover:bg-gray-100 text-xs">Ajarin Bot (Instruksi)</button>
-                         <div className="flex gap-2 text-sm text-black">
-                             {/* Dropdown / Input selector */}
-                             <div className="relative flex select-none">
-                                <span className="bg-gray-200 border border-gray-400 px-2 py-1 flex items-center leading-none">+62</span>
-                                <input 
-                                   type="text" 
-                                   value={csPhoneNumber} 
-                                   onChange={(e) => setCsPhoneNumber(e.target.value)} 
-                                   placeholder="Nomor WA Pelanggan..." 
-                                   className="px-2 py-1 outline-none text-black font-mono font-bold border border-gray-400 border-l-0"
-                                />
-                             </div>
-                         </div>
-                     </div>
-                 </div>
-                 <div className="flex-1 w-full bg-[#E5DDD5] border-x border-gray-300 p-4 overflow-y-auto flex flex-col gap-4 shadow-inner">
-                     <div className="text-center text-xs text-gray-500 bg-[#E5DDD5] font-bold">Log Percakapan Simulator untuk {csPhoneNumber ? `+62 ${csPhoneNumber}` : '...'}</div>
-                     {(chatLogsByPhone[csPhoneNumber] || []).map((log, idx) => (
-                         <div key={idx} className={`flex ${log.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                            <div className={`max-w-[75%] p-3 rounded-lg shadow-sm text-sm ${log.role === 'user' ? 'bg-[#DCF8C6] text-black rounded-tr-none' : 'bg-white text-black rounded-tl-none font-medium'}`}>
-                                {log.text}
-                            </div>
-                         </div>
-                     ))}
-                     {(!chatLogsByPhone[csPhoneNumber] || chatLogsByPhone[csPhoneNumber].length === 0) && (
-                         <div className="text-center text-sm font-medium text-gray-500 mt-10">Belum ada pesan. Mulai simulasi chat dengan mengirim pesan sebagai user <b>+62 {csPhoneNumber}</b>.</div>
-                     )}
-                 </div>
-                 <form onSubmit={handleSendChat} className="w-full bg-[#f0f0f0] p-3 border border-gray-300 flex gap-2 rounded-b-lg">
-                     <input type="text" value={chatInput} onChange={e => setChatInput(e.target.value)} required placeholder="Kirim simulasi pesan SEBAGAI pelanggan di area ini..." className="flex-1 p-2 outline-none rounded border border-gray-400 bg-white" />
-                     <button type="submit" disabled={isLoadingCs} className="bg-green-600 text-white px-4 py-2 rounded font-bold hover:bg-green-700 shadow-sm flex items-center gap-2">Send <Send className="w-4 h-4" /></button>
-                 </form>
-
-                 {isEditingMemory && (
-                     <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-                        <div className="bg-white border-2 border-green-700 w-full max-w-lg shadow-xl relative">
-                           <div className="bg-green-700 text-white px-4 py-2 flex justify-between font-bold">
-                               <span>Aturan & Memori Bot CS</span>
-                               <button onClick={() => setIsEditingMemory(false)}>X</button>
-                           </div>
-                           <div className="p-4">
-                               <p className="text-gray-600 mb-2 font-medium">Ajarkan AI cara menjawab, kebijakan toko Anda, atau informasi promosi terbaru yang akan diingat oleh sistem.</p>
-                               <textarea 
-                                  rows={6}
-                                  value={tempMemory}
-                                  onChange={e => setTempMemory(e.target.value)}
-                                  className="w-full border border-gray-400 p-2 outline-none focus:border-green-600"
-                               />
-                               <div className="flex justify-end gap-2 mt-4">
-                                  <button onClick={() => setIsEditingMemory(false)} className="px-4 py-2 bg-gray-200 font-bold border border-gray-400">Batal</button>
-                                  <button onClick={() => { setBotMemory(tempMemory); setIsEditingMemory(false); alert('Memori Bot berhasil diupdate!'); }} className="px-4 py-2 bg-green-600 text-white font-bold">Simpan Memori</button>
-                               </div>
-                           </div>
-                        </div>
-                     </div>
-                 )}
-              </div>
-          )}
-
           {aiTab === 'input' && (
               <div className="flex flex-col h-full bg-[#ece9d8] border border-gray-400 p-6 shadow-sm">
                  <h2 className="text-xl font-bold text-blue-900 border-b border-gray-400 pb-2 mb-4">Smart Data Input (Gemini AI)</h2>
@@ -362,69 +294,6 @@ Hanya kembalikan array JSON. Jangan ada teks lain. Ekstraklah sebanyak mungkin b
                        <div className="whitespace-pre-line text-sm text-gray-800">{genResponses['profit']}</div>
                      </div>
                  )}
-              </div>
-          )}
-
-          {aiTab === 'promo' && (
-              <div className="flex flex-col h-full bg-[#ece9d8] border border-gray-400 p-6 shadow-sm overflow-y-auto">
-                 <h2 className="text-xl font-bold text-rose-900 border-b border-gray-400 pb-2 mb-4 flex items-center gap-2">✨ AI Promo Generator</h2>
-                 <p className="text-gray-700 mb-6 text-sm font-medium">Otomatis buat ide bundling / promosi untuk cuci gudang atau meningkatkan konversi pada pembeli.</p>
-                 <button 
-                   onClick={() => handleRunAiFeature('promo', 'Kamu adalah ahli marketing kreatif.', 'Saya punya toko buku & alat tulis. Buatkan 3 ide paket bundling kreatif beserta judul diskon yang catchy untuk hari libur nasional mendatang.')}
-                   disabled={isProcessingGen['promo']} 
-                   className="bg-rose-600 text-white font-bold px-6 py-3 hover:bg-rose-700 shadow-sm self-start mb-6"
-                 >
-                   {isProcessingGen['promo'] ? 'Menemukan Ide Promo...' : 'Generate Ide Bundling Promosi'}
-                 </button>
-                 {genResponses['promo'] && (
-                     <div className="bg-white p-4 border border-gray-300 shadow-sm">
-                       <h3 className="font-bold text-rose-900 mb-2">Daftar Ide Diskon & Bundling:</h3>
-                       <div className="whitespace-pre-line text-sm text-gray-800">{genResponses['promo']}</div>
-                     </div>
-                 )}
-              </div>
-          )}
-
-          {aiTab === 'consultant' && (
-              <div className="flex flex-col h-full bg-[#ece9d8] border border-gray-400 p-6 shadow-sm overflow-y-auto w-full">
-                 <h2 className="text-xl font-bold text-cyan-900 border-b border-gray-400 pb-2 mb-4 flex items-center gap-2">✨ AI Business Consultant</h2>
-                 <p className="text-gray-700 mb-4 text-sm font-medium">Sistem interaktif bagi Anda (Owner) untuk bertanya tentang strategi bisnis, scaling, dll.</p>
-                 <div className="bg-white border border-gray-400 p-4 mb-4 flex flex-col gap-2 relative shadow-inner min-h-[300px]">
-                    <div className="absolute inset-0 bg-cyan-50/50 pointer-events-none"></div>
-                    <div className="z-10 bg-cyan-100 p-3 rounded shadow-sm self-start max-w-[80%] border border-cyan-300">
-                        <p className="text-sm font-bold text-cyan-900">Konsultan AI:</p>
-                        <p className="text-sm">Halo! Ada pertanyaan strategis soal tata kelola toko Anda hari ini? (Misal: "Bagaimana cara menangani karyawan yang kinerjanya menurun?")</p>
-                    </div>
-                    {genResponses['consultant'] && (
-                        <div className="z-10 bg-white p-3 rounded shadow-sm self-start max-w-[90%] border border-cyan-400 mt-8">
-                            <p className="text-sm font-bold text-cyan-900 mb-1">Rekomendasi Konsultan:</p>
-                            <div className="whitespace-pre-line text-sm">{genResponses['consultant']}</div>
-                        </div>
-                    )}
-                 </div>
-                 <div className="flex gap-2">
-                    <input 
-                      type="text" 
-                      id="consultant_prompt"
-                      placeholder="Ketik pertanyaan bisnis yang spesifik..." 
-                      className="flex-1 p-2 border border-gray-400 outline-none w-full shadow-inner"
-                      onKeyDown={(e) => {
-                          if (e.key === 'Enter') {
-                              handleRunAiFeature('consultant', 'Kamu adalah konsultan bisnis ritel senior yang sangat bijak dan praktikal.', (e.target as any).value);
-                          }
-                      }}
-                    />
-                    <button 
-                      onClick={() => {
-                        const input = document.getElementById('consultant_prompt') as HTMLInputElement;
-                        if (input.value) handleRunAiFeature('consultant', 'Kamu adalah konsultan bisnis ritel senior yang sangat bijak dan praktikal.', input.value);
-                      }}
-                      disabled={isProcessingGen['consultant']}
-                      className="bg-cyan-600 text-white font-bold px-6 py-2 hover:bg-cyan-700 shadow-sm"
-                    >
-                      {isProcessingGen['consultant'] ? 'Berpikir...' : 'Tanya Konsultan'}
-                    </button>
-                 </div>
               </div>
           )}
 

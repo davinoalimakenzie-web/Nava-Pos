@@ -94,7 +94,7 @@ export const Dashboard = ({ currentTime }: { currentTime: Date }) => {
           const prompt = `Lakukan analisis Cashflow berdasarkan data berikut:
           - Saldo Dana Laci (Real-time): Rp${saldoDanaLaci}
           - Total Hutang Supplier Aktif: Rp${hSupplier.reduce((sum: number, h: any) => sum + h.sisa_hutang, 0)} (${hSupplier.length} nota)
-          - Rincian Hutang: ${JSON.stringify(hSupplier.map((h: any) => ({ supplier: h.supplier_nama, sisa: h.sisa_hutang, jatuh_tempo: h.tanggal_jatuh_tempo })))}
+          - Rincian Hutang: ${JSON.stringify(hSupplier.map((h: any) => ({ supplier: h.supplier_name, sisa: h.sisa_hutang, jatuh_tempo: h.jatuh_tempo })))}
           - Total Kasbon Karyawan: Rp${tKasbon.reduce((sum: number, e: any) => sum + e.amount, 0)}
           - Kewajiban Lain (Aktif): Rp${kLain.reduce((sum: number, k: any) => sum + k.nilai, 0)}
           
@@ -513,7 +513,7 @@ export const Dashboard = ({ currentTime }: { currentTime: Date }) => {
   todayDate.setHours(0,0,0,0);
   const hutangMendesak = (hutangSupplier || []).filter((h: any) => {
       if (h.sisa_hutang <= 0) return false;
-      const jtDate = new Date(h.tanggal_jatuh_tempo);
+      const jtDate = new Date(h.jatuh_tempo);
       const diffTime = jtDate.getTime() - todayDate.getTime();
       const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
       return diffDays <= 14;
@@ -622,9 +622,9 @@ export const Dashboard = ({ currentTime }: { currentTime: Date }) => {
                     <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-calendar-clock"><path d="M21 7.5V6a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h3.5"/><path d="M16 2v4"/><path d="M8 2v4"/><path d="M3 10h5"/><path d="M17.5 17.5 16 16.25V14"/><circle cx="16" cy="16" r="6"/></svg>
                     Jadwal Jatuh Tempo Supplier
                 </h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
-                    {hutangSupplier.filter((h: any) => h.sisa_hutang > 0).sort((a: any, b: any) => new Date(a.tanggal_jatuh_tempo).getTime() - new Date(b.tanggal_jatuh_tempo).getTime()).map((h: any) => {
-                        const jtDate = new Date(h.tanggal_jatuh_tempo);
+                <div className={compactMode ? "flex overflow-x-auto gap-3 pb-2 snap-x" : "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3"}>
+                    {hutangSupplier.filter((h: any) => h.sisa_hutang > 0).sort((a: any, b: any) => new Date(a.jatuh_tempo).getTime() - new Date(b.jatuh_tempo).getTime()).map((h: any) => {
+                        const jtDate = new Date(h.jatuh_tempo);
                         const diffTime = jtDate.getTime() - todayDate.getTime();
                         const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
                         
@@ -636,10 +636,10 @@ export const Dashboard = ({ currentTime }: { currentTime: Date }) => {
                         else { statusColor = 'text-green-800'; bgColor = 'bg-green-100 border-green-400'; }
 
                         return (
-                            <div key={h.id} className={`border p-3 flex flex-col gap-1 cursor-pointer transition-transform hover:-translate-y-1 ${bgColor}`}>
-                                <div className="text-xs font-bold text-gray-500">{h.tanggal_jatuh_tempo.split('T')[0]} ({diffDays < 0 ? `Terlambat ${Math.abs(diffDays)} hari` : `${diffDays} hari lagi`})</div>
-                                <div className="font-bold text-sm truncate uppercase">{h.supplier_nama}</div>
-                                <div className="text-xs text-gray-600 bg-white border border-gray-300 px-1 font-mono">{h.nomor_nota}</div>
+                            <div key={h.id} className={`border p-3 flex flex-col gap-1 cursor-pointer transition-transform hover:-translate-y-1 ${bgColor} ${compactMode ? 'shrink-0 w-[280px] snap-start' : ''}`}>
+                                <div className="text-xs font-bold text-gray-500">{h.jatuh_tempo.split('T')[0]} ({diffDays < 0 ? `Terlambat ${Math.abs(diffDays)} hari` : `${diffDays} hari lagi`})</div>
+                                <div className="font-bold text-sm truncate uppercase">{h.supplier_name}</div>
+                                <div className="text-xs text-gray-600 bg-white border border-gray-300 px-1 font-mono">{h.id}</div>
                                 <div className={`text-lg font-black mt-2 ${statusColor}`}>{formatRp(h.sisa_hutang)}</div>
                             </div>
                         );
@@ -648,34 +648,7 @@ export const Dashboard = ({ currentTime }: { currentTime: Date }) => {
             </div>
         )}
 
-        {/* FITUR 4: AI CASHFLOW MONITOR CARDS */}
-        <div className="bg-gradient-to-r from-blue-900 to-blue-800 text-white border-2 border-yellow-500 p-4 shadow-lg flex flex-col rounded-sm">
-             <div className="flex justify-between items-center mb-3 pb-2 border-b border-blue-700">
-                 <h3 className="font-bold text-lg text-yellow-400 flex items-center gap-2">
-                     <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-bot"><path d="M12 8V4H8"/><rect width="16" height="12" x="4" y="8" rx="2"/><path d="M2 14h2"/><path d="M20 14h2"/><path d="M15 13v2"/><path d="M9 13v2"/></svg>
-                     AI Cashflow Monitor
-                 </h3>
-                 <button onClick={fetchAiCashflowMonitor} disabled={cashflowLoading} className="text-xs px-2 py-1 bg-white text-blue-900 font-bold border border-yellow-500 shadow-sm disabled:opacity-50 hover:bg-yellow-100 transition flex items-center gap-1">
-                     {cashflowLoading ? <RefreshCw className="w-3 h-3 animate-spin"/> : <RefreshCw className="w-3 h-3"/>}
-                     Refresh Analisis
-                 </button>
-             </div>
-             
-             <div className="text-sm font-medium leading-relaxed min-h-[80px]">
-                 {cashflowLoading ? (
-                     <div className="flex flex-col items-center justify-center p-4">
-                         <div className="w-6 h-6 border-4 border-yellow-400 border-t-transparent rounded-full animate-spin"></div>
-                         <p className="mt-2 text-blue-200 text-xs">AI sedang menganalisis kesehatan cashflow...</p>
-                     </div>
-                 ) : cashflowAiText ? (
-                     <div className="whitespace-pre-wrap markdown-body text-blue-50">
-                         {React.createElement('div', { dangerouslySetInnerHTML: { __html: cashflowAiText.replace(/\*\*(.*?)\*\*/g, '<strong class="text-white">$1</strong>').replace(/\*(.*?)\*/g, '<em>$1</em>').replace(/\n/g, '<br/>') } })}
-                     </div>
-                 ) : (
-                     <p className="text-blue-200">Belum ada analisis. Klik Refresh Analisis.</p>
-                 )}
-             </div>
-        </div>
+
 
         {/* TOP ROW STATS */}
         <div className="grid grid-cols-2 lg:grid-cols-5 gap-4 shrink-0">
@@ -794,70 +767,9 @@ export const Dashboard = ({ currentTime }: { currentTime: Date }) => {
             </motion.div>
         </div>
 
-        {/* DAILY SALES TIP WIDGET */}
-        <motion.div 
-            initial={{ opacity: 0, scale: 0.98 }}
-            animate={{ opacity: 1, scale: 1 }}
-            className="bg-[#ece9d8] border border-gray-400 shadow-sm flex flex-col"
-        >
-            <div className="bg-purple-800 text-white font-bold px-3 py-1.5 text-sm flex items-center justify-between shadow-sm">
-                <div className="flex items-center gap-2">
-                    <Sparkles className="w-4 h-4 text-yellow-300" />
-                    TIP BISNIS HARIAN AI
-                </div>
-                <button onClick={() => fetchDailyTip(true)} disabled={dailyAiTipLoading} className="text-gray-200 hover:text-white flex items-center gap-1 text-xs px-2 cursor-pointer outline-none">
-                    <RefreshCw className={`w-3 h-3 ${dailyAiTipLoading ? 'animate-spin' : ''}`} />
-                    Refresh
-                </button>
-            </div>
-            <div className="p-3 bg-white m-1 border border-gray-300 flex items-center gap-3">
-               {dailyAiTipLoading ? (
-                   <div className="flex-1 flex gap-2 items-center justify-center text-gray-500 min-h-[40px]">
-                       <Loader2 className="w-4 h-4 animate-spin" /> Sedang merumuskan tip berdasarkan penjualan...
-                   </div>
-               ) : (
-                   <p className="text-sm font-medium text-gray-800 flex-1 leading-relaxed">{dailyAiTip || "Coba sapa pelanggan secara personal hari ini untuk meningkatkan retensi."}</p>
-               )}
-            </div>
-        </motion.div>
 
-        {/* AI SALES FORECAST WIDGET */}
-        <motion.div 
-            initial={{ opacity: 0, scale: 0.98 }}
-            animate={{ opacity: 1, scale: 1 }}
-            transition={{ duration: 0.4 }}
-            className="bg-[#ece9d8] border border-gray-400 shadow-sm flex flex-col mb-4"
-        >
-            <div className="bg-blue-900 text-white font-bold px-3 py-1.5 text-sm flex gap-2 items-center shadow-sm">
-               <Sparkles className="w-4 h-4 text-purple-400" />
-               AI SALES FORECAST & STRATEGY
-            </div>
-            <div className="flex-1 p-3 bg-white m-1 border border-gray-300 flex flex-col items-center justify-center text-center">
-                {!hasFetchedForecast ? (
-                     <button 
-                         onClick={fetchAiForecast}
-                         disabled={forecastLoading}
-                         className="bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white font-bold py-2 px-4 rounded shadow flex items-center gap-2 text-sm"
-                     >
-                         {forecastLoading ? <><Loader2 className="w-4 h-4 animate-spin"/> Menganalisis Data...</> : <><Sparkles className="w-4 h-4"/> Buat Prediksi via AI</>}
-                     </button>
-                ) : (
-                     <div className="w-full text-left font-sans text-sm text-gray-800 flex flex-col gap-2">
-                         {forecastAiText ? (
-                             <div className="whitespace-pre-wrap leading-relaxed">{forecastAiText}</div>
-                         ) : (
-                             <div className="text-gray-500 italic">Gagal membuat prediksi.</div>
-                         )}
-                         <div className="mt-1 text-right border-t border-gray-200 pt-1">
-                             <button onClick={fetchAiForecast} disabled={forecastLoading} className="text-blue-600 hover:underline text-xs font-bold inline-flex items-center gap-1 cursor-pointer">
-                                 {forecastLoading ? <Loader2 className="w-3 h-3 animate-spin"/> : <Sparkles className="w-3 h-3"/>}
-                                 Refresh
-                             </button>
-                         </div>
-                     </div>
-                )}
-            </div>
-        </motion.div>
+
+
 
         <div className={`grid grid-cols-1 lg:grid-cols-3 gap-4 flex-1 min-h-[300px] transition-all duration-300 ${isRefreshing ? 'opacity-30 blur-[2px] pointer-events-none' : 'opacity-100'}`}>
             {/* WIDGET: PENDAPATAN HARI INI & MINGGUAN (GABUNGAN) */}

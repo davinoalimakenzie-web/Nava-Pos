@@ -51,7 +51,7 @@ export const MasterData = ({ currentTime }: { currentTime: Date }) => {
          <button onClick={() => setMasterDataTab('stock')} className={`px-2.5 py-1 text-[10px] md:text-xs md:px-4 md:py-1.5 whitespace-nowrap shrink-0 border border-gray-500 font-bold hover:bg-white ${masterDataTab === 'stock' ? 'bg-white border-b-white text-blue-900' : 'bg-gray-200 text-black'}`}>Master Stock</button>
          <button onClick={() => setMasterDataTab('opname')} className={`px-2.5 py-1 text-[10px] md:text-xs md:px-4 md:py-1.5 whitespace-nowrap shrink-0 border border-gray-500 font-bold hover:bg-white ${masterDataTab === 'opname' ? 'bg-white border-b-white text-blue-900' : 'bg-gray-200 text-black'}`}>Stock Opname</button>
          <button onClick={() => setMasterDataTab('order')} className={`px-2.5 py-1 text-[10px] md:text-xs md:px-4 md:py-1.5 whitespace-nowrap shrink-0 border border-gray-500 font-bold hover:bg-white ${masterDataTab === 'order' ? 'bg-white border-b-white text-blue-900' : 'bg-gray-200 text-black'}`}>Order Stock</button>
-         <button onClick={() => setMasterDataTab('return')} className={`px-2.5 py-1 text-[10px] md:text-xs md:px-4 md:py-1.5 whitespace-nowrap shrink-0 border border-gray-500 font-bold hover:bg-white ${masterDataTab === 'return' ? 'bg-white border-b-white text-blue-900' : 'bg-gray-200 text-black'}`}>Stock Return</button>
+         <button onClick={() => setMasterDataTab('return')} className={`px-2.5 py-1 text-[10px] md:text-xs md:px-4 md:py-1.5 whitespace-nowrap shrink-0 border border-gray-500 font-bold hover:bg-white ${masterDataTab === 'return' ? 'bg-white border-b-white text-blue-900' : 'bg-gray-200 text-black'}`}>Retur Supliyer</button>
          <button onClick={() => setMasterDataTab('pelanggan')} className={`px-2.5 py-1 text-[10px] md:text-xs md:px-4 md:py-1.5 whitespace-nowrap shrink-0 border border-gray-500 font-bold hover:bg-white ${masterDataTab === 'pelanggan' ? 'bg-white border-b-white text-blue-900' : 'bg-gray-200 text-black'}`}>Data Pelanggan</button>
          <button onClick={() => setMasterDataTab('supliyer')} className={`px-2.5 py-1 text-[10px] md:text-xs md:px-4 md:py-1.5 whitespace-nowrap shrink-0 border border-gray-500 font-bold hover:bg-white ${masterDataTab === 'supliyer' ? 'bg-white border-b-white text-blue-900' : 'bg-gray-200 text-black'}`}>Data Supliyer</button>
          <button onClick={() => setMasterDataTab('hutang')} className={`px-2.5 py-1 text-[10px] md:text-xs md:px-4 md:py-1.5 whitespace-nowrap shrink-0 border border-gray-500 font-bold hover:bg-white ${masterDataTab === 'hutang' ? 'bg-white border-b-white text-blue-900' : 'bg-gray-200 text-black'}`}>Hutang Supplier</button>
@@ -214,6 +214,10 @@ export const MasterData = ({ currentTime }: { currentTime: Date }) => {
                     <input type="number" id="returQty" min="1" defaultValue="1" className="border-gray-400 border p-1" />
                  </div>
                  <div className="flex-1 flex flex-col gap-1">
+                    <label>Kendala:</label>
+                    <input type="text" id="returKendala" className="border-gray-400 border p-1" placeholder="Misal: Kemasan rusak" />
+                 </div>
+                 <div className="flex-1 flex flex-col gap-1">
                     <label>Pilih Supliyer:</label>
                     <select className="border-gray-400 border p-1" id="returSupliyerId">
                        <option value="">-- Supliyer --</option>
@@ -224,6 +228,7 @@ export const MasterData = ({ currentTime }: { currentTime: Date }) => {
                     const idBarang = (document.getElementById('returBarangId') as HTMLSelectElement).value;
                     const qty = parseInt((document.getElementById('returQty') as HTMLInputElement).value);
                     const idSup = (document.getElementById('returSupliyerId') as HTMLSelectElement).value;
+                    const kendala = (document.getElementById('returKendala') as HTMLInputElement).value;
                     if (!idBarang || !qty || !idSup) return alert('Lengkapi data!');
                     
                     const item = inventory.find((i:any) => String(i.id) === idBarang);
@@ -238,6 +243,7 @@ export const MasterData = ({ currentTime }: { currentTime: Date }) => {
                        date: new Date().toLocaleDateString('id-ID'),
                        itemName: item.name,
                        qty,
+                       kendala,
                        supplierName: sup.name,
                        status: 'Proses'
                     }]);
@@ -248,18 +254,18 @@ export const MasterData = ({ currentTime }: { currentTime: Date }) => {
               <h3 className="font-bold border-b pb-1">Riwayat Retur ke Supliyer</h3>
               <table className="w-full text-left border-collapse whitespace-nowrap border border-gray-400 mt-2">
                  <thead className="bg-[#ece9d8] border-b-2 border-gray-400 font-bold text-sm">
-                    <tr><th className="p-2 border-r border-gray-300">ID Retur</th><th className="p-2 border-r border-gray-300">Tanggal</th><th className="p-2 border-r border-gray-300">Supliyer</th><th className="p-2 border-r border-gray-300">Barang Rusak</th><th className="p-2 border-r border-gray-300 text-center">Qty</th><th className="p-2 border-gray-300 text-center">Status</th></tr>
+                    <tr><th className="p-2 border-r border-gray-300">ID Retur</th><th className="p-2 border-r border-gray-300">Tanggal</th><th className="p-2 border-r border-gray-300">Supliyer</th><th className="p-2 border-r border-gray-300">Barang Rusak</th><th className="p-2 border-r border-gray-300">Kendala</th><th className="p-2 border-r border-gray-300 text-center">Qty</th><th className="p-2 border-gray-300 text-center">Status</th></tr>
                  </thead>
                  <tbody className="text-sm">
                     {supplierReturns.length === 0 ? (
-                       <tr><td colSpan={6} className="text-center p-4 italic text-gray-500">Belum ada data retur.</td></tr>
+                       <tr><td colSpan={7} className="text-center p-4 italic text-gray-500">Belum ada data retur.</td></tr>
                     ) : (
                        supplierReturns.map((r: any) => (
                           <tr key={r.id} className="border-b border-gray-300 hover:bg-gray-100">
                              <td className="p-2 border-r border-gray-300 font-mono font-bold text-red-700">{r.id}</td>
                              <td className="p-2 border-r border-gray-300">{r.date}</td>
                              <td className="p-2 border-r border-gray-300">{r.supplierName}</td>
-                             <td className="p-2 border-r border-gray-300">{r.itemName}</td>
+                             <td className="p-2 border-r border-gray-300">{r.itemName}</td><td className="p-2 border-r border-gray-300 text-gray-600">{r.kendala || '-'}</td>
                              <td className="p-2 border-r border-gray-300 text-center font-bold text-red-600">-{r.qty} Pcs</td>
                              <td className="p-2 text-center">
                                  <select value={r.status} onChange={e => {

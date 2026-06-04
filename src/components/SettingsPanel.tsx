@@ -9,7 +9,7 @@ export const SettingsPanel = ({ currentTime }: { currentTime: Date }) => {
       inventory, setInventory, customers, setCustomers, suppliers, setSuppliers, orderData, setOrderData, supplierReturns, setSupplierReturns, setShowLogoutConfirm,
       employees, setEmployees, attendances, setAttendances, leaveRequests, setLeaveRequests, transactions, setTransactions, expenses, setExpenses, piutangData, setPiutangData, pendingTransactions, setPendingTransactions, appLogs, addLog
   } = useAppContext();
-  const [settingTab, setSettingTab] = useState('print');
+  const [settingTab, setSettingTab] = useState('tools');
   
   // Backup & Restore states
   const [snapshots, setSnapshots] = useState<any[]>(() => {
@@ -46,8 +46,7 @@ export const SettingsPanel = ({ currentTime }: { currentTime: Date }) => {
       <LegacyWindowHeader title="PENGATURAN SISTEM" currentTime={currentTime} />
       
       <div className="flex gap-1 shrink-0 bg-[#ece9d8] p-1 border-b border-gray-400 shadow-sm z-10 overflow-x-auto no-scrollbar">
-         <button onClick={() => setSettingTab('print')} className={`px-2.5 py-1 text-[10px] md:text-xs md:px-4 md:py-1.5 whitespace-nowrap shrink-0 border border-gray-500 font-bold hover:bg-white ${settingTab === 'print' ? 'bg-white border-b-white text-blue-900' : 'bg-gray-200 text-black'}`}>Setting Print (Invoice)</button>
-         <button onClick={() => setSettingTab('scanner')} className={`px-2.5 py-1 text-[10px] md:text-xs md:px-4 md:py-1.5 whitespace-nowrap shrink-0 border border-gray-500 font-bold hover:bg-white ${settingTab === 'scanner' ? 'bg-white border-b-white text-blue-900' : 'bg-gray-200 text-black'}`}>Scanner Barcode</button>
+         <button onClick={() => setSettingTab('tools')} className={`px-2.5 py-1 text-[10px] md:text-xs md:px-4 md:py-1.5 whitespace-nowrap shrink-0 border border-gray-500 font-bold hover:bg-white ${settingTab === 'tools' ? 'bg-white border-b-white text-blue-900' : 'bg-gray-200 text-black'}`}>Tools</button>
          <button onClick={() => setSettingTab('sync')} className={`px-2.5 py-1 text-[10px] md:text-xs md:px-4 md:py-1.5 whitespace-nowrap shrink-0 border border-gray-500 font-bold hover:bg-white ${settingTab === 'sync' ? 'bg-white border-b-white text-blue-900' : 'bg-gray-200 text-black'}`}>Sinkronisasi</button>
          <button onClick={() => setSettingTab('margins')} className={`px-2.5 py-1 text-[10px] md:text-xs md:px-4 md:py-1.5 whitespace-nowrap shrink-0 border border-gray-500 font-bold hover:bg-white ${settingTab === 'margins' ? 'bg-white border-b-white text-blue-900' : 'bg-gray-200 text-black'}`}>Setting Margin Harga</button>
          <button onClick={() => setSettingTab('backup')} className={`px-2.5 py-1 text-[10px] md:text-xs md:px-4 md:py-1.5 whitespace-nowrap shrink-0 border border-gray-500 font-bold hover:bg-white ${settingTab === 'backup' ? 'bg-white border-b-white text-blue-900' : 'bg-gray-200 text-black'}`}>Backup & Restore</button>
@@ -146,7 +145,7 @@ export const SettingsPanel = ({ currentTime }: { currentTime: Date }) => {
               </div>
            )}
 
-           {settingTab === 'print' && (
+           {settingTab === 'tools' && (
               <div className="flex flex-col gap-4">
                  <div className="flex gap-2 items-center mb-4 border-b pb-2">
                     <Printer className="w-8 h-8 text-gray-500" />
@@ -201,12 +200,8 @@ export const SettingsPanel = ({ currentTime }: { currentTime: Date }) => {
                      alert('Pengaturan Disimpan!');
                      addLog('SETTING_SISTEM', 'Pengaturan Profil / Print / Invoice disimpan');
                  }}>Simpan Pengaturan</button>
-              </div>
-           )}
 
-           {settingTab === 'scanner' && (
-              <div className="flex flex-col gap-4">
-                 <div className="flex gap-2 items-center mb-4 border-b pb-2">
+                 <div className="flex gap-2 items-center mb-4 border-b pb-2 mt-8">
                     <MonitorSmartphone className="w-8 h-8 text-gray-500" />
                     <h2 className="text-xl font-bold text-blue-900">Kalibrasi Scanner Barcode</h2>
                  </div>
