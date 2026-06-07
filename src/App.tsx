@@ -26,11 +26,11 @@ const AppContent = () => {
   }
 
   return (
-    <div className="h-screen bg-gray-50 flex flex-col w-full overflow-hidden pt-8">
+    <div className="h-[100dvh] bg-[#8fb4d9] flex flex-col w-full overflow-hidden pt-1 pb-6">
       <div className="flex flex-row relative font-sans text-xs w-full flex-1 overflow-hidden">
         <GlobalModals />
         <Sidebar />
-        <main className="flex-1 flex flex-col h-full overflow-hidden text-black text-[11px] sm:text-xs min-w-0">
+        <main className="flex-1 flex flex-col h-full overflow-hidden text-black text-[11px] sm:text-xs min-w-0 pb-2">
           <ErrorBoundary>
             {activeTab === 'pos' && <POS currentTime={currentTime} />}
             {activeTab === 'absensi' && <Absensi currentTime={currentTime} />}

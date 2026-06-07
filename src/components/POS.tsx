@@ -1005,7 +1005,7 @@ export const POS = ({ currentTime }: { currentTime: Date }) => {
         </div>
 
         {/* BOTTOM SECTION */}
-        <div className="flex mt-1 justify-between items-stretch gap-3 w-full">
+        <div className="flex mt-1 justify-between items-stretch gap-3 w-full pb-3">
           {/* Left Totals */}
           <div className="flex flex-col justify-end gap-1 w-[280px] p-2 bg-[#8fb4d9] border border-white/50 shadow-sm shrink-0 rounded-sm">
              <div className="flex items-center h-[26px]">
