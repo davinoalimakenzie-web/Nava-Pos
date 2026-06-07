@@ -82,20 +82,20 @@ export const InputCashflow = () => {
       <div className="flex-1 flex flex-col border border-white p-1">
         
         {/* Filter Header */}
-        <div className="flex items-end gap-2 mb-1 p-1">
-          <div className="flex flex-col gap-0.5 w-32">
+        <div className="flex items-end gap-4 mb-2 p-1 w-full">
+          <div className="flex flex-col gap-1 w-36">
             <label className="text-[11px]">Dari Tanggal</label>
             <CustomDatePicker className="h-[22px]" />
           </div>
-          <div className="flex flex-col gap-0.5 w-32">
+          <div className="flex flex-col gap-1 w-36">
             <label className="text-[11px]">Sampai Tanggal</label>
             <CustomDatePicker className="h-[22px]" />
           </div>
-          <div className="flex flex-col gap-0.5 w-32">
+          <div className="flex flex-col gap-1 w-36">
             <label className="text-[11px]">Jenis</label>
             <select className="bg-white text-black px-1 py-0.5 outline-none h-[22px]"><option></option></select>
           </div>
-          <div className="flex flex-col gap-0.5 w-24">
+          <div className="flex flex-col gap-1 w-28">
             <label className="text-[11px]">Cash / TF</label>
             <select className="bg-white text-black px-1 py-0.5 outline-none h-[22px]"><option></option></select>
           </div>
@@ -149,26 +149,26 @@ export const InputCashflow = () => {
         </div>
 
         {/* Bottom Summary Panel */}
-        <div className="flex items-end gap-2 mt-2">
-          <div className="flex flex-col w-32">
-            <span className="text-[10px] opacity-90 mb-0.5">Uang Masuk</span>
-            <div className="bg-[#ccffff] text-black font-bold text-center py-1 text-sm border border-gray-500 shadow-sm tracking-tight text-[11px]">Rp 3.286.000</div>
+        <div className="flex items-end gap-4 mt-3">
+          <div className="flex flex-col w-36">
+            <span className="text-[11px] opacity-90 mb-1">Uang Masuk</span>
+            <div className="bg-[#ccffff] text-black font-bold text-right px-2 py-1 text-[12px] border border-gray-500 shadow-sm tracking-tight">Rp 3.286.000</div>
           </div>
-          <div className="flex flex-col w-32">
-            <span className="text-[10px] opacity-90 mb-0.5">Uang Keluar</span>
-            <div className="bg-[#ccffff] text-black font-bold text-center py-1 text-sm border border-gray-500 shadow-sm tracking-tight text-[11px]">Rp 865.000</div>
+          <div className="flex flex-col w-36">
+            <span className="text-[11px] opacity-90 mb-1">Uang Keluar</span>
+            <div className="bg-[#ccffff] text-black font-bold text-right px-2 py-1 text-[12px] border border-gray-500 shadow-sm tracking-tight">Rp 865.000</div>
           </div>
-          <div className="flex flex-col w-32">
-            <span className="text-[10px] opacity-90 mb-0.5">Total</span>
-            <div className="bg-[#ccffff] text-black font-bold text-center py-1 text-sm border border-gray-500 shadow-sm tracking-tight text-[11px]">Rp 2.421.000</div>
+          <div className="flex flex-col w-36">
+            <span className="text-[11px] opacity-90 mb-1">Total</span>
+            <div className="bg-[#ccffff] text-black font-bold text-right px-2 py-1 text-[12px] border border-gray-500 shadow-sm tracking-tight">Rp 2.421.000</div>
           </div>
-          <div className="flex flex-col w-32">
-            <span className="text-[10px] opacity-90 mb-0.5">TF / QRIS</span>
-            <div className="bg-[#ffffcc] text-black font-bold text-center py-1 text-sm border border-gray-500 shadow-sm tracking-tight text-[11px]">Rp 963.000</div>
+          <div className="flex flex-col w-36">
+            <span className="text-[11px] opacity-90 mb-1">TF / QRIS</span>
+            <div className="bg-[#ffffcc] text-black font-bold text-right px-2 py-1 text-[12px] border border-gray-500 shadow-sm tracking-tight">Rp 963.000</div>
           </div>
-          <div className="flex flex-col w-32 ml-auto">
-            <span className="text-[10px] opacity-90 mb-0.5">Uang Laci Flx</span>
-            <div className="bg-[#000080] text-white font-bold text-center py-1 text-sm border border-gray-500 shadow-sm tracking-tight text-[11px]">Rp 1.458.000</div>
+          <div className="flex flex-col w-40 ml-auto">
+            <span className="text-[11px] opacity-90 mb-1">Uang Laci Flx</span>
+            <div className="bg-[#000080] text-white font-bold text-right px-2 py-1 text-[12px] border border-gray-500 shadow-sm tracking-tight">Rp 1.458.000</div>
           </div>
         </div>
 
