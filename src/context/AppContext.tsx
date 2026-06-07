@@ -84,6 +84,7 @@ function useSyncState<T>(key: string, initial: T, syncEnabled: boolean) {
 export const AppProvider = ({ children }: { children: React.ReactNode }) => {
   const [user, setUser] = useState<any>(null);
   const [activeTab, setActiveTab] = useState('pos');
+  const [appMode, setAppMode] = useState<'POS' | 'SERVICE'>('POS');
   
   // System Settings
   const [storeSettings, setStoreSettings] = useState(() => {
@@ -195,6 +196,7 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
     <AppContext.Provider value={{
       user, setUser,
       activeTab, setActiveTab,
+      appMode, setAppMode,
       wallets, setWallets,
       appUsers, setAppUsers,
       inventory, setInventory,

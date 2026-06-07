@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Printer, MonitorSmartphone, Server, Lock, DownloadCloud, UploadCloud, Database, History, Trash2, AlertTriangle, Check } from 'lucide-react';
+import { Printer, MonitorSmartphone, Server, Lock, DownloadCloud, UploadCloud, Database, History, Trash2, AlertTriangle, Check, Eye, EyeOff } from 'lucide-react';
 import { LegacyWindowHeader } from './LegacyWindowHeader';
 import { useAppContext } from '../context/AppContext';
 
@@ -24,6 +24,10 @@ export const SettingsPanel = ({ currentTime }: { currentTime: Date }) => {
   const [uploadedFileData, setUploadedFileData] = useState<any | null>(null);
   const [resetInput, setResetInput] = useState('');
   const [showResetConfirm, setShowResetConfirm] = useState(false);
+  const [editUser, setEditUser] = useState<any>(null);
+  const [showEditPasswords, setShowEditPasswords] = useState(false);
+  const [showSyncMarginModal, setShowSyncMarginModal] = useState<{cat: string, lv1: number, lv2: number, lv3: number} | null>(null);
+  const [isSyncingMargin, setIsSyncingMargin] = useState(false);
 
   const handleBackupData = () => {
       const allData = { 
@@ -46,10 +50,8 @@ export const SettingsPanel = ({ currentTime }: { currentTime: Date }) => {
       <LegacyWindowHeader title="PENGATURAN SISTEM" currentTime={currentTime} />
       
       <div className="flex gap-1 shrink-0 bg-[#ece9d8] p-1 border-b border-gray-400 shadow-sm z-10 overflow-x-auto no-scrollbar">
-         <button onClick={() => setSettingTab('tools')} className={`px-2.5 py-1 text-[10px] md:text-xs md:px-4 md:py-1.5 whitespace-nowrap shrink-0 border border-gray-500 font-bold hover:bg-white ${settingTab === 'tools' ? 'bg-white border-b-white text-blue-900' : 'bg-gray-200 text-black'}`}>Tools</button>
-         <button onClick={() => setSettingTab('sync')} className={`px-2.5 py-1 text-[10px] md:text-xs md:px-4 md:py-1.5 whitespace-nowrap shrink-0 border border-gray-500 font-bold hover:bg-white ${settingTab === 'sync' ? 'bg-white border-b-white text-blue-900' : 'bg-gray-200 text-black'}`}>Sinkronisasi</button>
-         <button onClick={() => setSettingTab('margins')} className={`px-2.5 py-1 text-[10px] md:text-xs md:px-4 md:py-1.5 whitespace-nowrap shrink-0 border border-gray-500 font-bold hover:bg-white ${settingTab === 'margins' ? 'bg-white border-b-white text-blue-900' : 'bg-gray-200 text-black'}`}>Setting Margin Harga</button>
-         <button onClick={() => setSettingTab('backup')} className={`px-2.5 py-1 text-[10px] md:text-xs md:px-4 md:py-1.5 whitespace-nowrap shrink-0 border border-gray-500 font-bold hover:bg-white ${settingTab === 'backup' ? 'bg-white border-b-white text-blue-900' : 'bg-gray-200 text-black'}`}>Backup & Restore</button>
+         <button onClick={() => setSettingTab('tools')} className={`px-2.5 py-1 text-[10px] md:text-xs md:px-4 md:py-1.5 whitespace-nowrap shrink-0 border border-gray-500 font-bold hover:bg-white ${settingTab === 'tools' ? 'bg-white border-b-white text-blue-900' : 'bg-gray-200 text-black'}`}>Tools & Backup</button>
+         <button onClick={() => setSettingTab('margins')} className={`px-2.5 py-1 text-[10px] md:text-xs md:px-4 md:py-1.5 whitespace-nowrap shrink-0 border border-gray-500 font-bold hover:bg-white ${settingTab === 'margins' ? 'bg-white border-b-white text-blue-900' : 'bg-gray-200 text-black'}`}>Harga Level</button>
          {(user?.role === 'owner' || user?.role === 'admin') && (
              <button onClick={() => setSettingTab('akun')} className={`px-2.5 py-1 text-[10px] md:text-xs md:px-4 md:py-1.5 whitespace-nowrap shrink-0 border border-gray-500 font-bold hover:bg-white ${settingTab === 'akun' ? 'bg-white border-b-white text-blue-900' : 'bg-gray-200 text-black'}`}>Akun Login & Hak Akses</button>
          )}
@@ -61,7 +63,7 @@ export const SettingsPanel = ({ currentTime }: { currentTime: Date }) => {
            {settingTab === 'margins' && (
               <div className="flex flex-col gap-4">
                  <div className="flex gap-2 items-center mb-4 border-b pb-2">
-                    <h2 className="text-xl font-bold text-blue-900">Pengaturan Margin Harga Barang Baru</h2>
+                    <h2 className="text-xl font-bold text-blue-900">Pengaturan Persentase Harga Level</h2>
                  </div>
                  <div className="text-gray-600 mb-4 text-sm max-w-lg">
                     Atur nilai persentase default untuk Harga Level 1, Level 2, dan Level 3. Persentase ini akan digunakan untuk menghitung otomatis harga jual saat menginput stok baru berdasarkan kategori barang. Jika kategori tidak diatur, maka nilai UMUM akan digunakan.
@@ -73,6 +75,7 @@ export const SettingsPanel = ({ currentTime }: { currentTime: Date }) => {
                         <th className="p-2 w-28">Level 1 (%)</th>
                         <th className="p-2 w-28">Level 2 (%)</th>
                         <th className="p-2 w-28">Level 3 (%)</th>
+                        <th className="p-2 w-16 text-center">Aksi</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -105,6 +108,23 @@ export const SettingsPanel = ({ currentTime }: { currentTime: Date }) => {
                               onChange={e => setStoreSettings({...storeSettings, margins: {...(storeSettings.margins||{}), [cat]: {...(currentMargins[cat]||{}), level3: parseInt(e.target.value)||0}}})}
                             />
                           </td>
+                          <td className="p-2 text-center">
+                            {cat !== 'UMUM' && (
+                                <button
+                                    onClick={() => {
+                                        if (confirm(`Hapus margin untuk kategori ${cat}?`)) {
+                                            const newMargins = { ...storeSettings.margins };
+                                            delete newMargins[cat];
+                                            setStoreSettings({ ...storeSettings, margins: newMargins });
+                                            addLog('SETTING_MARGIN', `Kategori margin dihapus: ${cat}`);
+                                        }
+                                    }}
+                                    className="text-red-500 hover:bg-red-50 p-1 rounded"
+                                >
+                                    <Trash2 size={16} />
+                                </button>
+                            )}
+                          </td>
                         </tr>
                       )})}
                     </tbody>
@@ -118,8 +138,7 @@ export const SettingsPanel = ({ currentTime }: { currentTime: Date }) => {
                      const lv2 = parseInt(formData.get('level2') as string) || 0;
                      const lv3 = parseInt(formData.get('level3') as string) || 0;
                      if (!cat) return;
-                     setStoreSettings({...storeSettings, margins: {...(storeSettings.margins||{}), [cat.toUpperCase()]: {level1: lv1, level2: lv2, level3: lv3}}});
-                     addLog('SETTING_MARGIN', `Kategori margin baru: ${cat.toUpperCase()}`);
+                     setShowSyncMarginModal({ cat: cat.toUpperCase(), lv1, lv2, lv3 });
                      e.currentTarget.reset();
                  }} className="flex gap-2 items-end bg-gray-50 border border-gray-300 p-3 max-w-2xl">
                     <div className="flex flex-col gap-1 w-1/4">
@@ -140,8 +159,6 @@ export const SettingsPanel = ({ currentTime }: { currentTime: Date }) => {
                     </div>
                     <button type="submit" className="bg-green-600 text-white font-bold px-4 py-2 hover:bg-green-700">Tambah</button>
                  </form>
-
-                 <button className="bg-blue-600 text-white font-bold py-2 shadow hover:bg-blue-700 w-48 mt-4" onClick={() => alert('Pengaturan Margin Disimpan!')}>Simpan Pengaturan</button>
               </div>
            )}
 
@@ -224,12 +241,8 @@ export const SettingsPanel = ({ currentTime }: { currentTime: Date }) => {
                      alert('Kalibrasi Disimpan!');
                      addLog('SETTING_SISTEM', 'Kalibrasi Scanner disimpan');
                  }}>Simpan Kalibrasi</button>
-              </div>
-           )}
 
-           {settingTab === 'sync' && (
-              <div className="flex flex-col gap-4">
-                 <div className="flex gap-2 items-center mb-4 border-b pb-2">
+                 <div className="flex gap-2 items-center mt-8 mb-4 border-b pb-2 border-gray-300">
                     <Server className="w-8 h-8 text-gray-500" />
                     <h2 className="text-xl font-bold text-blue-900">Sinkronisasi Cloud Backup</h2>
                  </div>
@@ -246,101 +259,10 @@ export const SettingsPanel = ({ currentTime }: { currentTime: Date }) => {
                     <DownloadCloud className="w-5 h-5 inline-block mr-2" />
                     {storeSettings.syncEnabled ? 'Matikan Autobackup Cloud' : 'Aktifkan Cloud Database'}
                  </button>
-              </div>
-           )}
 
-           {settingTab === 'akun' && (
-              <div className="flex flex-col gap-4">
-                 <div className="flex justify-between items-end mb-4 border-b pb-2">
-                    <div className="flex gap-2 items-center">
-                        <Lock className="w-8 h-8 text-gray-500" />
-                        <h2 className="text-xl font-bold text-blue-900">Akun & Pembagian Hak Akses</h2>
-                    </div>
-                    <button onClick={() => setShowLogoutConfirm(true)} className="bg-red-600 hover:bg-red-700 text-white font-bold py-1.5 px-4 shadow text-sm">LOG OUT SEKARANG</button>
-                 </div>
-                 
-                 <div className="flex flex-col gap-2">
-                    <h3 className="font-bold text-lg mb-2">Daftar Pengguna Sistem</h3>
-                    <table className="w-full text-left border-collapse border border-gray-400">
-                      <thead className="bg-[#ece9d8]">
-                        <tr>
-                          <th className="border p-2">Username</th>
-                          <th className="border p-2">Nama Lengkap</th>
-                          <th className="border p-2">Password/PIN</th>
-                          <th className="border p-2">Role/Hak Akses</th>
-                          <th className="border p-2 w-24 text-center">Aksi</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {appUsers?.map((u: any) => (
-                           <tr key={u.id} className="hover:bg-gray-50">
-                             <td className="border p-2 font-mono">{u.username}</td>
-                             <td className="border p-2 font-bold">{u.name}</td>
-                             <td className="border p-2">*** (Tersembunyi)</td>
-                             <td className="border p-2 font-bold uppercase text-blue-800">{u.role}</td>
-                             <td className="border p-2 text-center">
-                               <button 
-                                 onClick={() => {
-                                   if(u.username === 'admin') return alert('User admin utama tidak dapat dihapus!');
-                                   if(window.confirm(`Hapus pengguna ${u.name}?`)) setAppUsers(appUsers.filter((usr: any) => usr.id !== u.id));
-                                 }} 
-                                 className="text-red-600 hover:bg-red-100 px-2 py-1 font-bold border border-red-300 rounded"
-                               >Hapus</button>
-                             </td>
-                           </tr>
-                        ))}
-                      </tbody>
-                    </table>
-
-                    <div className="bg-[#ece9d8] p-4 mt-4 border border-gray-400 shadow-sm">
-                       <h4 className="font-bold border-b border-gray-400 pb-2 mb-3">Tambah Pengguna Baru</h4>
-                       <form onSubmit={(e) => {
-                          e.preventDefault();
-                          const formData = new FormData(e.currentTarget);
-                          const newU = {
-                             id: 'u' + Date.now(),
-                             username: formData.get('username') as string,
-                             password: formData.get('password') as string,
-                             name: formData.get('name') as string,
-                             role: formData.get('role') as string,
-                          };
-                          if (appUsers?.find((u: any) => u.username === newU.username)) return alert('Username sudah digunakan!');
-                          setAppUsers([...(appUsers || []), newU]);
-                          e.currentTarget.reset();
-                          alert('Pengguna berhasil ditambahkan!');
-                       }} className="grid grid-cols-2 gap-4">
-                          <div className="flex flex-col gap-1">
-                            <label className="text-xs font-bold">Username</label>
-                            <input name="username" required className="border border-gray-400 p-1.5 outline-none" />
-                          </div>
-                          <div className="flex flex-col gap-1">
-                            <label className="text-xs font-bold">Nama Lengkap</label>
-                            <input name="name" required className="border border-gray-400 p-1.5 outline-none" />
-                          </div>
-                          <div className="flex flex-col gap-1">
-                            <label className="text-xs font-bold">Password / PIN</label>
-                            <input name="password" required className="border border-gray-400 p-1.5 outline-none" />
-                          </div>
-                          <div className="flex flex-col gap-1">
-                            <label className="text-xs font-bold">Role (Hak Akses)</label>
-                            <select name="role" required className="border border-gray-400 p-1.5 outline-none">
-                               <option value="kasir">Staff / Kasir (Terbatas)</option>
-                               <option value="admin">Administrator (Full Akses)</option>
-                            </select>
-                          </div>
-                          <div className="col-span-2 mt-2">
-                             <button type="submit" className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-6 shadow w-48">Simpan Pengguna</button>
-                          </div>
-                       </form>
-                    </div>
-                 </div>
-              </div>
-           )}
-
-           {settingTab === 'backup' && (
-            <div className="flex flex-col bg-[#ece9d8] text-black p-4 md:p-6 -m-6 border border-gray-400">
-              {/* Retro Panel Header */}
-              <div className="bg-[#000080] text-white px-3 py-1.5 flex flex-wrap items-center font-bold text-[10px] md:text-xs justify-between mb-4 shadow border border-gray-400">
+             <div className="flex flex-col bg-[#ece9d8] text-black p-4 mt-8 border border-gray-400">
+               {/* Retro Panel Header */}
+               <div className="bg-[#000080] text-white px-3 py-1.5 flex flex-wrap items-center font-bold text-[10px] md:text-xs justify-between mb-4 shadow border border-gray-400">
                 <span className="flex items-center gap-2 whitespace-nowrap">
                   <Database className="w-4 h-4 text-amber-400 shrink-0" /> RECOVERY & DATABASE MAINTENANCE CENTER (PIN: ACTIVE)
                 </span>
@@ -708,10 +630,306 @@ export const SettingsPanel = ({ currentTime }: { currentTime: Date }) => {
               </div>
 
             </div>
-          )}
+              </div>
+           )}
+           {settingTab === 'akun' && (
+              <div className="flex flex-col gap-4">
+                 <div className="flex justify-between items-end mb-4 border-b pb-2">
+                    <div className="flex gap-2 items-center">
+                        <Lock className="w-8 h-8 text-gray-500" />
+                        <h2 className="text-xl font-bold text-blue-900">Akun & Pembagian Hak Akses</h2>
+                    </div>
+                    <button onClick={() => setShowLogoutConfirm(true)} className="bg-red-600 hover:bg-red-700 text-white font-bold py-1.5 px-4 shadow text-sm">LOG OUT SEKARANG</button>
+                 </div>
+                 
+                 <div className="flex flex-col gap-2">
+                    <h3 className="font-bold text-lg mb-2">Daftar Pengguna Sistem</h3>
+                    <table className="w-full text-left border-collapse border border-gray-400">
+                      <thead className="bg-[#ece9d8]">
+                        <tr>
+                          <th className="border p-2">Username</th>
+                          <th className="border p-2">Nama Lengkap</th>
+                          <th className="border p-2">Password/PIN</th>
+                          <th className="border p-2">Role/Hak Akses</th>
+                          <th className="border p-2 w-24 text-center">Aksi</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {appUsers?.map((u: any) => (
+                           <tr key={u.id} className="hover:bg-gray-50">
+                             <td className="border p-2 font-mono">{u.username}</td>
+                             <td className="border p-2 font-bold">{u.name}</td>
+                             <td className="border p-2">*** (Tersembunyi)</td>
+                             <td className="border p-2 font-bold uppercase text-blue-800">{u.role}</td>
+                             <td className="border p-2 text-center">
+                               <button 
+                                 onClick={() => {
+                                    setEditUser({...u});
+                                 }} 
+                                 className="text-blue-900 hover:bg-blue-100 px-2 py-1 font-bold border border-blue-300 rounded"
+                               >Modifikasi</button>
+                             </td>
+                           </tr>
+                        ))}
+                      </tbody>
+                    </table>
+
+                    <div className="bg-[#ece9d8] p-4 mt-4 border border-gray-400 shadow-sm">
+                       <h4 className="font-bold border-b border-gray-400 pb-2 mb-3">Aturan Role/Hak Akses</h4>
+                       <div className="overflow-x-auto">
+                         <table className="w-full text-left border-collapse border border-gray-400 bg-white text-xs">
+                           <thead className="bg-gray-100">
+                             <tr>
+                               <th className="border border-gray-400 p-2 text-center w-1/4">Fitur Sistem</th>
+                               <th className="border border-gray-400 p-2 text-center bg-blue-50 text-blue-900 font-bold w-1/4">Owner</th>
+                               <th className="border border-gray-400 p-2 text-center bg-yellow-50 text-yellow-900 font-bold w-1/4">Admin</th>
+                               <th className="border border-gray-400 p-2 text-center bg-green-50 text-green-900 font-bold w-1/4">Kasir</th>
+                             </tr>
+                           </thead>
+                           <tbody>
+                             <tr>
+                               <td className="border border-gray-400 p-2 font-semibold">Transaksi Penjualan (POS)</td>
+                               <td className="border border-gray-400 p-2 text-center text-green-600"><Check size={16} className="mx-auto" /></td>
+                               <td className="border border-gray-400 p-2 text-center text-green-600"><Check size={16} className="mx-auto" /></td>
+                               <td className="border border-gray-400 p-2 text-center text-green-600"><Check size={16} className="mx-auto" /></td>
+                             </tr>
+                             <tr>
+                               <td className="border border-gray-400 p-2 font-semibold">Cashflow Harian</td>
+                               <td className="border border-gray-400 p-2 text-center text-green-600"><Check size={16} className="mx-auto" /></td>
+                               <td className="border border-gray-400 p-2 text-center text-gray-300">-</td>
+                               <td className="border border-gray-400 p-2 text-center text-green-600"><Check size={16} className="mx-auto" /></td>
+                             </tr>
+                             <tr>
+                               <td className="border border-gray-400 p-2 font-semibold">Manajemen Inventori</td>
+                               <td className="border border-gray-400 p-2 text-center text-green-600"><Check size={16} className="mx-auto" /></td>
+                               <td className="border border-gray-400 p-2 text-center text-green-600"><Check size={16} className="mx-auto" /></td>
+                               <td className="border border-gray-400 p-2 text-center text-gray-300">-</td>
+                             </tr>
+                             <tr>
+                               <td className="border border-gray-400 p-2 font-semibold">Pembelian & Retur</td>
+                               <td className="border border-gray-400 p-2 text-center text-green-600"><Check size={16} className="mx-auto" /></td>
+                               <td className="border border-gray-400 p-2 text-center text-green-600"><Check size={16} className="mx-auto" /></td>
+                               <td className="border border-gray-400 p-2 text-center text-gray-300">-</td>
+                             </tr>
+                             <tr>
+                               <td className="border border-gray-400 p-2 font-semibold">Manajemen Pelanggan</td>
+                               <td className="border border-gray-400 p-2 text-center text-green-600"><Check size={16} className="mx-auto" /></td>
+                               <td className="border border-gray-400 p-2 text-center text-green-600"><Check size={16} className="mx-auto" /></td>
+                               <td className="border border-gray-400 p-2 text-center text-gray-300">-</td>
+                             </tr>
+                             <tr>
+                               <td className="border border-gray-400 p-2 font-semibold">Karyawan & Absensi</td>
+                               <td className="border border-gray-400 p-2 text-center text-green-600"><Check size={16} className="mx-auto" /></td>
+                               <td className="border border-gray-400 p-2 text-center text-green-600"><Check size={16} className="mx-auto" /></td>
+                               <td className="border border-gray-400 p-2 text-center text-gray-300">-</td>
+                             </tr>
+                             <tr>
+                               <td className="border border-gray-400 p-2 font-semibold">Laporan Lengkap</td>
+                               <td className="border border-gray-400 p-2 text-center text-green-600"><Check size={16} className="mx-auto" /></td>
+                               <td className="border border-gray-400 p-2 text-center text-gray-300">-</td>
+                               <td className="border border-gray-400 p-2 text-center text-gray-300">-</td>
+                             </tr>
+                             <tr>
+                               <td className="border border-gray-400 p-2 font-semibold">Pengaturan Sistem (Role)</td>
+                               <td className="border border-gray-400 p-2 text-center text-green-600"><Check size={16} className="mx-auto" /></td>
+                               <td className="border border-gray-400 p-2 text-center text-gray-300">-</td>
+                               <td className="border border-gray-400 p-2 text-center text-gray-300">-</td>
+                             </tr>
+                           </tbody>
+                         </table>
+                       </div>
+                    </div>
+                 </div>
+
+              </div>
+           )}
 
         </div>
       </div>
+
+      {editUser && (
+        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
+          <div className="bg-[#460101] text-white w-[500px] shadow-2xl border border-gray-600 rounded-sm overflow-hidden flex flex-col font-sans">
+            <div className="flex justify-between items-center bg-gray-100 text-black px-2 py-1 border-b border-gray-400 select-none">
+              <div className="flex items-center">
+                <span className="w-4 h-4 bg-yellow-500 mr-2 flex items-center justify-center shadow-inner border border-gray-300">
+                   <div className="flex flex-wrap w-2 h-2 gap-0.5">
+                      <div className="w-0.5 h-0.5 bg-red-600"></div><div className="w-0.5 h-0.5 bg-orange-500"></div>
+                      <div className="w-0.5 h-0.5 bg-blue-600"></div><div className="w-0.5 h-0.5 bg-green-600"></div>
+                   </div>
+                </span>
+                <span className="text-xs">Modifikasi Akun Pengguna</span>
+              </div>
+              <div className="flex items-center gap-1">
+                 <button className="w-6 h-5 flex items-center justify-center border border-gray-400 hover:bg-gray-300 bg-gray-200 text-xs">__</button>
+                 <button className="w-6 h-5 flex items-center justify-center border border-gray-400 hover:bg-gray-300 bg-gray-200 text-xs">□</button>
+                 <button onClick={() => setEditUser(null)} className="w-6 h-5 flex items-center justify-center border border-gray-400 hover:bg-red-500 hover:text-white bg-gray-200 text-xs">X</button>
+              </div>
+            </div>
+            
+            <form onSubmit={(e) => {
+               e.preventDefault();
+               const formData = new FormData(e.currentTarget);
+               
+               const pass_lama = formData.get('pass_lama') as string;
+               const pass_baru = formData.get('pass_baru') as string;
+               const konfirmasi = formData.get('konfirmasi') as string;
+               
+               if (pass_baru || konfirmasi) {
+                  if (pass_baru === editUser.password) {
+                      return alert('Password Baru tidak boleh sama dengan Password Lama!');
+                  }
+                  if (pass_baru !== konfirmasi) {
+                      return alert('Password Baru dan Konfirmasi tidak cocok!');
+                  }
+               }
+               
+               const updatedUser = {
+                 ...editUser,
+                 password: pass_baru ? pass_baru : editUser.password,
+                 name: formData.get('name') as string,
+                 email: formData.get('email') as string,
+                 role: formData.get('role') as string,
+                 cabang: formData.get('cabang') as string,
+               };
+               
+               setAppUsers(appUsers.map((u: any) => u.id === editUser.id ? updatedUser : u));
+               setEditUser(null);
+               alert('Pengguna berhasil dimodifikasi!');
+            }} className="p-6 flex flex-col gap-3">
+              <div className="grid grid-cols-[140px_1fr] items-center">
+                <label className="font-bold text-sm">Username</label>
+                <input type="text" name="username" defaultValue={editUser.username} readOnly className="px-2 py-0.5 text-black bg-white outline-none w-full" />
+              </div>
+              <div className="grid grid-cols-[140px_1fr] items-center">
+                <label className="font-bold text-sm">Nama Pengguna</label>
+                <input type="text" name="name" defaultValue={editUser.name} className="px-2 py-0.5 text-black bg-white outline-none w-full" />
+              </div>
+              <div className="grid grid-cols-[140px_1fr] items-center">
+                <label className="font-bold text-sm">Password Lama</label>
+                <div className="relative w-full">
+                  <input type={showEditPasswords ? "text" : "password"} name="pass_lama" defaultValue={editUser.password} readOnly className="px-2 py-0.5 text-black bg-white outline-none w-full pr-7" />
+                  <button type="button" onClick={() => setShowEditPasswords(!showEditPasswords)} className="absolute right-1 top-1/2 -translate-y-1/2 text-gray-500 hover:text-black">
+                    {showEditPasswords ? <EyeOff size={16} /> : <Eye size={16} />}
+                  </button>
+                </div>
+              </div>
+              <div className="grid grid-cols-[140px_1fr] items-center">
+                <label className="font-bold text-sm">Password Baru</label>
+                <div className="relative w-full">
+                  <input type={showEditPasswords ? "text" : "password"} name="pass_baru" className="px-2 py-0.5 text-black bg-white outline-none w-full pr-7" />
+                  <button type="button" onClick={() => setShowEditPasswords(!showEditPasswords)} className="absolute right-1 top-1/2 -translate-y-1/2 text-gray-500 hover:text-black">
+                    {showEditPasswords ? <EyeOff size={16} /> : <Eye size={16} />}
+                  </button>
+                </div>
+              </div>
+              <div className="grid grid-cols-[140px_1fr] items-center">
+                <label className="font-bold text-sm">Konfirmasi</label>
+                <div className="relative w-full">
+                  <input type={showEditPasswords ? "text" : "password"} name="konfirmasi" className="px-2 py-0.5 text-black bg-white outline-none w-full pr-7" />
+                  <button type="button" onClick={() => setShowEditPasswords(!showEditPasswords)} className="absolute right-1 top-1/2 -translate-y-1/2 text-gray-500 hover:text-black">
+                    {showEditPasswords ? <EyeOff size={16} /> : <Eye size={16} />}
+                  </button>
+                </div>
+              </div>
+              <div className="grid grid-cols-[140px_1fr] items-center">
+                <label className="font-bold text-sm">Email</label>
+                <input type="email" name="email" defaultValue={editUser.email || ''} className="px-2 py-0.5 text-black bg-white outline-none w-full" />
+              </div>
+              <div className="grid grid-cols-[140px_1fr] items-center">
+                <label className="font-bold text-sm">Role Akses</label>
+                <select name="role" defaultValue={editUser.role?.toLowerCase() || 'admin'} className="px-1 py-0.5 text-black bg-white outline-none w-full border border-gray-400">
+                  <option value="owner">Owner</option>
+                  <option value="admin">Admin</option>
+                  <option value="kasir">Kasir</option>
+                </select>
+              </div>
+              <div className="grid grid-cols-[140px_1fr] items-center">
+                <label className="font-bold text-sm">Cabang</label>
+                <select name="cabang" defaultValue={editUser.cabang || (storeSettings.branches && storeSettings.branches.length > 0 ? storeSettings.branches[0] : '')} className="px-2 py-0.5 text-black outline-none bg-white">
+                   {storeSettings.branches?.map((b: string) => (
+                       <option key={b} value={b}>{b}</option>
+                   ))}
+                </select>
+              </div>
+              
+              <div className="flex justify-end gap-2 mt-2">
+                 <button type="button" onClick={() => setEditUser(null)} className="bg-white text-black px-6 py-0.5 hover:bg-gray-200">BATAL</button>
+                 <button type="submit" className="bg-white text-black px-6 py-0.5 hover:bg-gray-200">SIMPAN</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Sync Margin Modal */}
+      {showSyncMarginModal && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50">
+          <div className="bg-[#ece9d8] border-2 border-white border-r-gray-500 border-b-gray-500 shadow-xl w-full max-w-md">
+            <div className="bg-[#000080] text-white px-2 py-1 font-bold text-sm flex justify-between items-center">
+              <span>Sinkronisasi Harga</span>
+              <button disabled={isSyncingMargin} onClick={() => setShowSyncMarginModal(null)} className="hover:bg-red-500 hover:text-white px-2 font-bold">X</button>
+            </div>
+            <div className="p-6 flex flex-col gap-4 text-center">
+              {isSyncingMargin ? (
+                <div className="flex flex-col items-center justify-center py-8 gap-4">
+                  <div className="w-12 h-12 border-4 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+                  <p className="font-bold text-blue-900 animate-pulse">Menghitung ulang harga untuk kategori: {showSyncMarginModal.cat}...</p>
+                </div>
+              ) : (
+                <>
+                  <div className="bg-white p-4 border border-gray-400">
+                    <p className="font-bold mb-2">Buat Kategori: {showSyncMarginModal.cat}</p>
+                    <p className="text-sm text-gray-700">Margin akan disimpan: L1:{showSyncMarginModal.lv1}%, L2:{showSyncMarginModal.lv2}%, L3:{showSyncMarginModal.lv3}%</p>
+                  </div>
+                  <p className="text-sm">Apakah Anda ingin menyimpan dan menerapkan otomatis persentase ini ke semua barang dengan kategori ini?</p>
+                  <div className="flex justify-center gap-4 mt-4">
+                    <button 
+                      onClick={() => setShowSyncMarginModal(null)}
+                      className="bg-gray-200 border border-gray-400 font-bold px-6 py-2 hover:bg-gray-300"
+                    >
+                      Batal
+                    </button>
+                    <button 
+                      onClick={() => {
+                        setIsSyncingMargin(true);
+                        
+                        setTimeout(() => {
+                          // Save margins
+                          setStoreSettings({...storeSettings, margins: {...(storeSettings.margins||{}), [showSyncMarginModal.cat]: {level1: showSyncMarginModal.lv1, level2: showSyncMarginModal.lv2, level3: showSyncMarginModal.lv3}}});
+                          addLog('SETTING_MARGIN', `Kategori margin baru disinkronkan: ${showSyncMarginModal.cat}`);
+                          
+                          // Recalculate inventory
+                          const newInventory = inventory.map(item => {
+                            if (item.category?.toUpperCase() === showSyncMarginModal.cat) {
+                              const base = item.basePrice || item.price;
+                              return {
+                                ...item,
+                                level1Price: Math.round(base + (base * showSyncMarginModal.lv1 / 100)),
+                                level2Price: Math.round(base + (base * showSyncMarginModal.lv2 / 100)),
+                                level3Price: Math.round(base + (base * showSyncMarginModal.lv3 / 100)),
+                              };
+                            }
+                            return item;
+                          });
+                          
+                          setInventory(newInventory);
+                          setIsSyncingMargin(false);
+                          setShowSyncMarginModal(null);
+                        }, 1500); // Wait 1.5s for cool effect
+                      }}
+                      className="bg-blue-600 text-white font-bold px-6 py-2 hover:bg-blue-700 shadow-md flex items-center gap-2"
+                    >
+                      <Server className="w-4 h-4" /> Sinkronisasi Harga
+                    </button>
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 };
