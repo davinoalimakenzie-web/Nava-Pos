@@ -13,6 +13,8 @@ import { GlobalModals } from './components/GlobalModals';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { BukuBesar } from './components/BukuBesar';
 import { InputCashflow } from './components/InputCashflow';
+import { DanaBank } from './components/DanaBank';
+import { KalkulatorUser } from './components/KalkulatorUser';
 
 const AppContent = () => {
   const { user, activeTab } = useAppContext();
@@ -45,22 +47,8 @@ const AppContent = () => {
             {/* Service Mode Tabs (Empty state for now) */}
             {activeTab === 'buku_besar' && <BukuBesar />}
             {activeTab === 'input_cashflow' && <InputCashflow />}
-            {activeTab === 'dana_bank' && (
-              <div className="flex-1 flex items-center justify-center bg-[#8fb4d9]">
-                <div className="bg-white p-8 border-2 border-slate-400 shadow-xl text-center">
-                  <h2 className="text-2xl font-bold text-slate-800 mb-2">DANA BANK</h2>
-                  <p className="text-slate-500">Modul Dana Bank sedang dalam pengembangan.</p>
-                </div>
-              </div>
-            )}
-            {activeTab === 'kalkulator_user' && (
-              <div className="flex-1 flex items-center justify-center bg-[#8fb4d9]">
-                <div className="bg-white p-8 border-2 border-slate-400 shadow-xl text-center">
-                  <h2 className="text-2xl font-bold text-slate-800 mb-2">KALKULATOR USER</h2>
-                  <p className="text-slate-500">Modul Kalkulator User sedang dalam pengembangan.</p>
-                </div>
-              </div>
-            )}
+            {activeTab === 'dana_bank' && <DanaBank />}
+            {activeTab === 'kalkulator_user' && <KalkulatorUser />}
             {activeTab === 'control_panel' && (
               <div className="flex-1 flex items-center justify-center bg-[#8fb4d9]">
                 <div className="bg-white p-8 border-2 border-slate-400 shadow-xl text-center">

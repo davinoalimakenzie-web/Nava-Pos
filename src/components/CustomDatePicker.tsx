@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { ChevronDown, ChevronLeft, ChevronRight } from 'lucide-react';
+import { ChevronDown, Calendar } from 'lucide-react';
 
 interface CustomDatePickerProps {
   className?: string;
@@ -12,10 +12,19 @@ const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 
 
 export const CustomDatePicker: React.FC<CustomDatePickerProps> = ({ className = '', value, onChange }) => {
   const [isOpen, setIsOpen] = useState(false);
-  const [currentDate, setCurrentDate] = useState(value || new Date());
-  const [viewDate, setViewDate] = useState(value || new Date());
+  const [currentDate, setCurrentDate] = useState<Date | null>(value !== undefined ? value : new Date());
+  const [viewDate, setViewDate] = useState<Date>(value || new Date());
   
   const containerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (value !== undefined) {
+      setCurrentDate(value);
+      if (value) {
+        setViewDate(value);
+      }
+    }
+  }, [value]);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -55,21 +64,12 @@ export const CustomDatePicker: React.FC<CustomDatePickerProps> = ({ className = 
     setIsOpen(false);
   };
 
-  const formatDisplayDate = (d: Date) => {
-    const dayName = DAYS[d.getDay()];
-    let dayNameFull = dayName;
-    if(dayName === 'Sun') dayNameFull = 'Sunday';
-    if(dayName === 'Mon') dayNameFull = 'Monday';
-    if(dayName === 'Tue') dayNameFull = 'Tuesday';
-    if(dayName === 'Wed') dayNameFull = 'Wednesday';
-    if(dayName === 'Thu') dayNameFull = 'Thursday';
-    if(dayName === 'Fri') dayNameFull = 'Friday';
-    if(dayName === 'Sat') dayNameFull = 'Saturday';
-    
-    const dayNum = String(d.getDate()).padStart(2, '0');
-    const monthName = MONTHS[d.getMonth()];
+  const formatDisplayDate = (d: Date | null) => {
+    if (!d) return '';
+    const dayNum = d.getDate();
+    const month = d.getMonth() + 1;
     const year = d.getFullYear();
-    return `${dayNameFull} , ${dayNum}\u00A0\u00A0\u00A0${monthName}\u00A0\u00A0\u00A0${year}`;
+    return `${month}/ ${dayNum}/${year}`;
   };
 
   const year = viewDate.getFullYear();
@@ -109,8 +109,11 @@ export const CustomDatePicker: React.FC<CustomDatePickerProps> = ({ className = 
         <div className="flex-1 px-1 flex items-center h-full">
             <span className="truncate text-left whitespace-pre">{formatDisplayDate(currentDate)}</span>
         </div>
-        <div className="bg-[#b3d7ff] border-l border-blue-400 w-5 h-full flex items-center justify-center shrink-0">
-          <ChevronDown size={14} className="text-black" strokeWidth={2} />
+        <div className="flex items-center h-full shrink-0">
+          <Calendar size={12} className="text-gray-500 mr-1" />
+          <div className="border-l border-blue-400 w-4 h-full flex items-center justify-center bg-[#b3d7ff]">
+            <ChevronDown size={14} className="text-black" strokeWidth={2} />
+          </div>
         </div>
       </div>
       
@@ -135,7 +138,7 @@ export const CustomDatePicker: React.FC<CustomDatePickerProps> = ({ className = 
              </div>
              <div className="grid grid-cols-7 pb-1 gap-y-0.5">
                 {grid.map((cell, idx) => {
-                  const isSelected = cell.isCurrentMonth && cell.day === currentDate.getDate() && viewDate.getMonth() === currentDate.getMonth() && viewDate.getFullYear() === currentDate.getFullYear();
+                  const isSelected = cell.isCurrentMonth && currentDate && cell.day === currentDate.getDate() && viewDate.getMonth() === currentDate.getMonth() && viewDate.getFullYear() === currentDate.getFullYear();
                   
                   return (
                     <div 
