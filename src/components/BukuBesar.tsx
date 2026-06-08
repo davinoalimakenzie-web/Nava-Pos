@@ -82,30 +82,18 @@ const generateDummyData = (): RecordData[] => {
         const status = statusList[Math.floor(Math.random() * statusList.length)];
         const tech = teknisiList[Math.floor(Math.random() * teknisiList.length)];
         
-        let tglSelesai = null;
-        let tglAmbil = null;
-        let cashTf = '';
-        let total = 0;
-        let modal = 0;
-        let pph = 0;
-        let feeTeknisi = 0;
-        let jasa = 0;
-
-        if (status !== 'PROGRESS') {
-           tglSelesai = new Date(date);
-           tglSelesai.setHours(date.getHours() + Math.floor(Math.random() * 24));
-           total = Math.floor(Math.random() * 500) * 1000 + 50000;
-           modal = Math.floor(total * 0.3);
-           pph = Math.floor(total * 0.05);
-           feeTeknisi = Math.floor(total * 0.2);
-           jasa = total - modal - pph - feeTeknisi;
-        }
+        let tglSelesai = new Date(date);
+        tglSelesai.setHours(date.getHours() + Math.floor(Math.random() * 24));
         
-        if (status.includes('AMBIL')) {
-           tglAmbil = new Date(tglSelesai || date);
-           tglAmbil.setHours(tglAmbil.getHours() + Math.floor(Math.random() * 24));
-           cashTf = cashTfList[Math.floor(Math.random() * cashTfList.length)];
-        }
+        let total = Math.floor(Math.random() * 50) * 10000 + 50000;
+        let modal = Math.floor((total * 0.3) / 10000) * 10000;
+        let pph = Math.floor((total * 0.05) / 10000) * 10000;
+        let feeTeknisi = Math.floor((total * 0.2) / 10000) * 10000;
+        let jasa = total - modal - pph - feeTeknisi;
+        
+        let tglAmbil = new Date(tglSelesai);
+        tglAmbil.setHours(tglAmbil.getHours() + Math.floor(Math.random() * 24));
+        let cashTf = cashTfList[Math.floor(Math.random() * cashTfList.length)];
 
         dummy.push({
             id: `INV-${idCounter}`,
