@@ -3,7 +3,7 @@ import { ShoppingCart, LogOut, Wallet, Database, Bot, Settings, Clock, ChevronRi
 import { useAppContext } from '../context/AppContext';
 
 export const Sidebar = () => {
-  const { user, setUser, activeTab, setActiveTab, setShowLogoutConfirm, appMode, setAppMode } = useAppContext();
+  const { user, setUser, activeTab, setActiveTab, setShowLogoutConfirm, appMode, setAppMode, isKalkulatorOpen, setIsKalkulatorOpen } = useAppContext();
   const [isExpanded, setIsExpanded] = useState(false);
 
   const handleLogout = () => {
@@ -42,7 +42,15 @@ export const Sidebar = () => {
           </div>
           {isExpanded && (
             <div className="overflow-hidden transition-opacity duration-300">
-              <h2 className="font-bold text-lg tracking-wide leading-none whitespace-nowrap uppercase">
+              <h2 
+                onClick={() => {
+                  if (appMode === 'SERVICE') {
+                    setIsKalkulatorOpen(!isKalkulatorOpen);
+                  }
+                }}
+                className={`font-bold text-lg tracking-wide leading-none whitespace-nowrap uppercase ${appMode === 'SERVICE' ? 'cursor-pointer hover:text-green-400 transition-colors' : ''}`}
+                title={appMode === 'SERVICE' ? 'Buka Kalkulator User' : undefined}
+              >
                 {appMode === 'SERVICE' ? 'NAVA SERVICE' : 'NAVA POS'}
               </h2>
               <p className="text-[10px] text-blue-300 capitalize mt-1 border border-blue-500/30 inline-block px-1.5 py-0.5 rounded uppercase">Role: {user?.role}</p>
@@ -106,10 +114,6 @@ export const Sidebar = () => {
             <button onClick={() => setActiveTab('dana_bank')} title="DANA BANK" className={`flex items-center gap-3 p-2.5 rounded transition-all ${activeTab === 'dana_bank' ? 'bg-green-600 text-white shadow-md' : 'text-slate-300 hover:bg-slate-800'} ${isExpanded ? 'w-full' : 'w-10 justify-center'}`}>
               <Landmark className="w-4 h-4 shrink-0" /> 
               {isExpanded && <span className="whitespace-nowrap">DANA BANK</span>}
-            </button>
-            <button onClick={() => setActiveTab('kalkulator_user')} title="KALKULATOR USER" className={`flex items-center gap-3 p-2.5 rounded transition-all ${activeTab === 'kalkulator_user' ? 'bg-green-600 text-white shadow-md' : 'text-slate-300 hover:bg-slate-800'} ${isExpanded ? 'w-full' : 'w-10 justify-center'}`}>
-              <Calculator className="w-4 h-4 shrink-0" /> 
-              {isExpanded && <span className="whitespace-nowrap">KALKULATOR USER</span>}
             </button>
             <button onClick={() => setActiveTab('control_panel')} title="CONTROL PANEL" className={`flex items-center gap-3 p-2.5 rounded transition-all ${activeTab === 'control_panel' ? 'bg-green-600 text-white shadow-md' : 'text-slate-300 hover:bg-slate-800'} ${isExpanded ? 'w-full' : 'w-10 justify-center'}`}>
               <SlidersHorizontal className="w-4 h-4 shrink-0" /> 

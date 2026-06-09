@@ -33,6 +33,7 @@ const AppContent = () => {
     <div className="h-[100dvh] bg-[#8fb4d9] flex flex-col w-full overflow-hidden pt-1 pb-6">
       <div className="flex flex-row relative font-sans text-xs w-full flex-1 overflow-hidden">
         <GlobalModals />
+        <KalkulatorUser />
         <Sidebar />
         <main className="flex-1 flex flex-col h-full overflow-hidden text-black text-[11px] sm:text-xs min-w-0 pb-2">
           <ErrorBoundary>
@@ -48,7 +49,6 @@ const AppContent = () => {
             {activeTab === 'buku_besar' && <BukuBesar />}
             {activeTab === 'input_cashflow' && <InputCashflow />}
             {activeTab === 'dana_bank' && <DanaBank />}
-            {activeTab === 'kalkulator_user' && <KalkulatorUser />}
             {activeTab === 'control_panel' && (
               <div className="flex-1 flex items-center justify-center bg-[#8fb4d9]">
                 <div className="bg-white p-8 border-2 border-slate-400 shadow-xl text-center">
