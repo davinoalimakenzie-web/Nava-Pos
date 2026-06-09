@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { CustomDatePicker } from './CustomDatePicker';
 
-interface RecordData {
+export interface RecordData {
   id: string;
   nota: string;
   teknisi: string;
@@ -54,20 +54,28 @@ const getStatusTextColor = (stat: string) => {
 };
 
 const formatCurrency = (amount: number) => {
-  return new Intl.NumberFormat('id-ID', {
+  const isNegative = amount < 0;
+  const absAmount = Math.abs(amount);
+  const formatted = new Intl.NumberFormat('id-ID', {
     style: 'currency',
     currency: 'IDR',
     minimumFractionDigits: 0,
-  }).format(amount).replace('Rp', 'Rp ');
+  }).format(absAmount).replace(/Rp\s?/, 'Rp ');
+  return isNegative ? `-${formatted}` : formatted;
 };
 
-const parseNum = (val: string) => {
+const parseNum = (val: string | number) => {
+  if (typeof val === 'number') return val;
   if (!val) return 0;
-  const parsed = parseInt(val.replace(/[^0-9]/g, ''));
-  return isNaN(parsed) ? 0 : parsed;
+  const isNegative = val.trim().startsWith('-');
+  const parsed = parseInt(val.replace(/[^0-9]/g, ''), 10);
+  return isNaN(parsed) ? 0 : (isNegative ? -parsed : parsed);
 };
 
-const generateDummyData = (): RecordData[] => {
+let cachedRecords: RecordData[] | null = null;
+
+export const generateDummyData = (): RecordData[] => {
+  if (cachedRecords) return cachedRecords;
   const dummy: RecordData[] = [];
   const teknisiList = ['AND', 'IRF', 'SMD', 'UDN'];
   const statusList = ['PROGRESS', 'DONE', 'DONE AMBIL', 'CANCEL', 'CANCEL AMBIL'];
@@ -97,7 +105,7 @@ const generateDummyData = (): RecordData[] => {
 
         dummy.push({
             id: `INV-${idCounter}`,
-            nota: `NOTA-${String(idCounter).padStart(4, '0')}`,
+            nota: String(idCounter + 13000),
             teknisi: tech,
             namaUser: `User ${idCounter}`,
             noWaUser: `0812${Math.floor(Math.random() * 100000000)}`,
@@ -115,7 +123,8 @@ const generateDummyData = (): RecordData[] => {
         idCounter++;
     }
   }
-  return dummy.reverse(); // Newest first
+  cachedRecords = dummy.reverse();
+  return cachedRecords; // Newest first
 };
 
 export const BukuBesar = () => {
@@ -129,6 +138,16 @@ export const BukuBesar = () => {
   const [filterCashTf, setFilterCashTf] = useState('');
   const [filterNoNotaInput, setFilterNoNotaInput] = useState('');
   const [filterNoNotaApplied, setFilterNoNotaApplied] = useState('');
+  
+  const [sortConfig, setSortConfig] = useState<{ key: keyof RecordData; direction: 'asc' | 'desc' } | null>(null);
+
+  const handleSort = (key: keyof RecordData) => {
+    let direction: 'asc' | 'desc' = 'asc';
+    if (sortConfig && sortConfig.key === key && sortConfig.direction === 'asc') {
+      direction = 'desc';
+    }
+    setSortConfig({ key, direction });
+  };
 
   const handleResetFilter = () => {
     const today = new Date();
@@ -197,6 +216,33 @@ export const BukuBesar = () => {
 
     return true;
   });
+
+  const sortedFilteredRecords = React.useMemo(() => {
+    let sortableItems = [...filteredRecords];
+    if (sortConfig !== null) {
+      sortableItems.sort((a, b) => {
+        let aValue = a[sortConfig.key];
+        let bValue = b[sortConfig.key];
+        
+        if (sortConfig.key === 'biaya' || sortConfig.key === 'part') {
+           aValue = parseNum(aValue as string);
+           bValue = parseNum(bValue as string);
+        }
+
+        if (aValue === null) aValue = '';
+        if (bValue === null) bValue = '';
+        
+        if (aValue < bValue) {
+          return sortConfig.direction === 'asc' ? -1 : 1;
+        }
+        if (aValue > bValue) {
+          return sortConfig.direction === 'asc' ? 1 : -1;
+        }
+        return 0;
+      });
+    }
+    return sortableItems;
+  }, [filteredRecords, sortConfig]);
 
   const [logModalOpen, setLogModalOpen] = useState(false);
   const [logInput, setLogInput] = useState('');
@@ -279,16 +325,22 @@ export const BukuBesar = () => {
     };
 
     if (selectedRecordId) {
-      setRecords(records.map(r => r.id === selectedRecordId ? newRecord : r));
+      const u = records.map(r => r.id === selectedRecordId ? { ...r, ...newRecord, logMessage: r.logMessage } : r);
+      setRecords(u);
+      cachedRecords = u;
     } else {
-      setRecords([newRecord, ...records]);
+      const u = [newRecord, ...records];
+      setRecords(u);
+      cachedRecords = u;
     }
     handleClear();
   };
 
   const handleHapus = () => {
     if (selectedRecordId) {
-      setRecords(records.filter(r => r.id !== selectedRecordId));
+      const u = records.filter(r => r.id !== selectedRecordId);
+      setRecords(u);
+      cachedRecords = u;
       handleClear();
     }
   };
@@ -311,7 +363,7 @@ export const BukuBesar = () => {
   };
 
   return (
-    <div className="flex-1 flex flex-col bg-[#050B24] text-white p-2 h-full overflow-hidden text-[11px] font-sans">
+    <div className="flex-1 flex flex-col bg-[#050B24] text-white p-2 h-full overflow-hidden text-[13px] font-sans">
       {logModalOpen && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center">
           <div className="bg-white text-black p-4 w-[400px] shadow-lg flex flex-col gap-3 border border-gray-400">
@@ -336,14 +388,14 @@ export const BukuBesar = () => {
         <div className="flex flex-col gap-1">
           <div className="flex items-center">
             <label className="w-24 font-bold shrink-0">NOTA</label>
-            <input type="text" value={nota} onChange={e => setNota(e.target.value)} className="flex-1 bg-white text-black px-1 py-0.5 outline-none h-[22px]" />
+            <input type="text" value={nota} onChange={e => setNota(e.target.value.toUpperCase())} className="flex-1 bg-white text-black px-1 py-0.5 outline-none h-[26px]" />
           </div>
           <div className="flex items-center">
             <label className="w-24 font-bold shrink-0">TEKNISI</label>
             <select 
               value={teknisi} 
               onChange={e => setTeknisi(e.target.value)} 
-              className="flex-1 outline-none h-[22px] px-1 py-0.5"
+              className="flex-1 outline-none h-[26px] px-1 py-0.5"
               style={{ backgroundColor: getTeknisiBgColor(teknisi), color: getTeknisiTextColor(teknisi) }}
             >
               <option value=""></option>
@@ -355,11 +407,11 @@ export const BukuBesar = () => {
           </div>
           <div className="flex items-center">
             <label className="w-24 font-bold shrink-0">NAMA USER</label>
-            <input type="text" value={namaUser} onChange={e => setNamaUser(e.target.value)} className="flex-1 bg-white text-black px-1 py-0.5 outline-none h-[22px]" />
+            <input type="text" value={namaUser} onChange={e => setNamaUser(e.target.value.toUpperCase())} className="flex-1 bg-white text-black px-1 py-0.5 outline-none h-[26px]" />
           </div>
           <div className="flex items-center">
             <label className="w-24 font-bold shrink-0">NO. WA USER</label>
-            <input type="text" value={noWaUser} onChange={e => setNoWaUser(e.target.value)} className="flex-1 bg-white text-black px-1 py-0.5 outline-none h-[22px]" />
+            <input type="text" value={noWaUser} onChange={e => setNoWaUser(e.target.value.toUpperCase())} className="flex-1 bg-white text-black px-1 py-0.5 outline-none h-[26px]" />
           </div>
         </div>
 
@@ -367,18 +419,26 @@ export const BukuBesar = () => {
         <div className="flex flex-col gap-1">
           <div className="flex items-center">
             <label className="w-24 font-bold shrink-0">DEVICE</label>
-            <input type="text" value={device} onChange={e => setDevice(e.target.value)} className="flex-1 bg-white text-black px-1 py-0.5 outline-none h-[22px]" />
+            <input type="text" value={device} onChange={e => setDevice(e.target.value.toUpperCase())} className="flex-1 bg-white text-black px-1 py-0.5 outline-none h-[26px]" />
           </div>
           <div className="flex items-center">
             <label className="w-24 font-bold shrink-0">KELUHAN</label>
-            <input type="text" value={keluhan} onChange={e => setKeluhan(e.target.value)} className="flex-1 bg-white text-black px-1 py-0.5 outline-none h-[22px]" />
+            <input type="text" value={keluhan} onChange={e => setKeluhan(e.target.value.toUpperCase())} className="flex-1 bg-white text-black px-1 py-0.5 outline-none h-[26px]" />
           </div>
           <div className="flex items-center">
             <label className="w-24 font-bold shrink-0">STATUS</label>
             <select 
               value={status} 
-              onChange={e => setStatus(e.target.value)} 
-              className="flex-1 outline-none h-[22px] px-1 py-0.5"
+              onChange={e => {
+                const newStatus = e.target.value;
+                setStatus(newStatus);
+                if (newStatus === 'CANCEL AMBIL') {
+                  setBiaya('');
+                  setPart('');
+                  setCashTf('');
+                }
+              }} 
+              className="flex-1 outline-none h-[26px] px-1 py-0.5"
               style={{ backgroundColor: getStatusBgColor(status), color: getStatusTextColor(status) }}
             >
               <option value=""></option>
@@ -391,7 +451,7 @@ export const BukuBesar = () => {
           </div>
           <div className="flex items-center">
             <label className="w-24 font-bold shrink-0">GARANSI</label>
-            <select value={garansi} onChange={e => setGaransi(e.target.value)} className="flex-1 bg-white text-black px-1 py-0.5 outline-none h-[22px]">
+            <select value={garansi} onChange={e => setGaransi(e.target.value)} className="flex-1 bg-white text-black px-1 py-0.5 outline-none h-[26px]">
               <option value=""></option>
               <option value="7 HARI">7 HARI</option>
               <option value="14 HARI">14 HARI</option>
@@ -405,19 +465,36 @@ export const BukuBesar = () => {
         <div className="flex flex-col gap-1">
           <div className="flex items-center">
             <label className="w-24 font-bold shrink-0">TGL MASUK</label>
-            <CustomDatePicker value={tglMasuk} onChange={setTglMasuk} className="flex-1 h-[22px]" />
+            <CustomDatePicker value={tglMasuk} onChange={setTglMasuk} className="flex-1 h-[26px]" />
           </div>
           <div className="flex items-center">
             <label className="w-24 font-bold shrink-0">BIAYA</label>
-            <input type="text" value={biaya} onChange={e => setBiaya(e.target.value)} className="flex-1 bg-white text-black px-1 py-0.5 outline-none h-[22px]" />
+            <input 
+              type="text" 
+              value={biaya} 
+              onChange={e => setBiaya(e.target.value)} 
+              disabled={status === 'CANCEL AMBIL'}
+              className={`flex-1 bg-white text-black px-1 py-0.5 outline-none h-[26px] ${status === 'CANCEL AMBIL' ? 'opacity-50 cursor-not-allowed' : ''}`} 
+            />
           </div>
           <div className="flex items-center">
             <label className="w-24 font-bold shrink-0">PART</label>
-            <input type="text" value={part} onChange={e => setPart(e.target.value)} className="flex-1 bg-white text-black px-1 py-0.5 outline-none h-[22px]" />
+            <input 
+              type="text" 
+              value={part} 
+              onChange={e => setPart(e.target.value)} 
+              disabled={status === 'CANCEL AMBIL'}
+              className={`flex-1 bg-white text-black px-1 py-0.5 outline-none h-[26px] ${status === 'CANCEL AMBIL' ? 'opacity-50 cursor-not-allowed' : ''}`} 
+            />
           </div>
           <div className="flex items-center">
             <label className="w-24 font-bold shrink-0">JASA</label>
-            <input type="text" value={formatCurrency(jasa)} className="flex-1 bg-yellow-300 text-black px-1 py-0.5 outline-none font-bold h-[22px]" readOnly />
+            <input 
+              type="text" 
+              value={status === 'CANCEL AMBIL' ? '' : formatCurrency(jasa)} 
+              className={`flex-1 bg-yellow-300 text-black px-1 py-0.5 outline-none font-bold h-[26px] ${status === 'CANCEL AMBIL' ? 'opacity-50 cursor-not-allowed' : ''}`} 
+              readOnly 
+            />
           </div>
         </div>
 
@@ -425,11 +502,11 @@ export const BukuBesar = () => {
         <div className="flex flex-col gap-1">
           <div className="flex items-center relative group">
             <label className="w-24 font-bold shrink-0">TGL AMBIL</label>
-            <div className="flex-1 h-[22px] relative cursor-pointer">
+            <div className="flex-1 h-[26px] relative cursor-pointer">
                <CustomDatePicker 
                   value={tglAmbil} 
                   onChange={setTglAmbil} 
-                  className={`flex-1 h-[22px] w-full ${!selectedRecordId ? 'pointer-events-none opacity-80' : ''}`} 
+                  className={`flex-1 h-[26px] w-full ${!selectedRecordId ? 'pointer-events-none opacity-80' : ''}`} 
                />
                {!selectedRecordId && (
                   <div className="absolute inset-0 z-10" title="Bisa diedit setelah disimpan (klik dua kali pada tabel untuk edit)"></div>
@@ -438,7 +515,12 @@ export const BukuBesar = () => {
           </div>
           <div className="flex items-center">
             <label className="w-24 font-bold shrink-0">CASH / TF</label>
-            <select value={cashTf} onChange={e => setCashTf(e.target.value)} className="flex-1 bg-white text-black px-1 py-0.5 outline-none h-[22px]">
+            <select 
+              value={cashTf} 
+              onChange={e => setCashTf(e.target.value)} 
+              disabled={status === 'CANCEL AMBIL'}
+              className={`flex-1 bg-white text-black px-1 py-0.5 outline-none h-[26px] ${status === 'CANCEL AMBIL' ? 'opacity-50 cursor-not-allowed' : ''}`}
+            >
               <option value=""></option>
               <option value="CASH">CASH</option>
               <option value="TF">TF</option>
@@ -447,9 +529,9 @@ export const BukuBesar = () => {
           </div>
           <div className="flex-1"></div>
           <div className="flex items-center gap-2 w-full mt-1">
-            <button onClick={handleHapus} className="flex-1 border border-white hover:bg-white hover:text-[#050B24] py-1.5 text-[12px] transition-colors font-bold">HAPUS</button>
-            <button onClick={handleClear} className="flex-1 bg-white text-black hover:bg-gray-200 py-1.5 text-[12px] font-bold transition-colors">CLEAR</button>
-            <button onClick={handleSimpan} className="flex-1 bg-[#1e2b6b] border border-white hover:bg-[#2a3c94] py-1.5 text-[12px] transition-colors font-bold">SIMPAN</button>
+            <button onClick={handleHapus} className="flex-1 border border-white hover:bg-white hover:text-[#050B24] py-1.5 text-base transition-colors font-bold">HAPUS</button>
+            <button onClick={handleClear} className="flex-1 bg-white text-black hover:bg-gray-200 py-1.5 text-base font-bold transition-colors">CLEAR</button>
+            <button onClick={handleSimpan} className="flex-1 bg-[#1e2b6b] border border-white hover:bg-[#2a3c94] py-1.5 text-base transition-colors font-bold">SIMPAN</button>
           </div>
         </div>
       </div>
@@ -458,28 +540,26 @@ export const BukuBesar = () => {
 
       {/* Filter Bar */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-x-4 gap-y-1 mb-1 w-full">
-        <div className="md:col-span-3 flex items-end gap-2 overflow-x-auto no-scrollbar justify-start">
-          <div className="flex flex-col gap-0.5 min-w-[130px]">
-            <label className="text-[11px]">Dari Tanggal</label>
-            <input 
-              type="date" 
-              value={formatDateForInput(filterDariTanggal)} 
-              onChange={e => setFilterDariTanggal(e.target.value ? new Date(e.target.value) : null)} 
-              className="bg-white text-black px-1 py-0.5 outline-none h-5 text-[11px] w-full"
+        <div className="md:col-span-3 flex flex-wrap items-end gap-2 justify-start z-40 relative">
+          <div className="flex flex-col gap-0.5 min-w-[130px] z-[60]">
+            <label className="text-[13px]">Dari Tanggal</label>
+            <CustomDatePicker 
+              value={filterDariTanggal || undefined} 
+              onChange={(date) => setFilterDariTanggal(date)} 
+              className="h-[26px] w-full" 
             />
           </div>
-          <div className="flex flex-col gap-0.5 min-w-[130px]">
-            <label className="text-[11px]">Sampai Tanggal</label>
-            <input 
-              type="date" 
-              value={formatDateForInput(filterSampaiTanggal)} 
-              onChange={e => setFilterSampaiTanggal(e.target.value ? new Date(e.target.value) : null)} 
-              className="bg-white text-black px-1 py-0.5 outline-none h-5 text-[11px] w-full"
+          <div className="flex flex-col gap-0.5 min-w-[130px] z-[60]">
+            <label className="text-[13px]">Sampai Tanggal</label>
+            <CustomDatePicker 
+              value={filterSampaiTanggal || undefined} 
+              onChange={(date) => setFilterSampaiTanggal(date)} 
+              className="h-[26px] w-full" 
             />
           </div>
           <div className="flex flex-col gap-0.5 min-w-[110px]">
-            <label className="text-[11px]">Teknisi</label>
-            <select value={filterTeknisi} onChange={e => setFilterTeknisi(e.target.value)} className="bg-white text-black px-1 py-0.5 outline-none h-5 text-[11px]">
+            <label className="text-[13px]">Teknisi</label>
+            <select value={filterTeknisi} onChange={e => setFilterTeknisi(e.target.value)} className="bg-white text-black px-1 py-0.5 outline-none h-[26px] text-[13px]">
               <option value=""></option>
               <option value="AND">AND</option>
               <option value="IRF">IRF</option>
@@ -488,8 +568,8 @@ export const BukuBesar = () => {
             </select>
           </div>
           <div className="flex flex-col gap-0.5 min-w-[130px]">
-            <label className="text-[11px]">Status</label>
-            <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)} className="bg-white text-black px-1 py-0.5 outline-none h-5 text-[11px]">
+            <label className="text-[13px]">Status</label>
+            <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)} className="bg-white text-black px-1 py-0.5 outline-none h-[26px] text-[13px]">
               <option value=""></option>
               <option value="NGGANDUL">NGGANDUL</option>
               <option value="PROGRESS">PROGRESS</option>
@@ -500,8 +580,8 @@ export const BukuBesar = () => {
             </select>
           </div>
           <div className="flex flex-col gap-0.5 min-w-[110px]">
-            <label className="text-[11px]">Cash / TF</label>
-            <select value={filterCashTf} onChange={e => setFilterCashTf(e.target.value)} className="bg-white text-black px-1 py-0.5 outline-none h-5 text-[11px]">
+            <label className="text-[13px]">Cash / TF</label>
+            <select value={filterCashTf} onChange={e => setFilterCashTf(e.target.value)} className="bg-white text-black px-1 py-0.5 outline-none h-[26px] text-[13px]">
               <option value=""></option>
               <option value="CASH">CASH</option>
               <option value="TF">TF</option>
@@ -509,56 +589,77 @@ export const BukuBesar = () => {
             </select>
           </div>
           <div className="flex flex-col gap-0.5 min-w-[100px] mb-[1px]">
-            <button onClick={handleResetFilter} className="bg-white text-black px-3 py-0.5 hover:bg-gray-200 font-bold h-5 text-[11px]">RESET</button>
+            <button onClick={handleResetFilter} className="bg-white text-black px-3 py-0.5 hover:bg-gray-200 font-bold h-[26px] text-[13px]">RESET</button>
           </div>
         </div>
         
         <div className="flex items-end gap-2 justify-start">
           <div className="flex flex-col gap-0.5 flex-1 min-w-[70px]">
-            <label className="text-[11px]">No. Nota</label>
-            <input type="text" value={filterNoNotaInput} onChange={e => setFilterNoNotaInput(e.target.value)} onKeyDown={e => e.key === 'Enter' && handleSearchClick()} className="bg-white text-black px-1 py-0.5 outline-none h-5 text-[11px] w-full" />
+            <label className="text-[13px]">No. Nota</label>
+            <input type="text" value={filterNoNotaInput} onChange={e => setFilterNoNotaInput(e.target.value.toUpperCase())} onKeyDown={e => e.key === 'Enter' && handleSearchClick()} className="bg-white text-black px-1 py-0.5 outline-none h-[26px] text-[13px] w-full" />
           </div>
           <div className="flex flex-col gap-0.5 mb-[1px] shrink-0">
-            <button onClick={handleSearchClick} className="bg-white text-black px-3 py-0.5 hover:bg-gray-200 font-bold h-5 text-[11px]">CARI</button>
+            <button onClick={handleSearchClick} className="bg-white text-black px-3 py-0.5 hover:bg-gray-200 font-bold h-[26px] text-[13px]">CARI</button>
           </div>
           <div className="flex flex-col gap-0.5 mb-[1px] shrink-0">
-            <button onClick={handleLogClick} className="bg-red-600 text-white px-3 py-0.5 hover:bg-red-700 font-bold h-5 text-[11px]">LOG</button>
+            <button onClick={handleLogClick} className="bg-red-600 text-white px-3 py-0.5 hover:bg-red-700 font-bold h-[26px] text-[13px]">LOG</button>
           </div>
         </div>
       </div>
 
       {/* Table Area */}
       <div className="flex-1 bg-white overflow-auto border border-gray-400 mt-1">
-        <table className="w-full text-black text-[11px]">
+        <table className="w-full text-black text-[13px]">
           <thead className="bg-[#8f1994] text-white sticky top-0 z-10 shadow">
             <tr>
-              <th className="px-2 py-1 border-r border-[#a930b0] font-normal text-left whitespace-nowrap">NOTA</th>
-              <th className="px-2 py-1 border-r border-[#a930b0] font-normal text-left whitespace-nowrap">STATUS</th>
-              <th className="px-2 py-1 border-r border-[#a930b0] font-normal text-left whitespace-nowrap">TEKNISI</th>
-              <th className="px-2 py-1 border-r border-[#a930b0] font-normal text-left whitespace-nowrap">USER</th>
-              <th className="px-2 py-1 border-r border-[#a930b0] font-normal text-left whitespace-nowrap">WAUSER</th>
-              <th className="px-2 py-1 border-r border-[#a930b0] font-normal text-left max-w-[120px] whitespace-nowrap">DEVICE</th>
-              <th className="px-2 py-1 border-r border-[#a930b0] font-normal text-left max-w-[160px] whitespace-nowrap">KELUHAN</th>
-              <th className="px-2 py-1 border-r border-[#a930b0] font-normal text-left whitespace-nowrap">TGLMASUK</th>
-              <th className="px-2 py-1 border-r border-[#a930b0] font-normal text-right whitespace-nowrap">BIAYA</th>
-              <th className="px-2 py-1 border-r border-[#a930b0] font-normal text-right whitespace-nowrap">MODAL</th>
-              <th className="px-2 py-1 border-r border-[#a930b0] font-normal text-right whitespace-nowrap">JASA</th>
-              <th className="px-2 py-1 border-r border-[#a930b0] font-normal text-left whitespace-nowrap">TGLAMBIL</th>
-              <th className="px-2 py-1 border-r border-[#a930b0] font-normal text-left whitespace-nowrap">GARANSI</th>
-              <th className="px-2 py-1 font-normal text-left whitespace-nowrap">BAYAR</th>
+              <th className="px-2 py-1 border-r border-[#a930b0] font-normal text-left whitespace-nowrap cursor-pointer select-none" onClick={() => handleSort('nota')}>NOTA {sortConfig?.key === 'nota' && (sortConfig.direction === 'asc' ? '▲' : '▼')}</th>
+              <th className="px-2 py-1 border-r border-[#a930b0] font-normal text-left whitespace-nowrap cursor-pointer select-none" onClick={() => handleSort('status')}>STATUS {sortConfig?.key === 'status' && (sortConfig.direction === 'asc' ? '▲' : '▼')}</th>
+              <th className="px-2 py-1 border-r border-[#a930b0] font-normal text-left whitespace-nowrap cursor-pointer select-none" onClick={() => handleSort('teknisi')}>TEKNISI {sortConfig?.key === 'teknisi' && (sortConfig.direction === 'asc' ? '▲' : '▼')}</th>
+              <th className="px-2 py-1 border-r border-[#a930b0] font-normal text-left whitespace-nowrap cursor-pointer select-none" onClick={() => handleSort('namaUser')}>USER {sortConfig?.key === 'namaUser' && (sortConfig.direction === 'asc' ? '▲' : '▼')}</th>
+              <th className="px-2 py-1 border-r border-[#a930b0] font-normal text-left whitespace-nowrap cursor-pointer select-none" onClick={() => handleSort('noWaUser')}>WAUSER {sortConfig?.key === 'noWaUser' && (sortConfig.direction === 'asc' ? '▲' : '▼')}</th>
+              <th className="px-2 py-1 border-r border-[#a930b0] font-normal text-left max-w-[120px] whitespace-nowrap cursor-pointer select-none" onClick={() => handleSort('device')}>DEVICE {sortConfig?.key === 'device' && (sortConfig.direction === 'asc' ? '▲' : '▼')}</th>
+              <th className="px-2 py-1 border-r border-[#a930b0] font-normal text-left max-w-[160px] whitespace-nowrap cursor-pointer select-none" onClick={() => handleSort('keluhan')}>KELUHAN {sortConfig?.key === 'keluhan' && (sortConfig.direction === 'asc' ? '▲' : '▼')}</th>
+              <th className="px-2 py-1 border-r border-[#a930b0] font-normal text-left whitespace-nowrap cursor-pointer select-none" onClick={() => handleSort('tglMasuk')}>TGLMASUK {sortConfig?.key === 'tglMasuk' && (sortConfig.direction === 'asc' ? '▲' : '▼')}</th>
+              <th className="px-2 py-1 border-r border-[#a930b0] font-normal text-right whitespace-nowrap cursor-pointer select-none" onClick={() => handleSort('biaya')}>BIAYA {sortConfig?.key === 'biaya' && (sortConfig.direction === 'asc' ? '▲' : '▼')}</th>
+              <th className="px-2 py-1 border-r border-[#a930b0] font-normal text-right whitespace-nowrap cursor-pointer select-none" onClick={() => handleSort('part')}>MODAL {sortConfig?.key === 'part' && (sortConfig.direction === 'asc' ? '▲' : '▼')}</th>
+              <th className="px-2 py-1 border-r border-[#a930b0] font-normal text-right whitespace-nowrap cursor-pointer select-none" onClick={() => handleSort('jasa')}>JASA {sortConfig?.key === 'jasa' && (sortConfig.direction === 'asc' ? '▲' : '▼')}</th>
+              <th className="px-2 py-1 border-r border-[#a930b0] font-normal text-left whitespace-nowrap cursor-pointer select-none" onClick={() => handleSort('tglAmbil')}>TGLAMBIL {sortConfig?.key === 'tglAmbil' && (sortConfig.direction === 'asc' ? '▲' : '▼')}</th>
+              <th className="px-2 py-1 border-r border-[#a930b0] font-normal text-left whitespace-nowrap cursor-pointer select-none" onClick={() => handleSort('garansi')}>GARANSI {sortConfig?.key === 'garansi' && (sortConfig.direction === 'asc' ? '▲' : '▼')}</th>
+              <th className="px-2 py-1 font-normal text-left whitespace-nowrap cursor-pointer select-none" onClick={() => handleSort('cashTf')}>BAYAR {sortConfig?.key === 'cashTf' && (sortConfig.direction === 'asc' ? '▲' : '▼')}</th>
             </tr>
           </thead>
           <tbody>
-            {filteredRecords.length === 0 && (
+            {sortedFilteredRecords.length === 0 && (
                <tr>
                   <td colSpan={14} className="p-6 text-center text-gray-500 bg-gray-50 h-full">Belum ada data. Silakan isi form dan tekan SIMPAN.</td>
                </tr>
             )}
-            {filteredRecords.map((row) => (
+            {sortedFilteredRecords.map((row) => {
+              const isColoredRow = ['CANCEL', 'DONE', 'PROGRESS'].includes(row.status);
+              const isSelected = selectedRecordId === row.id;
+              
+              let rowStyle: React.CSSProperties = {};
+              let rowClass = "border-b border-gray-300 transition-colors cursor-pointer ";
+              
+              if (isSelected) {
+                 rowClass += "bg-[#c4dbf6]";
+              } else if (isColoredRow) {
+                 rowStyle.backgroundColor = getStatusBgColor(row.status);
+                 rowStyle.color = 'black'; 
+              } else {
+                 rowClass += "hover:bg-blue-50"; 
+              }
+
+              if (row.logMessage) {
+                 rowClass += " border-l-4 border-l-red-500";
+              }
+
+              return (
               <tr 
                 key={row.id} 
-                onDoubleClick={() => handleEdit(row)}
-                className={`border-b border-gray-300 transition-colors cursor-pointer ${selectedRecordId === row.id ? 'bg-[#c4dbf6]' : 'hover:bg-blue-50'} ${row.logMessage ? 'border-l-4 border-l-red-500' : ''}`}
+                onClick={() => handleEdit(row)}
+                className={rowClass}
+                style={rowStyle}
                 title={row.logMessage ? `Log:\n${row.logMessage}` : ''}
               >
                 <td className="px-2 py-1 border-r border-gray-300">{row.nota}</td>
@@ -580,13 +681,13 @@ export const BukuBesar = () => {
                 <td className="px-2 py-1 border-r border-gray-300 truncate max-w-[80px]">
                    {row.tglMasuk?.toLocaleDateString('en-GB', { day: '2-digit', month: 'short' })}
                 </td>
-                <td className="px-2 py-1 border-r border-gray-300 text-right whitespace-nowrap font-medium text-red-600">
+                <td className={`px-2 py-1 border-r border-gray-300 text-right whitespace-nowrap font-medium ${isColoredRow ? '' : 'text-red-600'}`}>
                    {row.biaya ? formatCurrency(parseNum(row.biaya)) : ''}
                 </td>
-                <td className="px-2 py-1 border-r border-gray-300 text-right whitespace-nowrap font-medium text-orange-600">
+                <td className={`px-2 py-1 border-r border-gray-300 text-right whitespace-nowrap font-medium ${isColoredRow ? '' : 'text-orange-600'}`}>
                    {row.part ? formatCurrency(parseNum(row.part)) : ''}
                 </td>
-                <td className="px-2 py-1 border-r border-gray-300 text-right whitespace-nowrap font-medium text-emerald-600">
+                <td className={`px-2 py-1 border-r border-gray-300 text-right whitespace-nowrap font-medium ${row.jasa < 0 ? 'text-red-500' : (isColoredRow ? '' : 'text-emerald-600')}`}>
                    {formatCurrency(row.jasa)}
                 </td>
                 <td className="px-2 py-1 border-r border-gray-300 truncate max-w-[80px]">
@@ -595,7 +696,8 @@ export const BukuBesar = () => {
                 <td className="px-2 py-1 border-r border-gray-300 whitespace-nowrap">{row.garansi}</td>
                 <td className="px-2 py-1">{row.cashTf}</td>
               </tr>
-            ))}
+              );
+            })}
           </tbody>
         </table>
       </div>
@@ -603,27 +705,27 @@ export const BukuBesar = () => {
       {/* Bottom Summary Area */}
       <div className="flex gap-2 mt-2 w-full overflow-x-auto no-scrollbar font-bold text-center">
         <div className="flex flex-col min-w-[110px] flex-1">
-          <span className="text-[10px] text-left mb-0.5 opacity-90">Total Unit Masuk</span>
+          <span className="text-base text-left mb-0.5 opacity-90">Total Unit Masuk</span>
           <div className="bg-[#cc0099] text-xl py-1 rounded-sm shadow-inner">{records.length}</div>
         </div>
         <div className="flex flex-col min-w-[110px] flex-1">
-          <span className="text-[10px] text-left mb-0.5 opacity-90">Unit Nggandul</span>
+          <span className="text-base text-left mb-0.5 opacity-90">Unit Nggandul</span>
           <div className="bg-[#4d0099] text-xl py-1 rounded-sm shadow-inner">{records.filter(r => r.status && !r.status.includes('DONE') && !r.status.includes('CANCEL')).length}</div>
         </div>
         <div className="flex flex-col min-w-[110px] flex-1">
-          <span className="text-[10px] text-left mb-0.5 opacity-90">Progress</span>
+          <span className="text-base text-left mb-0.5 opacity-90">Progress</span>
           <div className="bg-[#e6e600] text-black text-xl py-1 rounded-sm shadow-inner">{records.filter(r => r.status === 'PROGRESS').length}</div>
         </div>
         <div className="flex flex-col min-w-[110px] flex-1">
-          <span className="text-[10px] text-left mb-0.5 opacity-90">Done Saja</span>
+          <span className="text-base text-left mb-0.5 opacity-90">Done Saja</span>
           <div className="bg-[#00cc00] text-xl py-1 rounded-sm shadow-inner">{records.filter(r => r.status === 'DONE').length}</div>
         </div>
         <div className="flex flex-col min-w-[110px] flex-1">
-          <span className="text-[10px] text-left mb-0.5 opacity-90">Cancel</span>
+          <span className="text-base text-left mb-0.5 opacity-90">Cancel</span>
           <div className="bg-[#ff8c00] text-black text-xl py-1 rounded-sm shadow-inner">{records.filter(r => r.status === 'CANCEL').length}</div>
         </div>
         <div className="flex flex-col min-w-[110px] flex-1">
-          <span className="text-[10px] text-left mb-0.5 opacity-90">Cancel Diambil</span>
+          <span className="text-base text-left mb-0.5 opacity-90">Cancel Diambil</span>
           <div className="bg-[#cc0000] text-xl py-1 rounded-sm shadow-inner">{records.filter(r => r.status === 'CANCEL AMBIL').length}</div>
         </div>
       </div>

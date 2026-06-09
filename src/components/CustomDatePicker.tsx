@@ -4,7 +4,7 @@ import { ChevronDown, Calendar } from 'lucide-react';
 interface CustomDatePickerProps {
   className?: string;
   value?: Date | null;
-  onChange?: (date: Date) => void;
+  onChange?: (date: Date | null) => void;
 }
 
 const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
@@ -120,17 +120,17 @@ export const CustomDatePicker: React.FC<CustomDatePickerProps> = ({ className = 
       {isOpen && (
         <div className="absolute top-[100%] left-0 mt-[1px] z-50 bg-white text-black border border-gray-400 shadow-lg w-[200px] font-sans text-xs pt-1">
           {/* Header */}
-          <div className="flex items-center justify-between px-2 py-0.5 bg-white text-black">
-            <button onClick={handlePrevMonth} className="hover:bg-gray-200">
-              <span className="text-black text-[10px] leading-none text-center">◀</span>
+          <div className="flex items-center justify-between px-2 py-1 bg-white text-black border-b border-gray-100 mb-1">
+            <button onClick={handlePrevMonth} className="w-4 h-4 rounded bg-[#60a5fa] hover:bg-blue-500 flex items-center justify-center text-white">
+              <span className="text-[10px] leading-none mb-px">◀</span>
             </button>
             <span className="font-medium text-sm">{MONTHS[month]} {year}</span>
-            <button onClick={handleNextMonth} className="hover:bg-gray-200">
-                <span className="text-black text-[10px] leading-none text-center">▶</span>
+            <button onClick={handleNextMonth} className="w-4 h-4 rounded bg-[#60a5fa] hover:bg-blue-500 flex items-center justify-center text-white">
+                <span className="text-[10px] leading-none mb-px">▶</span>
             </button>
           </div>
           
-          <div className="px-1 mt-1">
+          <div className="px-1">
              <div className="grid grid-cols-7 border-b border-gray-200 mb-1">
                {DAYS.map(d => (
                  <div key={d} className="text-center py-0.5 font-medium">{d}</div>
@@ -156,10 +156,15 @@ export const CustomDatePicker: React.FC<CustomDatePickerProps> = ({ className = 
              </div>
           </div>
           
-          {/* Today Button area */}
-          <div className="border-t border-gray-200 py-2 flex items-center justify-center gap-2 cursor-pointer hover:bg-gray-100" onClick={handleSetToday}>
-             <div className="w-8 h-4 border border-blue-400 rounded-[2px] bg-white"></div>
-             <span className="text-[11px]">Today: {today.getMonth()+1}/{today.getDate()}/{today.getFullYear()}</span>
+          {/* Today and Clear Button area */}
+          <div className="border-t border-gray-200 py-1 flex flex-col gap-1">
+             <div className="flex items-center justify-center gap-2 cursor-pointer hover:bg-gray-100 py-1" onClick={handleSetToday}>
+                <div className="w-8 h-4 border border-blue-400 rounded-[2px] bg-white"></div>
+                <span className="text-[11px]">Today: {today.getMonth()+1}/{today.getDate()}/{today.getFullYear()}</span>
+             </div>
+             <div className="flex justify-center pb-1">
+                <button onClick={(e) => { e.stopPropagation(); setCurrentDate(null); if(onChange) onChange(null); setIsOpen(false); }} className="text-[11px] px-3 py-0.5 border border-gray-400 rounded hover:bg-gray-100 text-gray-700 font-medium">Bersihkan</button>
+             </div>
           </div>
         </div>
       )}
