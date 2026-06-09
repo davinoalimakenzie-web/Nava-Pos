@@ -9,8 +9,78 @@ export const KalkulatorUser = () => {
   const [isMaximized, setIsMaximized] = useState(false);
   
   const [position, setPosition] = useState({ x: 0, y: 0 });
-  const [dimensions, setDimensions] = useState({ w: 600, h: 460 });
+  const [dimensions, setDimensions] = useState({ w: 580, h: 420 });
   const dragRef = useRef<{ startX: number, startY: number, initialX: number, initialY: number } | null>(null);
+
+  // Cost and Selling states
+  const [lcdOledIphoneCost, setLcdOledIphoneCost] = useState('');
+  const [lcdOledIphoneSell, setLcdOledIphoneSell] = useState('');
+
+  const [lcdOledAndroidCost, setLcdOledAndroidCost] = useState('');
+  const [lcdOledAndroidSell, setLcdOledAndroidSell] = useState('');
+
+  const [lcdBagusCost, setLcdBagusCost] = useState('');
+  const [lcdBagusSell, setLcdBagusSell] = useState('');
+
+  const [batreAndroidCost, setBatreAndroidCost] = useState('');
+  const [batreAndroidSell, setBatreAndroidSell] = useState('');
+
+  const [lcdBiasaCost, setLcdBiasaCost] = useState('');
+  const [lcdBiasaSell, setLcdBiasaSell] = useState('');
+
+  const [batreIphoneCost, setBatreIphoneCost] = useState('');
+  const [batreIphoneSell, setBatreIphoneSell] = useState('');
+
+  // Helper formatting and calculations
+  const formatNumberString = (val: string) => {
+    const digits = val.replace(/\D/g, '');
+    if (!digits) return '';
+    return new Intl.NumberFormat('id-ID').format(parseInt(digits, 10));
+  };
+
+  const handleCostChange = (
+    val: string,
+    setCost: (v: string) => void,
+    setSell: (v: string) => void,
+    formulaType: 'formula1' | 'formula2'
+  ) => {
+    const formatted = formatNumberString(val);
+    setCost(formatted);
+    
+    if (formatted === '') {
+      setSell('');
+      return;
+    }
+    
+    const num = parseInt(formatted.replace(/\D/g, ''), 10);
+    if (!isNaN(num)) {
+      // Formula 1: (modal * 2) + 10% = (modal * 2) * 1.10
+      // Formula 2: (modal * 2) + 20% = (modal * 2) * 1.20
+      const multiplied = num * 2;
+      const margin = formulaType === 'formula1' ? 0.10 : 0.20;
+      const sellPrice = Math.round(multiplied * (1 + margin));
+      setSell(formatNumberString(String(sellPrice)));
+    }
+  };
+
+  const handleSellChange = (val: string, setSell: (v: string) => void) => {
+    setSell(formatNumberString(val));
+  };
+
+  const handleReset = () => {
+    setLcdOledIphoneCost('');
+    setLcdOledIphoneSell('');
+    setLcdOledAndroidCost('');
+    setLcdOledAndroidSell('');
+    setLcdBagusCost('');
+    setLcdBagusSell('');
+    setBatreAndroidCost('');
+    setBatreAndroidSell('');
+    setLcdBiasaCost('');
+    setLcdBiasaSell('');
+    setBatreIphoneCost('');
+    setBatreIphoneSell('');
+  };
 
   // Initialize position when opened
   useEffect(() => {
@@ -118,61 +188,137 @@ export const KalkulatorUser = () => {
 
       {/* Main Content Area */}
       {!isMinimized && (
-        <div className="flex-1 bg-[#050038] text-white flex flex-col items-center pt-5 w-full relative">
+        <div className="flex-1 bg-[#050038] text-white flex flex-col items-center pt-3 pb-3 w-full relative justify-center">
           
-          <h1 className="text-xl font-bold mb-4 tracking-[0.05em] text-center px-4 font-sans uppercase text-white">KALKULATOR USER</h1>
-          
-          <div className="w-[90%] border border-gray-400 relative mt-2 pt-6 pb-4 px-6 flex flex-col gap-5">
+          <div className="w-[94%] border border-white/40 rounded-md relative pt-4 pb-4 px-5 flex flex-col gap-4 bg-[#030026]/40 shadow-inner">
             
-            {/* Outline Box for Harga Batre to overlap naturally */}
-            <div className="absolute top-[-10px] right-[-10px] w-[calc(50%+5px)] border border-gray-500 bg-[#000080] p-3 shadow-lg z-10 flex flex-col justify-center">
-               <div className="flex justify-end gap-3 items-center mb-1.5">
-                 <span className="font-bold text-[11px] font-sans text-white">Harga Batre</span>
-                 <input type="text" className="w-[110px] h-[22px] bg-white text-black outline-none px-2 text-[11px] font-medium text-right shadow-inner" />
-               </div>
-               <div>
-                 <input type="text" className="w-full h-8 bg-white text-black outline-none px-2 text-sm font-bold text-center shadow-inner" />
-               </div>
-            </div>
-
-            {/* Left column top element */}
-            <div className="flex flex-col w-[45%]">
-              <span className="font-bold text-[11px] mb-1 font-sans">Harga LCD "POLOS"</span>
-              <input type="text" className="w-[120px] h-[22px] bg-white text-black outline-none px-2 text-[11px] font-medium shadow-inner" />
-              <input type="text" className="w-full h-8 mt-2 bg-white text-black outline-none px-2 text-[12px] font-bold shadow-inner" />
-            </div>
-
-            {/* Grid for remaining 4 */}
-            <div className="grid grid-cols-2 gap-x-12 gap-y-5 w-full">
+            {/* 3x2 Grid containing all 6 inputs including Harga Batre cleanly inside */}
+            <div className="grid grid-cols-2 gap-x-8 gap-y-4 w-full">
               
-              <div className="flex flex-col w-full">
-                <span className="font-bold text-[11px] mb-1 font-sans">Harga LCD "OG"</span>
-                <input type="text" className="w-[120px] h-[22px] bg-[#b8c5d1] text-black outline-none px-2 text-[11px] font-medium shadow-inner" />
-                <input type="text" className="w-full h-8 mt-2 bg-white text-black outline-none px-2 text-[12px] font-bold shadow-inner" />
+              {/* Row 1, Col 1: Harga LCD OLED iPhone */}
+              <div className="flex flex-col w-full items-start">
+                <span className="font-bold text-[11px] mb-1 font-sans text-gray-200 uppercase tracking-wide">Harga LCD OLED iPhone</span>
+                <input 
+                  type="text" 
+                  placeholder="Modal (Rp)"
+                  value={lcdOledIphoneCost}
+                  onChange={(e) => handleCostChange(e.target.value, setLcdOledIphoneCost, setLcdOledIphoneSell, 'formula2')}
+                  className="w-[120px] h-[22px] bg-white text-black outline-none px-2 text-[11px] font-medium shadow-inner border border-gray-300 rounded-sm" 
+                />
+                <input 
+                  type="text" 
+                  placeholder="Harga Jual User (Rp)"
+                  value={lcdOledIphoneSell}
+                  onChange={(e) => handleSellChange(e.target.value, setLcdOledIphoneSell)}
+                  className="w-full h-8 mt-1.5 bg-yellow-100 text-black outline-none px-2 text-[13px] font-extrabold shadow-inner border border-yellow-300 rounded-sm text-center" 
+                />
               </div>
 
+              {/* Row 1, Col 2: Harga LCD OLED Android */}
               <div className="flex flex-col w-full items-end">
-                <span className="font-bold text-[11px] mb-1 font-sans">Harga LCD "MEETOO"</span>
-                <input type="text" className="w-[120px] h-[22px] bg-[#ff6666] text-black outline-none px-2 text-[11px] font-medium shadow-inner" />
-                <input type="text" className="w-full h-8 mt-2 bg-white text-black outline-none px-2 text-[12px] font-bold shadow-inner" />
+                <span className="font-bold text-[11px] mb-1 font-sans text-gray-200 uppercase tracking-wide">Harga LCD OLED Android</span>
+                <input 
+                  type="text" 
+                  placeholder="Modal (Rp)"
+                  value={lcdOledAndroidCost}
+                  onChange={(e) => handleCostChange(e.target.value, setLcdOledAndroidCost, setLcdOledAndroidSell, 'formula1')}
+                  className="w-[120px] h-[22px] bg-[#d8b4fe] text-black outline-none px-2 text-[11px] font-medium shadow-inner border border-purple-300 rounded-sm text-right" 
+                />
+                <input 
+                  type="text" 
+                  placeholder="Harga Jual User (Rp)"
+                  value={lcdOledAndroidSell}
+                  onChange={(e) => handleSellChange(e.target.value, setLcdOledAndroidSell)}
+                  className="w-full h-8 mt-1.5 bg-yellow-100 text-black outline-none px-2 text-[13px] font-extrabold shadow-inner border border-yellow-300 rounded-sm text-center" 
+                />
               </div>
 
-              <div className="flex flex-col w-full">
-                <span className="font-bold text-[11px] mb-1 font-sans">Harga LCD "SHINESTAR"</span>
-                <input type="text" className="w-[120px] h-[22px] bg-[#ffb366] text-black outline-none px-2 text-[11px] font-medium shadow-inner" />
-                <input type="text" className="w-full h-8 mt-2 bg-white text-black outline-none px-2 text-[12px] font-bold shadow-inner" />
+              {/* Row 2, Col 1: Harga LCD Bagus */}
+              <div className="flex flex-col w-full items-start">
+                <span className="font-bold text-[11px] mb-1 font-sans text-gray-200 uppercase tracking-wide">Harga LCD Bagus</span>
+                <input 
+                  type="text" 
+                  placeholder="Modal (Rp)"
+                  value={lcdBagusCost}
+                  onChange={(e) => handleCostChange(e.target.value, setLcdBagusCost, setLcdBagusSell, 'formula2')}
+                  className="w-[120px] h-[22px] bg-[#b8c5d1] text-black outline-none px-2 text-[11px] font-medium shadow-inner border border-gray-400 rounded-sm" 
+                />
+                <input 
+                  type="text" 
+                  placeholder="Harga Jual User (Rp)"
+                  value={lcdBagusSell}
+                  onChange={(e) => handleSellChange(e.target.value, setLcdBagusSell)}
+                  className="w-full h-8 mt-1.5 bg-white text-black outline-none px-2 text-[13px] font-extrabold shadow-inner border border-gray-300 rounded-sm text-center" 
+                />
               </div>
 
+              {/* Row 2, Col 2: Harga Batre Android */}
               <div className="flex flex-col w-full items-end">
-                <span className="font-bold text-[11px] mb-1 font-sans">Harga LCD "POZI"</span>
-                <input type="text" className="w-[120px] h-[22px] bg-[#66ccff] text-black outline-none px-2 text-[11px] font-medium shadow-inner" />
-                <input type="text" className="w-full h-8 mt-2 bg-white text-black outline-none px-2 text-[12px] font-bold shadow-inner" />
+                <span className="font-bold text-[11px] mb-1 font-sans text-gray-200 uppercase tracking-wide">Harga Batre Android</span>
+                <input 
+                  type="text" 
+                  placeholder="Modal (Rp)"
+                  value={batreAndroidCost}
+                  onChange={(e) => handleCostChange(e.target.value, setBatreAndroidCost, setBatreAndroidSell, 'formula1')}
+                  className="w-[120px] h-[22px] bg-[#ff6666] text-black outline-none px-2 text-[11px] font-medium shadow-inner border border-red-300 rounded-sm text-right" 
+                />
+                <input 
+                  type="text" 
+                  placeholder="Harga Jual User (Rp)"
+                  value={batreAndroidSell}
+                  onChange={(e) => handleSellChange(e.target.value, setBatreAndroidSell)}
+                  className="w-full h-8 mt-1.5 bg-white text-black outline-none px-2 text-[13px] font-extrabold shadow-inner border border-gray-300 rounded-sm text-center" 
+                />
+              </div>
+
+              {/* Row 3, Col 1: Harga LCD Biasa */}
+              <div className="flex flex-col w-full items-start">
+                <span className="font-bold text-[11px] mb-1 font-sans text-gray-200 uppercase tracking-wide">Harga LCD Biasa</span>
+                <input 
+                  type="text" 
+                  placeholder="Modal (Rp)"
+                  value={lcdBiasaCost}
+                  onChange={(e) => handleCostChange(e.target.value, setLcdBiasaCost, setLcdBiasaSell, 'formula2')}
+                  className="w-[120px] h-[22px] bg-[#ffb366] text-black outline-none px-2 text-[11px] font-medium shadow-inner border border-amber-300 rounded-sm" 
+                />
+                <input 
+                  type="text" 
+                  placeholder="Harga Jual User (Rp)"
+                  value={lcdBiasaSell}
+                  onChange={(e) => handleSellChange(e.target.value, setLcdBiasaSell)}
+                  className="w-full h-8 mt-1.5 bg-white text-black outline-none px-2 text-[13px] font-extrabold shadow-inner border border-gray-300 rounded-sm text-center" 
+                />
+              </div>
+
+              {/* Row 3, Col 2: Harga Batre iPhone */}
+              <div className="flex flex-col w-full items-end">
+                <span className="font-bold text-[11px] mb-1 font-sans text-gray-200 uppercase tracking-wide">Harga Batre iPhone</span>
+                <input 
+                  type="text" 
+                  placeholder="Modal (Rp)"
+                  value={batreIphoneCost}
+                  onChange={(e) => handleCostChange(e.target.value, setBatreIphoneCost, setBatreIphoneSell, 'formula2')}
+                  className="w-[120px] h-[22px] bg-[#66ccff] text-black outline-none px-2 text-[11px] font-medium shadow-inner border border-blue-300 rounded-sm text-right" 
+                />
+                <input 
+                  type="text" 
+                  placeholder="Harga Jual User (Rp)"
+                  value={batreIphoneSell}
+                  onChange={(e) => handleSellChange(e.target.value, setBatreIphoneSell)}
+                  className="w-full h-8 mt-1.5 bg-white text-black outline-none px-2 text-[13px] font-extrabold shadow-inner border border-gray-300 rounded-sm text-center" 
+                />
               </div>
 
             </div>
 
-            <div className="flex justify-center mt-3">
-              <button className="bg-white text-black hover:bg-gray-200 transition-colors font-bold py-1 px-8 outline-none text-[11px] min-w-[90px] h-[24px] flex items-center justify-center font-sans tracking-wide rounded-sm shadow">RESET</button>
+            {/* Reset Button tightly aligned at the bottom with proper height */}
+            <div className="flex justify-center mt-1">
+              <button 
+                onClick={handleReset}
+                className="bg-white text-black hover:bg-red-500 hover:text-white transition-all font-bold py-1 px-8 outline-none text-[11px] min-w-[100px] h-[26px] flex items-center justify-center font-sans tracking-wide rounded-sm shadow border border-gray-300 uppercase cursor-pointer"
+              >
+                RESET
+              </button>
             </div>
           </div>
         </div>

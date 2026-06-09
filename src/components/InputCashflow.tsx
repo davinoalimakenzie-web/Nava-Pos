@@ -204,6 +204,32 @@ export const InputCashflow = () => {
   const uangMasuk = filteredRecords.filter(r => r.jenis === 'NOTA').reduce((sum, r) => sum + r.biaya, 0);
   const uangKeluar = filteredRecords.filter(r => r.jenis === 'PENGELUARAN' || r.jenis === 'BON').reduce((sum, r) => sum + r.pob, 0); // POB used as nominal for pengeluaran? wait, pengeluaran reduces what? pob? Wait we need to check how to calculate total. Typically pengeluaran/bon uses 'POB' as the amount field?
   
+  // Stats for Buku Besar records
+  const allBBRecords = generateDummyData();
+  const todayStr_ = new Date().toDateString();
+  const currentMonth_ = new Date().getMonth();
+  const currentYear_ = new Date().getFullYear();
+
+  const todayBBFiltered = allBBRecords.filter(r => r.tglMasuk && new Date(r.tglMasuk).toDateString() === todayStr_);
+  const todayStats = {
+    progress: todayBBFiltered.filter(r => r.status === 'PROGRESS').length,
+    done: todayBBFiltered.filter(r => r.status === 'DONE').length,
+    ambil: todayBBFiltered.filter(r => r.status === 'DONE AMBIL').length,
+    cancel: todayBBFiltered.filter(r => r.status === 'CANCEL' || r.status === 'CANCEL AMBIL').length,
+  };
+
+  const monthBBFiltered = allBBRecords.filter(r => {
+    if (!r.tglMasuk) return false;
+    const d = new Date(r.tglMasuk);
+    return d.getMonth() === currentMonth_ && d.getFullYear() === currentYear_;
+  });
+  const monthStats = {
+    progress: monthBBFiltered.filter(r => r.status === 'PROGRESS').length,
+    done: monthBBFiltered.filter(r => r.status === 'DONE').length,
+    ambil: monthBBFiltered.filter(r => r.status === 'DONE AMBIL').length,
+    cancel: monthBBFiltered.filter(r => r.status === 'CANCEL' || r.status === 'CANCEL AMBIL').length,
+  };
+  
   const handleJenisChange = (val: string) => {
     setJenis(val);
     setNota('');
@@ -352,13 +378,86 @@ export const InputCashflow = () => {
             />
           </div>
 
-          <div className="flex items-center gap-2 mt-4 justify-between">
-            <button onClick={handleHapus} disabled={!selectedRowId} className={`bg-white text-black font-bold px-4 py-1.5 transition-colors ${selectedRowId ? 'hover:bg-gray-200' : 'opacity-50'}`}>HAPUS</button>
-            <button onClick={handleClear} className="bg-white text-black font-bold px-4 py-1.5 hover:bg-gray-200 transition-colors">CLEAR</button>
-            <button onClick={handleSimpanClick} className="bg-white text-black font-bold px-4 py-1.5 hover:bg-gray-200 transition-colors">SIMPAN</button>
+          <div className="flex items-center gap-2 mt-4 select-none w-full">
+            <button 
+              onClick={handleHapus} 
+              disabled={!selectedRowId} 
+              className={`flex-1 h-8 font-bold text-xs rounded-sm transition-colors flex items-center justify-center shadow ${
+                selectedRowId 
+                  ? 'bg-red-600 hover:bg-red-700 text-white cursor-pointer' 
+                  : 'bg-white/20 text-white/40 cursor-not-allowed'
+              }`}
+            >
+              HAPUS
+            </button>
+            <button 
+              onClick={handleClear} 
+              className="flex-1 h-8 bg-white text-black font-bold text-xs hover:bg-gray-200 transition-colors rounded-sm flex items-center justify-center shadow"
+            >
+              CLEAR
+            </button>
+            <button 
+              onClick={handleSimpanClick} 
+              className="flex-1 h-8 bg-white text-black font-bold text-xs hover:bg-gray-200 transition-colors rounded-sm flex items-center justify-center shadow"
+            >
+              SIMPAN
+            </button>
           </div>
 
-          <div className="mt-4 w-full h-[100px] border border-red-900/50 bg-[#2A0506]"></div>
+          <div className="mt-4 w-full h-[90px] border border-red-900/50 bg-[#260405] rounded-sm p-1.5 flex flex-col text-[11px] justify-between shadow-inner overflow-hidden select-none">
+            <div className="flex flex-col h-full justify-between">
+              <div className="border-b border-red-950 pb-0.5 mb-0.5 font-bold text-red-200 uppercase tracking-wider text-[9px]">
+                <span>RINGKASAN STATUS HARI INI</span>
+              </div>
+              <div className="grid grid-cols-2 gap-x-1.5 gap-y-1 py-0.5">
+                <div className="flex justify-between items-center bg-yellow-950/40 px-1 py-0.5 rounded-sm border border-yellow-900/50">
+                  <span className="text-slate-300 font-medium">PROGRESS:</span>
+                  <span className="font-bold text-yellow-400">{todayStats.progress}</span>
+                </div>
+                <div className="flex justify-between items-center bg-emerald-950/40 px-1 py-0.5 rounded-sm border border-emerald-900/50">
+                  <span className="text-slate-300 font-medium">DONE:</span>
+                  <span className="font-bold text-emerald-400">{todayStats.done}</span>
+                </div>
+                <div className="flex justify-between items-center bg-blue-950/40 px-1 py-0.5 rounded-sm border border-blue-900/50">
+                  <span className="text-slate-300 font-medium">AMBIL:</span>
+                  <span className="font-bold text-blue-400">{todayStats.ambil}</span>
+                </div>
+                <div className="flex justify-between items-center bg-red-950/40 px-1 py-0.5 rounded-sm border border-red-900/50">
+                  <span className="text-slate-300 font-medium">CANCEL:</span>
+                  <span className="font-bold text-red-400">{todayStats.cancel}</span>
+                </div>
+              </div>
+              <div className="text-[9px] text-red-300/60 text-center italic border-t border-red-950 pt-1 leading-none">
+                Klik ganda baris tabel untuk edit.
+              </div>
+            </div>
+          </div>
+
+          <div className="mt-2 w-full h-[76px] border border-red-900/50 bg-[#260405] rounded-sm p-1.5 flex flex-col text-[11px] justify-between shadow-inner overflow-hidden select-none">
+            <div className="flex flex-col h-full justify-between">
+              <div className="border-b border-red-950 pb-0.5 mb-0.5 font-bold text-red-200 uppercase tracking-wider text-[9px]">
+                <span>RINGKASAN STATUS BULAN INI</span>
+              </div>
+              <div className="grid grid-cols-2 gap-x-1.5 gap-y-1 py-0.5">
+                <div className="flex justify-between items-center bg-yellow-950/40 px-1 py-0.5 rounded-sm border border-yellow-900/50">
+                  <span className="text-slate-300 font-medium">PROGRESS:</span>
+                  <span className="font-bold text-yellow-400">{monthStats.progress}</span>
+                </div>
+                <div className="flex justify-between items-center bg-emerald-950/40 px-1 py-0.5 rounded-sm border border-emerald-900/50">
+                  <span className="text-slate-300 font-medium">DONE:</span>
+                  <span className="font-bold text-emerald-400">{monthStats.done}</span>
+                </div>
+                <div className="flex justify-between items-center bg-blue-950/40 px-1 py-0.5 rounded-sm border border-blue-900/50">
+                  <span className="text-slate-300 font-medium">AMBIL:</span>
+                  <span className="font-bold text-blue-400">{monthStats.ambil}</span>
+                </div>
+                <div className="flex justify-between items-center bg-red-950/40 px-1 py-0.5 rounded-sm border border-red-900/50">
+                  <span className="text-slate-300 font-medium">CANCEL:</span>
+                  <span className="font-bold text-red-400">{monthStats.cancel}</span>
+                </div>
+              </div>
+            </div>
+          </div>
 
           {/* SIMPAN MODAL */}
           {simpanModalOpen && (
@@ -524,26 +623,26 @@ export const InputCashflow = () => {
            const laciFix = total - qrisTotal;
 
            return (
-              <div className="flex items-end gap-4 mt-3">
-                <div className="flex flex-col w-44">
-                  <span className="text-[13px] opacity-90 mb-1">Uang Masuk</span>
-                  <div className="bg-[#ccffff] text-black font-bold text-right px-2 py-1 text-base border border-gray-500 shadow-sm tracking-tight">{formatCurrency(cashTotal)}</div>
+              <div className="flex gap-2 mt-3 w-full font-bold select-none">
+                <div className="flex flex-col flex-1 min-w-0">
+                  <span className="text-[11px] uppercase tracking-wider opacity-90 mb-0.5 text-left truncate">Uang Masuk</span>
+                  <div className="bg-[#ccffff] text-black font-bold text-right px-2 py-1 text-[13px] border border-gray-500 shadow-sm tracking-tight truncate">{formatCurrency(cashTotal)}</div>
                 </div>
-                <div className="flex flex-col w-44">
-                  <span className="text-[13px] opacity-90 mb-1">Uang Keluar</span>
-                  <div className="bg-[#ccffff] text-black font-bold text-right px-2 py-1 text-base border border-gray-500 shadow-sm tracking-tight">{formatCurrency(outTotal)}</div>
+                <div className="flex flex-col flex-1 min-w-0">
+                  <span className="text-[11px] uppercase tracking-wider opacity-90 mb-0.5 text-left truncate">Uang Keluar</span>
+                  <div className="bg-[#ccffff] text-black font-bold text-right px-2 py-1 text-[13px] border border-gray-500 shadow-sm tracking-tight truncate">{formatCurrency(outTotal)}</div>
                 </div>
-                <div className="flex flex-col w-44">
-                  <span className="text-[13px] opacity-90 mb-1">Total</span>
-                  <div className="bg-[#ccffff] text-black font-bold text-right px-2 py-1 text-base border border-gray-500 shadow-sm tracking-tight">{formatCurrency(total)}</div>
+                <div className="flex flex-col flex-1 min-w-0">
+                  <span className="text-[11px] uppercase tracking-wider opacity-90 mb-0.5 text-left truncate">Total</span>
+                  <div className="bg-[#ccffff] text-black font-bold text-right px-2 py-1 text-[13px] border border-gray-500 shadow-sm tracking-tight truncate">{formatCurrency(total)}</div>
                 </div>
-                <div className="flex flex-col w-44">
-                  <span className="text-[13px] opacity-90 mb-1">TF / QRIS</span>
-                  <div className="bg-[#ffffcc] text-black font-bold text-right px-2 py-1 text-base border border-gray-500 shadow-sm tracking-tight">{formatCurrency(qrisTotal)}</div>
+                <div className="flex flex-col flex-1 min-w-0">
+                  <span className="text-[11px] uppercase tracking-wider opacity-90 mb-0.5 text-left truncate">TF / QRIS</span>
+                  <div className="bg-[#ffffcc] text-black font-bold text-right px-2 py-1 text-[13px] border border-gray-500 shadow-sm tracking-tight truncate">{formatCurrency(qrisTotal)}</div>
                 </div>
-                <div className="flex flex-col w-48 ml-auto">
-                  <span className="text-[13px] opacity-90 mb-1">Uang Laci Flx</span>
-                  <div className="bg-[#000080] text-white font-bold text-right px-2 py-1 text-base border border-gray-500 shadow-sm tracking-tight">{formatCurrency(laciFix)}</div>
+                <div className="flex flex-col flex-1 min-w-0">
+                  <span className="text-[11px] uppercase tracking-wider opacity-90 mb-0.5 text-left truncate font-bold text-blue-100">Uang Laci Flx</span>
+                  <div className="bg-[#000080] text-white font-bold text-right px-2 py-1 text-[13px] border border-gray-500 shadow-sm tracking-tight truncate">{formatCurrency(laciFix)}</div>
                 </div>
               </div>
            );
