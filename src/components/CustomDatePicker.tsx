@@ -66,10 +66,10 @@ export const CustomDatePicker: React.FC<CustomDatePickerProps> = ({ className = 
 
   const formatDisplayDate = (d: Date | null) => {
     if (!d) return '';
-    const dayNum = d.getDate();
-    const month = d.getMonth() + 1;
+    const dayNum = String(d.getDate()).padStart(2, '0');
+    const month = String(d.getMonth() + 1).padStart(2, '0');
     const year = d.getFullYear();
-    return `${month}/ ${dayNum}/${year}`;
+    return `${dayNum}/${month}/${year}`;
   };
 
   const year = viewDate.getFullYear();
@@ -160,7 +160,7 @@ export const CustomDatePicker: React.FC<CustomDatePickerProps> = ({ className = 
           <div className="border-t border-gray-200 py-1 flex flex-col gap-1">
              <div className="flex items-center justify-center gap-2 cursor-pointer hover:bg-gray-100 py-1" onClick={handleSetToday}>
                 <div className="w-8 h-4 border border-blue-400 rounded-[2px] bg-white"></div>
-                <span className="text-[11px]">Today: {today.getMonth()+1}/{today.getDate()}/{today.getFullYear()}</span>
+                <span className="text-[11px]">Today: {String(today.getDate()).padStart(2, '0')}/{String(today.getMonth()+1).padStart(2, '0')}/{today.getFullYear()}</span>
              </div>
              <div className="flex justify-center pb-1">
                 <button onClick={(e) => { e.stopPropagation(); setCurrentDate(null); if(onChange) onChange(null); setIsOpen(false); }} className="text-[11px] px-3 py-0.5 border border-gray-400 rounded hover:bg-gray-100 text-gray-700 font-medium">Bersihkan</button>

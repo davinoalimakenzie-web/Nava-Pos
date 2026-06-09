@@ -72,6 +72,16 @@ const parseNum = (val: string | number) => {
   return isNaN(parsed) ? 0 : (isNegative ? -parsed : parsed);
 };
 
+const formatDateToDDMMYYYY = (d: Date | null) => {
+  if (!d) return '';
+  const dateObj = new Date(d);
+  if (isNaN(dateObj.getTime())) return '';
+  const day = String(dateObj.getDate()).padStart(2, '0');
+  const month = String(dateObj.getMonth() + 1).padStart(2, '0');
+  const year = dateObj.getFullYear();
+  return `${day}/${month}/${year}`;
+};
+
 let cachedRecords: RecordData[] | null = null;
 
 export const generateDummyData = (): RecordData[] => {
@@ -530,10 +540,13 @@ export const BukuBesar = () => {
             </select>
           </div>
           <div className="flex-1"></div>
-          <div className="flex items-center gap-2 w-full mt-1">
-            <button onClick={handleHapus} className="flex-1 border border-white hover:bg-white hover:text-[#050B24] py-1.5 text-base transition-colors font-bold">HAPUS</button>
-            <button onClick={handleClear} className="flex-1 bg-white text-black hover:bg-gray-200 py-1.5 text-base font-bold transition-colors">CLEAR</button>
-            <button onClick={handleSimpan} className="flex-1 bg-[#1e2b6b] border border-white hover:bg-[#2a3c94] py-1.5 text-base transition-colors font-bold">SIMPAN</button>
+          <div className="flex items-center">
+            <div className="w-24 shrink-0"></div>
+            <div className="grid grid-cols-3 gap-2 flex-1 mt-1">
+              <button onClick={handleHapus} className="border border-white hover:bg-white hover:text-[#050B24] py-1.5 text-xs sm:text-[13px] md:text-sm font-bold uppercase truncate transition-colors text-center w-full">HAPUS</button>
+              <button onClick={handleClear} className="bg-white text-black hover:bg-gray-200 py-1.5 text-xs sm:text-[13px] md:text-sm font-bold uppercase truncate transition-colors text-center w-full">CLEAR</button>
+              <button onClick={handleSimpan} className="bg-[#1e2b6b] border border-white hover:bg-[#2a3c94] py-1.5 text-xs sm:text-[13px] md:text-sm font-bold uppercase truncate transition-colors text-center w-full">SIMPAN</button>
+            </div>
           </div>
         </div>
       </div>
@@ -611,124 +624,136 @@ export const BukuBesar = () => {
 
       {/* Table Area */}
       <div className="flex-1 bg-white overflow-auto border border-gray-400 mt-1">
-        <table className="w-full text-black text-[13px]">
+        <table className="w-full table-fixed text-black text-[11px]">
           <thead className="bg-[#8f1994] text-white sticky top-0 z-10 shadow">
             <tr>
-              <th className="px-2 py-1 border-r border-[#a930b0] font-normal text-left whitespace-nowrap cursor-pointer select-none" onClick={() => handleSort('nota')}>NOTA {sortConfig?.key === 'nota' && (sortConfig.direction === 'asc' ? '▲' : '▼')}</th>
-              <th className="px-2 py-1 border-r border-[#a930b0] font-normal text-left whitespace-nowrap cursor-pointer select-none" onClick={() => handleSort('status')}>STATUS {sortConfig?.key === 'status' && (sortConfig.direction === 'asc' ? '▲' : '▼')}</th>
-              <th className="px-2 py-1 border-r border-[#a930b0] font-normal text-left whitespace-nowrap cursor-pointer select-none" onClick={() => handleSort('teknisi')}>TEKNISI {sortConfig?.key === 'teknisi' && (sortConfig.direction === 'asc' ? '▲' : '▼')}</th>
-              <th className="px-2 py-1 border-r border-[#a930b0] font-normal text-left whitespace-nowrap cursor-pointer select-none" onClick={() => handleSort('namaUser')}>USER {sortConfig?.key === 'namaUser' && (sortConfig.direction === 'asc' ? '▲' : '▼')}</th>
-              <th className="px-2 py-1 border-r border-[#a930b0] font-normal text-left whitespace-nowrap cursor-pointer select-none" onClick={() => handleSort('noWaUser')}>WAUSER {sortConfig?.key === 'noWaUser' && (sortConfig.direction === 'asc' ? '▲' : '▼')}</th>
-              <th className="px-2 py-1 border-r border-[#a930b0] font-normal text-left max-w-[120px] whitespace-nowrap cursor-pointer select-none" onClick={() => handleSort('device')}>DEVICE {sortConfig?.key === 'device' && (sortConfig.direction === 'asc' ? '▲' : '▼')}</th>
-              <th className="px-2 py-1 border-r border-[#a930b0] font-normal text-left max-w-[160px] whitespace-nowrap cursor-pointer select-none" onClick={() => handleSort('keluhan')}>KELUHAN {sortConfig?.key === 'keluhan' && (sortConfig.direction === 'asc' ? '▲' : '▼')}</th>
-              <th className="px-2 py-1 border-r border-[#a930b0] font-normal text-left whitespace-nowrap cursor-pointer select-none" onClick={() => handleSort('tglMasuk')}>TGLMASUK {sortConfig?.key === 'tglMasuk' && (sortConfig.direction === 'asc' ? '▲' : '▼')}</th>
-              <th className="px-2 py-1 border-r border-[#a930b0] font-normal text-right whitespace-nowrap cursor-pointer select-none" onClick={() => handleSort('biaya')}>BIAYA {sortConfig?.key === 'biaya' && (sortConfig.direction === 'asc' ? '▲' : '▼')}</th>
-              <th className="px-2 py-1 border-r border-[#a930b0] font-normal text-right whitespace-nowrap cursor-pointer select-none" onClick={() => handleSort('part')}>MODAL {sortConfig?.key === 'part' && (sortConfig.direction === 'asc' ? '▲' : '▼')}</th>
-              <th className="px-2 py-1 border-r border-[#a930b0] font-normal text-right whitespace-nowrap cursor-pointer select-none" onClick={() => handleSort('jasa')}>JASA {sortConfig?.key === 'jasa' && (sortConfig.direction === 'asc' ? '▲' : '▼')}</th>
-              <th className="px-2 py-1 border-r border-[#a930b0] font-normal text-left whitespace-nowrap cursor-pointer select-none" onClick={() => handleSort('tglAmbil')}>TGLAMBIL {sortConfig?.key === 'tglAmbil' && (sortConfig.direction === 'asc' ? '▲' : '▼')}</th>
-              <th className="px-2 py-1 border-r border-[#a930b0] font-normal text-left whitespace-nowrap cursor-pointer select-none" onClick={() => handleSort('garansi')}>GARANSI {sortConfig?.key === 'garansi' && (sortConfig.direction === 'asc' ? '▲' : '▼')}</th>
-              <th className="px-2 py-1 font-normal text-left whitespace-nowrap cursor-pointer select-none" onClick={() => handleSort('cashTf')}>BAYAR {sortConfig?.key === 'cashTf' && (sortConfig.direction === 'asc' ? '▲' : '▼')}</th>
+              <th className="px-1 py-0.5 border-r border-[#a930b0] font-normal text-center whitespace-nowrap cursor-pointer select-none w-[45px]" onClick={() => handleSort('nota')}>NOTA {sortConfig?.key === 'nota' && (sortConfig.direction === 'asc' ? '▲' : '▼')}</th>
+              <th className="px-1 py-0.5 border-r border-[#a930b0] font-normal text-left whitespace-nowrap cursor-pointer select-none w-[85px]" onClick={() => handleSort('status')}>STATUS {sortConfig?.key === 'status' && (sortConfig.direction === 'asc' ? '▲' : '▼')}</th>
+              <th className="px-1 py-0.5 border-r border-[#a930b0] font-normal text-center whitespace-nowrap cursor-pointer select-none w-[45px]" onClick={() => handleSort('teknisi')}>TEKNISI {sortConfig?.key === 'teknisi' && (sortConfig.direction === 'asc' ? '▲' : '▼')}</th>
+              <th className="px-1 py-0.5 border-r border-[#a930b0] font-normal text-left whitespace-nowrap cursor-pointer select-none w-[70px]" onClick={() => handleSort('namaUser')}>USER {sortConfig?.key === 'namaUser' && (sortConfig.direction === 'asc' ? '▲' : '▼')}</th>
+              <th className="px-1 py-0.5 border-r border-[#a930b0] font-normal text-left whitespace-nowrap cursor-pointer select-none w-[80px]" onClick={() => handleSort('noWaUser')}>WAUSER {sortConfig?.key === 'noWaUser' && (sortConfig.direction === 'asc' ? '▲' : '▼')}</th>
+              <th className="px-1 py-0.5 border-r border-[#a930b0] font-normal text-left whitespace-nowrap cursor-pointer select-none w-[75px]" onClick={() => handleSort('device')}>DEVICE {sortConfig?.key === 'device' && (sortConfig.direction === 'asc' ? '▲' : '▼')}</th>
+              <th className="px-1 py-0.5 border-r border-[#a930b0] font-normal text-left whitespace-nowrap cursor-pointer select-none w-[100px]" onClick={() => handleSort('keluhan')}>KELUHAN {sortConfig?.key === 'keluhan' && (sortConfig.direction === 'asc' ? '▲' : '▼')}</th>
+              <th className="px-1 py-0.5 border-r border-[#a930b0] font-normal text-center whitespace-nowrap cursor-pointer select-none w-[65px]" onClick={() => handleSort('tglMasuk')}>TGLMASUK {sortConfig?.key === 'tglMasuk' && (sortConfig.direction === 'asc' ? '▲' : '▼')}</th>
+              <th className="px-1 py-0.5 border-r border-[#a930b0] font-normal text-right whitespace-nowrap cursor-pointer select-none w-[75px]" onClick={() => handleSort('biaya')}>BIAYA {sortConfig?.key === 'biaya' && (sortConfig.direction === 'asc' ? '▲' : '▼')}</th>
+              <th className="px-1 py-0.5 border-r border-[#a930b0] font-normal text-right whitespace-nowrap cursor-pointer select-none w-[75px]" onClick={() => handleSort('part')}>MODAL {sortConfig?.key === 'part' && (sortConfig.direction === 'asc' ? '▲' : '▼')}</th>
+              <th className="px-1 py-0.5 border-r border-[#a930b0] font-normal text-right whitespace-nowrap cursor-pointer select-none w-[75px]" onClick={() => handleSort('jasa')}>JASA {sortConfig?.key === 'jasa' && (sortConfig.direction === 'asc' ? '▲' : '▼')}</th>
+              <th className="px-1 py-0.5 border-r border-[#a930b0] font-normal text-left whitespace-nowrap cursor-pointer select-none w-[65px]" onClick={() => handleSort('tglAmbil')}>TGLAMBIL {sortConfig?.key === 'tglAmbil' && (sortConfig.direction === 'asc' ? '▲' : '▼')}</th>
+              <th className="px-1 py-0.5 border-r border-[#a930b0] font-normal text-left whitespace-nowrap cursor-pointer select-none w-[65px]" onClick={() => handleSort('garansi')}>GARANSI {sortConfig?.key === 'garansi' && (sortConfig.direction === 'asc' ? '▲' : '▼')}</th>
+              <th className="px-1 py-0.5 font-normal text-left whitespace-nowrap cursor-pointer select-none w-[45px]" onClick={() => handleSort('cashTf')}>BAYAR {sortConfig?.key === 'cashTf' && (sortConfig.direction === 'asc' ? '▲' : '▼')}</th>
             </tr>
           </thead>
           <tbody>
             {sortedFilteredRecords.length === 0 && (
-               <tr>
-                  <td colSpan={14} className="p-6 text-center text-gray-500 bg-gray-50 h-full">Belum ada data. Silakan isi form dan tekan SIMPAN.</td>
-               </tr>
+                <tr>
+                   <td colSpan={14} className="p-6 text-center text-gray-500 bg-gray-50 h-full">Belum ada data. Silakan isi form dan tekan SIMPAN.</td>
+                </tr>
             )}
             {sortedFilteredRecords.map((row) => {
               const isColoredRow = ['CANCEL', 'DONE', 'PROGRESS'].includes(row.status);
-              const isSelected = selectedRecordId === row.id;
-              
-              let rowStyle: React.CSSProperties = {};
-              let rowClass = "border-b border-gray-300 transition-colors cursor-pointer ";
-              
-              if (isSelected) {
-                 rowClass += "bg-[#c4dbf6]";
-              } else if (isColoredRow) {
-                 rowStyle.backgroundColor = getStatusBgColor(row.status);
-                 rowStyle.color = 'black'; 
-              } else {
-                 rowClass += "hover:bg-blue-50"; 
-              }
-
-              if (row.logMessage) {
-                 rowClass += " border-l-4 border-l-red-500";
-              }
-
-              return (
-              <tr 
-                key={row.id} 
-                onClick={() => handleEdit(row)}
-                className={rowClass}
-                style={rowStyle}
-                title={row.logMessage ? `Log:\n${row.logMessage}` : ''}
-              >
-                <td className="px-2 py-1 border-r border-gray-300">{row.nota}</td>
-                <td className="p-0 border-r border-gray-300 text-white font-bold text-center align-middle whitespace-nowrap">
-                   {row.status && (
-                     <div 
-                        className="w-full h-full flex items-center justify-center px-2 py-1 uppercase" 
-                        style={{ backgroundColor: getStatusBgColor(row.status), color: getStatusTextColor(row.status) }}
-                     >
-                        {row.status}
-                     </div>
-                   )}
-                </td>
-                <td className="px-2 py-1 border-r border-gray-300 font-bold text-center">{row.teknisi}</td>
-                <td className="px-2 py-1 border-r border-gray-300 whitespace-nowrap">{row.namaUser}</td>
-                <td className="px-2 py-1 border-r border-gray-300">{row.noWaUser}</td>
-                <td className="px-2 py-1 border-r border-gray-300 truncate max-w-[120px]" title={row.device}>{row.device}</td>
-                <td className="px-2 py-1 border-r border-gray-300 truncate max-w-[160px]" title={row.keluhan}>{row.keluhan}</td>
-                <td className="px-2 py-1 border-r border-gray-300 truncate max-w-[80px]">
-                   {row.tglMasuk?.toLocaleDateString('en-GB', { day: '2-digit', month: 'short' })}
-                </td>
-                <td className={`px-2 py-1 border-r border-gray-300 text-right whitespace-nowrap font-medium ${isColoredRow ? '' : 'text-red-600'}`}>
-                   {row.biaya ? formatCurrency(parseNum(row.biaya)) : ''}
-                </td>
-                <td className={`px-2 py-1 border-r border-gray-300 text-right whitespace-nowrap font-medium ${isColoredRow ? '' : 'text-orange-600'}`}>
-                   {row.part ? formatCurrency(parseNum(row.part)) : ''}
-                </td>
-                <td className={`px-2 py-1 border-r border-gray-300 text-right whitespace-nowrap font-medium ${row.jasa < 0 ? 'text-red-500' : (isColoredRow ? '' : 'text-emerald-600')}`}>
-                   {formatCurrency(row.jasa)}
-                </td>
-                <td className="px-2 py-1 border-r border-gray-300 truncate max-w-[80px]">
-                   {row.tglAmbil ? row.tglAmbil.toLocaleDateString('en-GB', { day: '2-digit', month: 'short' }) : ''}
-                </td>
-                <td className="px-2 py-1 border-r border-gray-300 whitespace-nowrap">{row.garansi}</td>
-                <td className="px-2 py-1">{row.cashTf}</td>
-              </tr>
-              );
-            })}
-          </tbody>
-        </table>
-      </div>
+               const isSelected = selectedRecordId === row.id;
+               
+               let rowStyle: React.CSSProperties = {};
+               let rowClass = "border-b border-gray-300 transition-colors cursor-pointer ";
+               
+               if (isSelected) {
+                  rowClass += "bg-[#c4dbf6]";
+               } else if (isColoredRow) {
+                  rowStyle.backgroundColor = getStatusBgColor(row.status);
+                  rowStyle.color = 'black'; 
+               } else {
+                  rowClass += "hover:bg-blue-50"; 
+               }
+ 
+               if (row.logMessage) {
+                  rowClass += " border-l-4 border-l-red-500";
+               }
+ 
+               return (
+               <tr 
+                 key={row.id} 
+                 onClick={() => handleEdit(row)}
+                 className={rowClass}
+                 style={rowStyle}
+                 title={row.logMessage ? `Log:\n${row.logMessage}` : ''}
+               >
+                 <td className="px-1 py-0.5 border-r border-gray-300 text-center w-[45px] truncate">{row.nota}</td>
+                 <td className="p-0 border-r border-gray-300 text-white font-bold text-left align-middle whitespace-nowrap w-[85px]">
+                    {row.status && (
+                      <div 
+                         className="w-full h-full flex items-center justify-start px-1 py-0.5 uppercase truncate text-[10px]" 
+                         style={{ backgroundColor: getStatusBgColor(row.status), color: getStatusTextColor(row.status) }}
+                      >
+                         {row.status}
+                       </div>
+                    )}
+                 </td>
+                 <td 
+                   className="px-1 py-0.5 border-r border-gray-300 font-bold text-center w-[45px] truncate"
+                   style={['AND', 'IRF', 'SMD', 'UDN'].includes(row.teknisi) ? {
+                     backgroundColor: getTeknisiBgColor(row.teknisi),
+                     color: getTeknisiTextColor(row.teknisi)
+                   } : {}}
+                 >
+                   {row.teknisi}
+                 </td>
+                 <td className="px-1 py-0.5 border-r border-gray-300 whitespace-nowrap text-left w-[70px] truncate" title={row.namaUser}>{row.namaUser}</td>
+                 <td className="px-1 py-0.5 border-r border-gray-300 text-left w-[80px] truncate" title={row.noWaUser}>{row.noWaUser}</td>
+                 <td className="px-1 py-0.5 border-r border-gray-300 text-left w-[75px] truncate" title={row.device}>{row.device}</td>
+                 <td className="px-1 py-0.5 border-r border-gray-300 text-left w-[100px] truncate" title={row.keluhan}>{row.keluhan}</td>
+                 <td className="px-1 py-0.5 border-r border-gray-300 text-center w-[65px] truncate">
+                    {formatDateToDDMMYYYY(row.tglMasuk)}
+                 </td>
+                 <td className={`px-1 py-0.5 border-r border-gray-300 text-right whitespace-nowrap font-medium w-[75px] truncate ${isColoredRow ? '' : 'text-red-600'}`}>
+                    {row.biaya ? formatCurrency(parseNum(row.biaya)) : ''}
+                 </td>
+                 <td className={`px-1 py-0.5 border-r border-gray-300 text-right whitespace-nowrap font-medium w-[75px] truncate ${isColoredRow ? '' : 'text-orange-600'}`}>
+                    {row.part ? formatCurrency(parseNum(row.part)) : ''}
+                 </td>
+                 <td className={`px-1 py-0.5 border-r border-gray-300 text-right whitespace-nowrap font-medium w-[75px] truncate ${row.jasa < 0 ? 'text-red-500' : (isColoredRow ? '' : 'text-emerald-600')}`}>
+                    {formatCurrency(row.jasa)}
+                 </td>
+                 <td className="px-1 py-0.5 border-r border-gray-300 text-center w-[65px] truncate">
+                    {formatDateToDDMMYYYY(row.tglAmbil)}
+                 </td>
+                 <td className="px-1 py-0.5 border-r border-gray-300 text-left whitespace-nowrap w-[65px] truncate" title={row.garansi}>{row.garansi}</td>
+                 <td className="px-1 py-0.5 text-left w-[45px] truncate" title={row.cashTf}>{row.cashTf}</td>
+               </tr>
+               );
+             })}
+           </tbody>
+         </table>
+       </div>
 
       {/* Bottom Summary Area */}
-      <div className="flex gap-2 mt-2 w-full overflow-x-auto no-scrollbar font-bold text-center">
-        <div className="flex flex-col min-w-[110px] flex-1">
-          <span className="text-base text-left mb-0.5 opacity-90">Total Unit Masuk</span>
+      <div className="grid grid-cols-7 gap-2 mt-2 w-full font-bold text-center">
+        <div className="flex flex-col min-w-0">
+          <span className="text-sm md:text-base text-left mb-0.5 opacity-90 truncate" title="Total Unit Masuk">Total Unit Masuk</span>
           <div className="bg-[#cc0099] text-xl py-1 rounded-sm shadow-inner">{records.length}</div>
         </div>
-        <div className="flex flex-col min-w-[110px] flex-1">
-          <span className="text-base text-left mb-0.5 opacity-90">Unit Nggandul</span>
+        <div className="flex flex-col min-w-0">
+          <span className="text-sm md:text-base text-left mb-0.5 opacity-90 truncate" title="Unit Nggandul">Unit Nggandul</span>
           <div className="bg-[#4d0099] text-xl py-1 rounded-sm shadow-inner">{records.filter(r => r.status && !r.status.includes('DONE') && !r.status.includes('CANCEL')).length}</div>
         </div>
-        <div className="flex flex-col min-w-[110px] flex-1">
-          <span className="text-base text-left mb-0.5 opacity-90">Progress</span>
+        <div className="flex flex-col min-w-0">
+          <span className="text-sm md:text-base text-left mb-0.5 opacity-90 truncate" title="Progress">Progress</span>
           <div className="bg-[#e6e600] text-black text-xl py-1 rounded-sm shadow-inner">{records.filter(r => r.status === 'PROGRESS').length}</div>
         </div>
-        <div className="flex flex-col min-w-[110px] flex-1">
-          <span className="text-base text-left mb-0.5 opacity-90">Done Saja</span>
+        <div className="flex flex-col min-w-0">
+          <span className="text-sm md:text-base text-left mb-0.5 opacity-90 truncate" title="Done Saja">Done Saja</span>
           <div className="bg-[#00cc00] text-xl py-1 rounded-sm shadow-inner">{records.filter(r => r.status === 'DONE').length}</div>
         </div>
-        <div className="flex flex-col min-w-[110px] flex-1">
-          <span className="text-base text-left mb-0.5 opacity-90">Cancel</span>
+        <div className="flex flex-col min-w-0">
+          <span className="text-sm md:text-base text-left mb-0.5 opacity-90 truncate" title="Cancel">Cancel</span>
           <div className="bg-[#ff8c00] text-black text-xl py-1 rounded-sm shadow-inner">{records.filter(r => r.status === 'CANCEL').length}</div>
         </div>
-        <div className="flex flex-col min-w-[110px] flex-1">
-          <span className="text-base text-left mb-0.5 opacity-90">Cancel Diambil</span>
+        <div className="flex flex-col min-w-0">
+          <span className="text-sm md:text-base text-left mb-0.5 opacity-90 truncate" title="Cancel Diambil">Cancel Diambil</span>
           <div className="bg-[#cc0000] text-xl py-1 rounded-sm shadow-inner">{records.filter(r => r.status === 'CANCEL AMBIL').length}</div>
+        </div>
+        <div className="flex flex-col min-w-0">
+          <span className="text-sm md:text-base text-left mb-0.5 opacity-90 truncate" title="Done Diambil">Done Diambil</span>
+          <div className="bg-[#114edc] text-xl py-1 rounded-sm shadow-inner">{records.filter(r => r.status === 'DONE AMBIL').length}</div>
         </div>
       </div>
     </div>

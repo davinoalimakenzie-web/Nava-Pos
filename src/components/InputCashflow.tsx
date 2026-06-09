@@ -35,6 +35,22 @@ const formatCurrency = (amount: number) => {
   return isNegative ? `-${formatted}` : formatted;
 };
 
+const getTeknisiBgColor = (tek: string) => {
+  switch (tek) {
+    case 'AND': return '#00cc00';
+    case 'IRF': return '#114edc';
+    case 'SMD': return '#a930b0';
+    case 'UDN': return '#e6e600';
+    default: return 'white';
+  }
+};
+
+const getTeknisiTextColor = (tek: string) => {
+  if (tek === 'UDN') return 'black';
+  if (tek) return 'white';
+  return 'black';
+};
+
 export const InputCashflow = () => {
   const [records, setRecords] = useState<CashflowRow[]>(() => {
     const saved = localStorage.getItem('POS_Cashflow');
@@ -229,6 +245,13 @@ export const InputCashflow = () => {
     ambil: monthBBFiltered.filter(r => r.status === 'DONE AMBIL').length,
     cancel: monthBBFiltered.filter(r => r.status === 'CANCEL' || r.status === 'CANCEL AMBIL').length,
   };
+
+  const overallStats = {
+    progress: allBBRecords.filter(r => r.status === 'PROGRESS').length,
+    done: allBBRecords.filter(r => r.status === 'DONE').length,
+    ambil: allBBRecords.filter(r => r.status === 'DONE AMBIL').length,
+    cancel: allBBRecords.filter(r => r.status === 'CANCEL' || r.status === 'CANCEL AMBIL').length,
+  };
   
   const handleJenisChange = (val: string) => {
     setJenis(val);
@@ -247,7 +270,7 @@ export const InputCashflow = () => {
       
       {/* Left Form Panel */}
       <div className="w-[320px] flex flex-col shrink-0">
-        <div className="flex flex-col gap-2 p-2 h-full relative">
+        <div className="flex flex-col gap-2 p-2 h-full relative overflow-y-auto pr-1 scrollbar-thin">
           
           <div className="flex items-center gap-2">
             <label className="w-28 font-bold shrink-0">TGL INPUT</label>
@@ -298,7 +321,8 @@ export const InputCashflow = () => {
               value={teknisi}
               onChange={e => setTeknisi(e.target.value)}
               disabled={jenis === 'NOTA' || isPengeluaran}
-              className={`flex-1 bg-white text-black px-1 py-0.5 outline-none h-[26px] ${(jenis === 'NOTA' || isPengeluaran) ? 'opacity-50' : ''}`}
+              className={`flex-1 outline-none h-[26px] px-1 py-0.5 ${(jenis === 'NOTA' || isPengeluaran) ? 'opacity-50' : ''}`}
+              style={{ backgroundColor: getTeknisiBgColor(teknisi), color: getTeknisiTextColor(teknisi) }}
             >
               <option value=""></option>
               <option value="AND">AND</option>
@@ -459,6 +483,32 @@ export const InputCashflow = () => {
             </div>
           </div>
 
+          <div className="mt-2 w-full h-[76px] border border-red-900/50 bg-[#260405] rounded-sm p-1.5 flex flex-col text-[11px] justify-between shadow-inner overflow-hidden select-none">
+            <div className="flex flex-col h-full justify-between">
+              <div className="border-b border-red-950 pb-0.5 mb-0.5 font-bold text-red-200 uppercase tracking-wider text-[9px]">
+                <span>RINGKASAN STATUS KESELURUHAN</span>
+              </div>
+              <div className="grid grid-cols-2 gap-x-1.5 gap-y-1 py-0.5">
+                <div className="flex justify-between items-center bg-yellow-950/40 px-1 py-0.5 rounded-sm border border-yellow-900/50">
+                  <span className="text-slate-300 font-medium">PROGRESS:</span>
+                  <span className="font-bold text-yellow-400">{overallStats.progress}</span>
+                </div>
+                <div className="flex justify-between items-center bg-emerald-950/40 px-1 py-0.5 rounded-sm border border-emerald-900/50">
+                  <span className="text-slate-300 font-medium">DONE:</span>
+                  <span className="font-bold text-emerald-400">{overallStats.done}</span>
+                </div>
+                <div className="flex justify-between items-center bg-blue-950/40 px-1 py-0.5 rounded-sm border border-blue-900/50">
+                  <span className="text-slate-300 font-medium">AMBIL:</span>
+                  <span className="font-bold text-blue-400">{overallStats.ambil}</span>
+                </div>
+                <div className="flex justify-between items-center bg-red-950/40 px-1 py-0.5 rounded-sm border border-red-900/50">
+                  <span className="text-slate-300 font-medium">CANCEL:</span>
+                  <span className="font-bold text-red-400">{overallStats.cancel}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
           {/* SIMPAN MODAL */}
           {simpanModalOpen && (
             <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/60">
@@ -564,7 +614,15 @@ export const InputCashflow = () => {
                   <td className="px-2 py-1 border-r border-gray-300 text-center">{row.tglInput.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}</td>
                   <td className={`px-2 py-1 border-r border-gray-300 text-center ${row.jenis === 'PENGELUARAN' && selectedRowId !== row.id ? 'bg-[#ff0000] text-white font-normal' : row.jenis === 'PENGELUARAN' && selectedRowId === row.id ? 'bg-[#ff0000] text-white' : ''}`}>{row.jenis}</td>
                   <td className="px-2 py-1 border-r border-gray-300 text-center">{row.nota}</td>
-                  <td className={`px-2 py-1 border-r border-gray-300 text-center ${row.teknisi === 'AND' ? 'bg-[#98fb98] text-black' : row.teknisi === 'IRF' ? 'bg-[#e0e0e0] text-black' : row.teknisi === 'SMD' ? 'bg-[#dda0dd] text-black' : row.teknisi === 'UDN' ? 'bg-[#ffffe0] text-black' : ''}`}>{row.teknisi}</td>
+                  <td 
+                    className="px-2 py-1 border-r border-gray-300 text-center font-bold"
+                    style={['AND', 'IRF', 'SMD', 'UDN'].includes(row.teknisi) ? {
+                      backgroundColor: getTeknisiBgColor(row.teknisi),
+                      color: getTeknisiTextColor(row.teknisi)
+                    } : {}}
+                  >
+                    {row.teknisi}
+                  </td>
                   <td className="px-2 py-1 border-r border-gray-300 text-left pl-2">{row.keterangan}</td>
                   <td className="px-2 py-1 border-r border-gray-300 text-right pr-2 font-medium">{row.biaya ? formatCurrency(row.biaya) : ''}</td>
                   <td className="px-2 py-1 border-r border-gray-300 text-right pr-2 font-medium">{row.pob ? formatCurrency(row.pob) : ''}</td>
