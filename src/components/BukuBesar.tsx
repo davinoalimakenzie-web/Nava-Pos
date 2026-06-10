@@ -1,5 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { CustomDatePicker } from './CustomDatePicker';
+import { Download, MessageSquare, ExternalLink, FileSpreadsheet } from 'lucide-react';
+import * as XLSX from 'xlsx';
 
 export interface RecordData {
   id: string;
@@ -105,9 +107,7 @@ export const generateDummyData = (): RecordData[] => {
         
         let total = Math.floor(Math.random() * 50) * 10000 + 50000;
         let modal = Math.floor((total * 0.3) / 10000) * 10000;
-        let pph = Math.floor((total * 0.05) / 10000) * 10000;
-        let feeTeknisi = Math.floor((total * 0.2) / 10000) * 10000;
-        let jasa = total - modal - pph - feeTeknisi;
+        let jasa = total - modal;
         
         let tglAmbil = new Date(tglSelesai);
         tglAmbil.setHours(tglAmbil.getHours() + Math.floor(Math.random() * 24));
@@ -138,8 +138,97 @@ export const generateDummyData = (): RecordData[] => {
 };
 
 export const BukuBesar = () => {
-  const [records, setRecords] = useState<RecordData[]>(generateDummyData());
+  const [records, setRecords] = useState<RecordData[]>(() => {
+    const saved = localStorage.getItem('POS_BukuBesar');
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        return parsed.map((r: any) => ({
+          ...r,
+          tglMasuk: r.tglMasuk ? new Date(r.tglMasuk) : null,
+          tglAmbil: r.tglAmbil ? new Date(r.tglAmbil) : null,
+        }));
+      } catch (e) {
+        console.error("Gagal membaca local storage Buku Besar", e);
+      }
+    }
+    const initial = generateDummyData();
+    localStorage.setItem('POS_BukuBesar', JSON.stringify(initial));
+    return initial;
+  });
+
+  useEffect(() => {
+    localStorage.setItem('POS_BukuBesar', JSON.stringify(records));
+    cachedRecords = records;
+  }, [records]);
+
   const [selectedRecordId, setSelectedRecordId] = useState<string | null>(null);
+
+  const getWhatsAppUrl = (noWa: string, customMessage: string) => {
+    let cleaned = noWa.replace(/\D/g, "");
+    if (cleaned.startsWith("0")) {
+      cleaned = "62" + cleaned.slice(1);
+    }
+    return `https://wa.me/${cleaned}?text=${encodeURIComponent(customMessage)}`;
+  };
+
+  const getWaMessage = (row: any) => {
+    const formattedBiaya = row.biaya ? formatCurrency(parseNum(row.biaya)) : 'Rp 0';
+    if (row.status === 'DONE') {
+      return `Halo Ibu/Bapak *${row.namaUser || ''}*, device Anda *${row.device || ''}* dengan No. Nota *${row.nota || ''}* telah selesai diperbaiki dengan nominal biaya *${formattedBiaya}*. Silakan bisa diambil dan dicek kembali di toko kami. Terima kasih! 🙏`;
+    } else if (row.status === 'DONE AMBIL') {
+      return `Halo Ibu/Bapak *${row.namaUser || ''}*, device Anda *${row.device || ''}* dengan No. Nota *${row.nota || ''}* telah selesai diperbaiki dengan nominal biaya *${formattedBiaya}* dan telah diambil (DONE AMBIL). Terima kasih banyak atas kepercayaan Anda! 🙏`;
+    } else if (row.status === 'CANCEL' || row.status === 'CANCEL AMBIL') {
+      return `Halo Ibu/Bapak *${row.namaUser || ''}*, mohon maaf device Anda *${row.device || ''}* dengan No. Nota *${row.nota || ''}* tidak dapat diperbaiki (CANCEL). Perangkat silakan bisa diambil kembali di toko. Terima kasih.`;
+    } else if (row.status === 'PROGRESS') {
+      return `Halo Ibu/Bapak *${row.namaUser || ''}*, device Anda *${row.device || ''}* dengan No. Nota *${row.nota || ''}* sedang dalam pengerjaan oleh teknisi kami. Kami akan menginfokan kembali jika sudah selesai. Terima kasih banyak atas kepercayaan Anda!`;
+    }
+    return `Halo Ibu/Bapak *${row.namaUser || ''}*, menginfokan mengenai perbaikan device Anda *${row.device || ''}* dengan No. Nota *${row.nota || ''}*. Saat ini status unit adalah: *${row.status || ''}*. Silakan menghubungi kami untuk detailnya. Terima kasih.`;
+  };
+
+  const exportToExcel = () => {
+    const dataToExport = records.map(r => ({
+      'No. Nota': r.nota,
+      'Status': r.status,
+      'Teknisi': r.teknisi,
+      'Nama Pelanggan': r.namaUser,
+      'No. WhatsApp': r.noWaUser,
+      'Device / Perangkat': r.device,
+      'Keluhan / Kerusakan': r.keluhan,
+      'Garansi': r.garansi,
+      'Tanggal Masuk': formatDateToDDMMYYYY(r.tglMasuk),
+      'Biaya': parseNum(r.biaya),
+      'Modal / Part': parseNum(r.part),
+      'Jasa (Pendapatan)': r.jasa,
+      'Tanggal Ambil': formatDateToDDMMYYYY(r.tglAmbil),
+      'Metode Bayar': r.cashTf,
+      'Catatan Log': r.logMessage || ''
+    }));
+
+    const worksheet = XLSX.utils.json_to_sheet(dataToExport);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'Buku Besar');
+
+    worksheet['!cols'] = [
+      { wch: 10 }, // No. Nota
+      { wch: 15 }, // Status
+      { wch: 10 }, // Teknisi
+      { wch: 20 }, // Nama Pelanggan
+      { wch: 15 }, // No. WhatsApp
+      { wch: 20 }, // Device
+      { wch: 25 }, // Keluhan
+      { wch: 15 }, // Garansi
+      { wch: 15 }, // Tanggal Masuk
+      { wch: 15 }, // Biaya
+      { wch: 15 }, // Modal
+      { wch: 15 }, // Jasa
+      { wch: 15 }, // Tanggal Ambil
+      { wch: 15 }, // Metode Bayar
+      { wch: 40 }  // Catatan Log
+    ];
+
+    XLSX.writeFile(workbook, `Buku_Besar_Backup_${new Date().toISOString().split('T')[0]}.xlsx`);
+  };
 
   const [filterDariTanggal, setFilterDariTanggal] = useState<Date | null>(new Date());
   const [filterSampaiTanggal, setFilterSampaiTanggal] = useState<Date | null>(new Date());
@@ -256,6 +345,15 @@ export const BukuBesar = () => {
 
   const [logModalOpen, setLogModalOpen] = useState(false);
   const [logInput, setLogInput] = useState('');
+  const [alertModal, setAlertModal] = useState<{open: boolean, message: string}>({ open: false, message: '' });
+  const [waPopupModal, setWaPopupModal] = useState<{
+    open: boolean;
+    message: string;
+    noWa: string;
+    recordToSave: RecordData;
+    isEdit: boolean;
+    updatedLogMessage: string;
+  } | null>(null);
   
   const handleLogClick = () => {
     if (!selectedRecordId) {
@@ -317,7 +415,26 @@ export const BukuBesar = () => {
     setCashTf('');
   };
 
+  const commitSave = (record: RecordData, isEdit: boolean, finalLogMessage: string) => {
+    const recordWithLog = { ...record, logMessage: finalLogMessage };
+    if (isEdit) {
+      const u = records.map(r => r.id === record.id ? recordWithLog : r);
+      setRecords(u);
+      cachedRecords = u;
+    } else {
+      const u = [recordWithLog, ...records];
+      setRecords(u);
+      cachedRecords = u;
+    }
+    handleClear();
+  };
+
   const handleSimpan = () => {
+    if (!nota || !teknisi || !namaUser || !noWaUser || !device || !keluhan || !status || !garansi || !tglMasuk || !biaya || !part || !tglAmbil || !cashTf) {
+      setAlertModal({ open: true, message: 'Harap isi semua kolom sebelum menyimpan!' });
+      return;
+    }
+
     const newRecord: RecordData = {
       id: selectedRecordId || Date.now().toString(),
       nota,
@@ -336,16 +453,42 @@ export const BukuBesar = () => {
       cashTf
     };
 
+    const timestamp = new Date().toLocaleString('id-ID', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+
+    let updatedLogMessage = '';
+    let isStatusChanged = false;
+
     if (selectedRecordId) {
-      const u = records.map(r => r.id === selectedRecordId ? { ...r, ...newRecord, logMessage: r.logMessage } : r);
-      setRecords(u);
-      cachedRecords = u;
+      const oldRecord = records.find(r => r.id === selectedRecordId);
+      updatedLogMessage = oldRecord?.logMessage || '';
+      if (oldRecord && oldRecord.status !== status) {
+        isStatusChanged = true;
+        const changeEntry = `[${timestamp}] AutoLog: Status berubah dari '${oldRecord.status || 'KOSONG'}' ke '${status}' oleh Teknisi/Admin: ${teknisi}`;
+        updatedLogMessage = updatedLogMessage ? `${updatedLogMessage}\n${changeEntry}` : changeEntry;
+      }
     } else {
-      const u = [newRecord, ...records];
-      setRecords(u);
-      cachedRecords = u;
+      isStatusChanged = true; // Treating on-creation as status change
+      updatedLogMessage = `[${timestamp}] AutoLog: Unit baru masuk dengan status '${status}' (Teknisi: ${teknisi})`;
     }
-    handleClear();
+
+    const targetStatuses = ['DONE', 'CANCEL', 'DONE AMBIL'];
+    const isTargetStatus = targetStatuses.includes(status.toUpperCase().trim());
+    const isWaEmptyOrStrip = !noWaUser || noWaUser.trim() === '' || noWaUser.trim() === '-';
+
+    if (isTargetStatus && isStatusChanged && !isWaEmptyOrStrip) {
+      // Open the editable WhatsApp notification popup
+      setWaPopupModal({
+        open: true,
+        message: getWaMessage(newRecord),
+        noWa: noWaUser,
+        recordToSave: newRecord,
+        isEdit: !!selectedRecordId,
+        updatedLogMessage: updatedLogMessage
+      });
+    } else {
+      // Save directly
+      commitSave(newRecord, !!selectedRecordId, updatedLogMessage);
+    }
   };
 
   const handleHapus = () => {
@@ -376,19 +519,135 @@ export const BukuBesar = () => {
 
   return (
     <div className="flex-1 flex flex-col bg-[#050B24] text-white p-2 h-full overflow-hidden text-[13px] font-sans">
-      {logModalOpen && (
+      {alertModal.open && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center">
-          <div className="bg-white text-black p-4 w-[400px] shadow-lg flex flex-col gap-3 border border-gray-400">
-            <h3 className="font-bold border-b border-gray-300 pb-2 text-sm">Tambah Log Message</h3>
-            <textarea 
-               className="w-full border border-gray-300 p-2 outline-none h-24 text-sm" 
-               placeholder="Tulis pesan atau log teknisi..."
-               value={logInput}
-               onChange={e => setLogInput(e.target.value)}
-            />
-            <div className="flex justify-end gap-2 mt-2">
-              <button onClick={() => setLogModalOpen(false)} className="px-4 py-1.5 border border-gray-400 hover:bg-gray-100 font-bold text-xs transition-colors">BATAL</button>
-              <button onClick={submitLog} className="px-4 py-1.5 bg-[#1e2b6b] text-white hover:bg-[#2a3c94] font-bold text-xs transition-colors">SIMPAN LOG</button>
+          <div className="bg-white text-black p-4 w-[320px] shadow-lg flex flex-col gap-3 border border-gray-400">
+            <h3 className="font-bold border-b border-gray-300 pb-2 text-sm text-red-600">Peringatan</h3>
+            <p className="text-sm font-medium">{alertModal.message}</p>
+            <div className="flex justify-end mt-2">
+              <button 
+                onClick={() => setAlertModal({ open: false, message: '' })} 
+                className="px-4 py-1.5 bg-[#1e2b6b] text-white hover:bg-[#2a3c94] font-bold text-xs transition-colors"
+               >
+                 TUTUP
+               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {logModalOpen && (
+        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
+          <div className="bg-[#f3f4f6] text-black w-full max-w-lg shadow-2xl flex flex-col border-2 border-slate-600 max-h-[85vh]">
+            <div className="bg-[#1e2b6b] text-white px-4 py-2.5 font-bold flex justify-between items-center border-b border-slate-700 shadow-sm">
+              <span className="flex items-center gap-1.5 uppercase tracking-wide text-xs">
+                📚 Riwayat Log Transaksi (Nota: {records.find(r => r.id === selectedRecordId)?.nota || '-'})
+              </span>
+              <button onClick={() => setLogModalOpen(false)} className="text-white hover:text-red-300 font-bold transition-colors">✕</button>
+            </div>
+            
+            <div className="p-4 flex-1 overflow-y-auto flex flex-col gap-4">
+              {/* Timeline list of previous logs */}
+              <div>
+                <h4 className="font-bold text-[11px] text-gray-500 uppercase mb-2 tracking-wider border-b border-gray-300 pb-1 flex items-center justify-between">
+                  <span>Aktivitas Perangkat</span>
+                  <span className="text-[10px] lowercase normal-case italic font-normal text-gray-400">Terurut Waktu</span>
+                </h4>
+                <div className="flex flex-col gap-2 max-h-[220px] overflow-y-auto pr-1">
+                  {records.find(r => r.id === selectedRecordId)?.logMessage ? (
+                    records.find(r => r.id === selectedRecordId)!.logMessage!.split('\n').map((line, idx) => {
+                      const isAuto = line.includes('AutoLog:');
+                      return (
+                        <div key={idx} className={`p-2.5 border rounded-sm text-xs leading-relaxed ${isAuto ? 'bg-amber-50 border-amber-200 text-amber-900 shadow-sm' : 'bg-blue-50 border-blue-200 text-blue-900 shadow-sm'}`}>
+                          <p className="font-medium whitespace-pre-wrap">{line}</p>
+                        </div>
+                      );
+                    })
+                  ) : (
+                    <p className="text-xs text-gray-400 italic py-2">Belum ada log terekam untuk perangkat ini.</p>
+                  )}
+                </div>
+              </div>
+
+              {/* Form to submit manual log input */}
+              <div className="border-t border-gray-300 pt-3 flex flex-col gap-1.5">
+                <h4 className="font-bold text-[11px] text-gray-500 uppercase tracking-wider">Tambah Catatan / Log Teknisi</h4>
+                <textarea 
+                   className="w-full border border-gray-300 bg-white p-2.5 outline-none h-20 text-xs text-black shadow-inner" 
+                   placeholder="Tulis pesan status pengerjaan atau detail penggantian part baru..."
+                   value={logInput}
+                   onChange={e => setLogInput(e.target.value)}
+                />
+              </div>
+            </div>
+
+            <div className="bg-gray-100 border-t border-gray-200 p-3 flex justify-end gap-2 shrink-0">
+              <button onClick={() => setLogModalOpen(false)} className="px-4 py-1.5 border border-gray-400 bg-white text-gray-800 hover:bg-gray-50 font-bold text-xs transition-colors">BATAL</button>
+              <button onClick={submitLog} className="px-4 py-1.5 bg-[#1e2b6b] text-white hover:bg-[#2a3c94] font-bold text-xs transition-colors shadow">SIMPAN CATATAN</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {waPopupModal?.open && (
+        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
+          <div className="bg-[#f3f4f6] text-black w-full max-w-lg shadow-2xl flex flex-col border-2 border-slate-600">
+            <div className="bg-[#1e2b6b] text-white px-4 py-2.5 font-bold flex justify-between items-center border-b border-slate-700 shadow-sm">
+              <span className="flex items-center gap-1.5 uppercase tracking-wide text-xs">
+                📲 Edit & Kirim Notifikasi WhatsApp (Status: {waPopupModal.recordToSave.status})
+              </span>
+              <button 
+                onClick={() => setWaPopupModal(null)} 
+                className="text-white hover:text-red-300 font-bold transition-colors"
+              >
+                ✕
+              </button>
+            </div>
+            
+            <div className="p-4 flex flex-col gap-3">
+              <div className="text-xs text-gray-600 bg-white p-2.5 border border-gray-300 rounded-sm">
+                <p><strong>Penerima:</strong> {waPopupModal.recordToSave.namaUser} ({waPopupModal.noWa})</p>
+                <p className="mt-1"><strong>Status Garapan Baru:</strong> <span className="bg-blue-100 text-blue-900 px-1.5 py-0.5 rounded font-bold text-[10px]">{waPopupModal.recordToSave.status}</span></p>
+              </div>
+
+              <div className="flex flex-col gap-1.5">
+                <label className="font-bold text-[11px] text-gray-500 uppercase tracking-wider">Isi Pesan WhatsApp:</label>
+                <textarea 
+                  className="w-full border border-gray-300 bg-white p-2.5 outline-none h-44 text-xs text-black shadow-inner font-sans resize-y" 
+                  value={waPopupModal.message}
+                  onChange={(e) => setWaPopupModal({ ...waPopupModal, message: e.target.value })}
+                  placeholder="Isi pesan chat..."
+                />
+              </div>
+            </div>
+
+            <div className="bg-gray-100 border-t border-gray-200 p-3 flex flex-wrap justify-end gap-2 shrink-0">
+              <button 
+                onClick={() => setWaPopupModal(null)} 
+                className="px-4 py-1.5 border border-gray-400 bg-white hover:bg-gray-50 font-bold text-xs text-gray-800 transition-colors"
+              >
+                BATAL
+              </button>
+              <button 
+                onClick={() => {
+                  commitSave(waPopupModal.recordToSave, waPopupModal.isEdit, waPopupModal.updatedLogMessage);
+                  setWaPopupModal(null);
+                }} 
+                className="px-4 py-1.5 bg-gray-600 text-white hover:bg-gray-700 font-bold text-xs transition-colors shadow"
+              >
+                SIMPAN SAJA
+              </button>
+              <button 
+                onClick={() => {
+                  window.open(getWhatsAppUrl(waPopupModal.noWa, waPopupModal.message), '_blank');
+                  commitSave(waPopupModal.recordToSave, waPopupModal.isEdit, waPopupModal.updatedLogMessage);
+                  setWaPopupModal(null);
+                }} 
+                className="px-4 py-1.5 bg-emerald-600 text-white hover:bg-emerald-700 font-bold text-xs transition-colors shadow flex items-center gap-1"
+                title="Kirim pesan di WhatsApp lalu lanjut simpan"
+              >
+                <MessageSquare className="w-3.5 h-3.5" /> KIRIM & LANJUT SIMPAN
+              </button>
             </div>
           </div>
         </div>
@@ -618,6 +877,11 @@ export const BukuBesar = () => {
           </div>
           <div className="flex flex-col gap-0.5 mb-[1px] shrink-0">
             <button onClick={handleLogClick} className="bg-red-600 text-white px-3 py-0.5 hover:bg-red-700 font-bold h-[26px] text-[13px]">LOG</button>
+          </div>
+          <div className="flex flex-col gap-0.5 mb-[1px] shrink-0">
+            <button onClick={exportToExcel} className="bg-emerald-600 text-white px-3 py-0.5 hover:bg-emerald-700 font-bold h-[26px] text-[13px] flex items-center gap-1 transition-colors" title="Eksport data Buku Besar ke file .xlsx (Excel)">
+              <FileSpreadsheet className="w-3.5 h-3.5" /> EXCEL
+            </button>
           </div>
         </div>
       </div>

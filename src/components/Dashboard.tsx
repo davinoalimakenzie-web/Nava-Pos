@@ -49,6 +49,60 @@ export const Dashboard = ({ currentTime }: { currentTime: Date }) => {
     hutangSupplier, kewajibanLain, setActiveTab 
   } = useAppContext();
 
+  // Comprehensive Time Filter States
+  const [timeframe, setTimeframe] = useState<'WEEK' | 'MONTH' | '3MONTHS' | 'CUSTOM'>('MONTH');
+  const [customStart, setCustomStart] = useState<string>(() => {
+    const d = new Date();
+    d.setMonth(d.getMonth() - 1);
+    return d.toISOString().split('T')[0];
+  });
+  const [customEnd, setCustomEnd] = useState<string>(() => {
+    return new Date().toISOString().split('T')[0];
+  });
+
+  const parsedRange = useMemo(() => {
+    const today = new Date();
+    const end = new Date(today);
+    end.setHours(23, 59, 59, 999);
+    
+    let start = new Date(today);
+    start.setHours(0, 0, 0, 0);
+
+    if (timeframe === 'WEEK') {
+      start.setDate(today.getDate() - 6);
+    } else if (timeframe === 'MONTH') {
+      start.setDate(1); // 1st of current month
+    } else if (timeframe === '3MONTHS') {
+      start.setMonth(today.getMonth() - 3);
+      start.setDate(1);
+    } else if (timeframe === 'CUSTOM') {
+      if (customStart) {
+        start = new Date(customStart);
+        start.setHours(0, 0, 0, 0);
+      }
+      if (customEnd) {
+        const customEndDate = new Date(customEnd);
+        customEndDate.setHours(23, 59, 59, 999);
+        end.setTime(customEndDate.getTime());
+      }
+    }
+    return { start, end };
+  }, [timeframe, customStart, customEnd]);
+
+  const filteredTransactions = useMemo(() => {
+    return transactions.filter((t: any) => {
+      const tDate = new Date(t.date);
+      return tDate >= parsedRange.start && tDate <= parsedRange.end;
+    });
+  }, [transactions, parsedRange]);
+
+  const filteredExpenses = useMemo(() => {
+    return expenses.filter((e: any) => {
+      const eDate = new Date(e.date);
+      return eDate >= parsedRange.start && eDate <= parsedRange.end;
+    });
+  }, [expenses, parsedRange]);
+
   const [notificationsEnabled, setNotificationsEnabled] = useState(() => {
     return localStorage.getItem('POS_stockNotifications') === 'true';
   });
@@ -305,7 +359,7 @@ export const Dashboard = ({ currentTime }: { currentTime: Date }) => {
   const topItems = useMemo(() => {
     const itemCounts: Record<string, {name: string, qty: number, total: number}> = {};
     
-    transactions.forEach((t: any) => {
+    filteredTransactions.forEach((t: any) => {
         t.items.forEach((item: any) => {
             if (item.isReturn) return;
             if (!itemCounts[item.name]) {
@@ -319,12 +373,12 @@ export const Dashboard = ({ currentTime }: { currentTime: Date }) => {
     return Object.values(itemCounts)
         .sort((a, b) => b.qty - a.qty)
         .slice(0, 5); // top 5
-  }, [transactions]);
+  }, [filteredTransactions]);
 
   const revenueByCategory = useMemo(() => {
     const categoryTotals: Record<string, number> = {};
 
-    transactions.forEach((t: any) => {
+    filteredTransactions.forEach((t: any) => {
         t.items.forEach((item: any) => {
             const cat = item.category || 'LAINNYA';
             if (!categoryTotals[cat]) {
@@ -341,31 +395,49 @@ export const Dashboard = ({ currentTime }: { currentTime: Date }) => {
     return Object.entries(categoryTotals)
         .map(([name, value]) => ({ name, value }))
         .sort((a, b) => b.value - a.value);
-  }, [transactions]);
+  }, [filteredTransactions]);
 
   const PIE_COLORS = ['#0052cc', '#00a651', '#f59e0b', '#dc2626', '#8b5cf6', '#0ea5e9', '#ec4899'];
 
-  const currentMonthDailySalesData = useMemo(() => {
+  const rangeDailySalesData = useMemo(() => {
     const data = [];
-    const today = new Date();
-    const year = today.getFullYear();
-    const month = today.getMonth();
-    const numDays = new Date(year, month + 1, 0).getDate();
+    const start = new Date(parsedRange.start);
+    const end = new Date(parsedRange.end);
 
-    for (let i = 1; i <= numDays; i++) {
-      const d = new Date(year, month, i);
-      const dateStr = d.toISOString().split('T')[0];
-      const dayTxs = transactions.filter((t: any) => t.date.startsWith(dateStr));
-      const totalSales = dayTxs.reduce((sum: number, t: any) => sum + t.total, 0);
+    const diffTime = Math.abs(end.getTime() - start.getTime());
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
 
-      data.push({
-        date: dateStr,
-        sales: totalSales,
-        label: i.toString() // Day of the month
-      });
+    let temp = new Date(start);
+    if (diffDays <= 45) {
+      while (temp <= end) {
+        const dateStr = temp.toISOString().split('T')[0];
+        const dayTxs = filteredTransactions.filter((t: any) => t.date.startsWith(dateStr));
+        const totalSales = dayTxs.reduce((sum: number, t: any) => sum + t.total, 0);
+
+        data.push({
+          date: dateStr,
+          sales: totalSales,
+          label: temp.toLocaleDateString('id-ID', { day: '2-digit', month: 'short' })
+        });
+        temp.setDate(temp.getDate() + 1);
+      }
+    } else {
+      const step = Math.ceil(diffDays / 30);
+      while (temp <= end) {
+        const dateStr = temp.toISOString().split('T')[0];
+        const dayTxs = filteredTransactions.filter((t: any) => t.date.startsWith(dateStr));
+        const totalSales = dayTxs.reduce((sum: number, t: any) => sum + t.total, 0);
+
+        data.push({
+          date: dateStr,
+          sales: totalSales,
+          label: temp.toLocaleDateString('id-ID', { day: '2-digit', month: 'short' })
+        });
+        temp.setDate(temp.getDate() + step);
+      }
     }
     return data;
-  }, [transactions]);
+  }, [filteredTransactions, parsedRange]);
 
   // 3. Current Cash Flow Status (Today) and Growth
   const cashFlowToday = useMemo(() => {
@@ -578,6 +650,69 @@ export const Dashboard = ({ currentTime }: { currentTime: Date }) => {
       </div>
 
       <div className="p-2 flex flex-col gap-4 overflow-y-auto h-full text-black">
+        
+        {/* TIME RANGE SELECTOR BAR */}
+        <div className="bg-[#ece9d8] border border-gray-400 p-2.5 flex flex-wrap items-center justify-between gap-3 shadow-sm select-none shrink-0">
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-bold text-gray-700 uppercase tracking-wider">🗓️ Rentang Analitik:</span>
+            <div className="inline-flex rounded-sm shadow-sm bg-gray-300 p-0.5 border border-gray-400">
+              <button
+                onClick={() => setTimeframe('WEEK')}
+                className={`px-3 py-1 text-xs font-bold transition-all uppercase rounded-sm ${timeframe === 'WEEK' ? 'bg-[#1e2b6b] text-white shadow-sm' : 'text-gray-700 hover:bg-gray-100/70 border border-transparent'}`}
+              >
+                Minggu Ini
+              </button>
+              <button
+                onClick={() => setTimeframe('MONTH')}
+                className={`px-3 py-1 text-xs font-bold transition-all uppercase rounded-sm ${timeframe === 'MONTH' ? 'bg-[#1e2b6b] text-white shadow-sm' : 'text-gray-700 hover:bg-gray-100/70 border border-transparent'}`}
+              >
+                Bulan Ini
+              </button>
+              <button
+                onClick={() => setTimeframe('3MONTHS')}
+                className={`px-3 py-1 text-xs font-bold transition-all uppercase rounded-sm ${timeframe === '3MONTHS' ? 'bg-[#1e2b6b] text-white shadow-sm' : 'text-gray-700 hover:bg-gray-100/70 border border-transparent'}`}
+              >
+                3 Bulan terakhir
+              </button>
+              <button
+                onClick={() => setTimeframe('CUSTOM')}
+                className={`px-3 py-1 text-xs font-bold transition-all uppercase rounded-sm ${timeframe === 'CUSTOM' ? 'bg-[#1e2b6b] text-white shadow-sm' : 'text-gray-700 hover:bg-gray-100/70 border border-transparent'}`}
+              >
+                Kustom
+              </button>
+            </div>
+          </div>
+
+          {timeframe === 'CUSTOM' && (
+            <div className="flex items-center gap-2.5 bg-white/80 p-1 border border-gray-400 rounded-sm shadow-inner">
+              <div className="flex items-center gap-1">
+                <span className="text-[10px] font-bold text-gray-600 uppercase">Dari:</span>
+                <input
+                  type="date"
+                  value={customStart}
+                  onChange={(e) => setCustomStart(e.target.value)}
+                  className="bg-white border border-gray-400 px-1 py-0.5 text-xs text-black outline-none h-6 font-mono"
+                />
+              </div>
+              <div className="flex items-center gap-1">
+                <span className="text-[10px] font-bold text-gray-600 uppercase">Sampai:</span>
+                <input
+                  type="date"
+                  value={customEnd}
+                  onChange={(e) => setCustomEnd(e.target.value)}
+                  className="bg-white border border-gray-400 px-1 py-0.5 text-xs text-black outline-none h-6 font-mono"
+                />
+              </div>
+            </div>
+          )}
+
+          <div className="text-right flex flex-col justify-center bg-white/50 border border-gray-300 px-3 py-1 rounded-sm shadow-inner min-w-[200px]">
+            <span className="text-[9px] text-gray-500 font-bold uppercase tracking-wider leading-none mb-0.5">Periode Tinjau Analitik</span>
+            <span className="text-xs font-black text-blue-900 font-mono">
+              {parsedRange.start.toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' })} - {parsedRange.end.toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' })}
+            </span>
+          </div>
+        </div>
         
         {/* FITUR 1: WIDGET DANA BEBAS DOMINAN */}
         <div className="bg-white border-4 border-blue-900 shadow-lg p-6 relative">
@@ -871,7 +1006,7 @@ export const Dashboard = ({ currentTime }: { currentTime: Date }) => {
                    PRODUK PALING LARIS
                 </div>
                 <div className="flex-1 p-4 bg-white m-1 border border-gray-300 min-h-[250px]">
-                     <ResponsiveContainer width="99%" height="100%" minHeight={250}>
+                     <ResponsiveContainer width="100%" height={255}>
                         <BarChart data={topItems} layout="vertical" margin={{ top: 5, right: 20, bottom: 5, left: 100 }}>
                           <CartesianGrid strokeDasharray="3 3" stroke="#e0e0e0"/>
                           <XAxis type="number" fontSize={11} />
@@ -898,7 +1033,7 @@ export const Dashboard = ({ currentTime }: { currentTime: Date }) => {
                        PENDAPATAN PER KATEGORI
                     </div>
                     <div className="flex-1 p-4 bg-white m-1 border border-gray-300 min-h-[250px]">
-                         <ResponsiveContainer width="99%" height="100%" minHeight={250}>
+                         <ResponsiveContainer width="100%" height={255}>
                             <PieChart>
                               <Pie
                                 data={revenueByCategory}
@@ -937,7 +1072,7 @@ export const Dashboard = ({ currentTime }: { currentTime: Date }) => {
                        PENDAPATAN VS PENGELUARAN (6 BULAN)
                     </div>
                     <div className="flex-1 p-4 bg-white m-1 border border-gray-300 min-h-[250px]">
-                        <ResponsiveContainer width="99%" height="100%" minHeight={250}>
+                        <ResponsiveContainer width="100%" height={255}>
                             <LineChart data={monthlyData} margin={{ top: 5, right: 20, bottom: 5, left: 20 }}>
                               <CartesianGrid strokeDasharray="3 3" stroke="#e0e0e0"/>
                               <XAxis dataKey="label" fontSize={11} />
@@ -960,12 +1095,12 @@ export const Dashboard = ({ currentTime }: { currentTime: Date }) => {
                     animate={{ opacity: 1, scale: 1 }}
                     transition={{ duration: 0.5, delay: 0.85 }}
                     className="bg-[#ece9d8] border border-gray-400 shadow-sm flex flex-col lg:col-span-2">
-                    <div className="bg-blue-900 text-white font-bold px-3 py-1.5 text-sm flex justify-between shadow-sm">
-                       PENDAPATAN HARIAN (BULAN INI)
+                    <div className="bg-blue-900 text-white font-bold px-3 py-1.5 text-sm flex justify-between shadow-sm uppercase tracking-wide text-xs">
+                       PENDAPATAN HARIAN ({timeframe === 'WEEK' ? 'MINGGU INI' : timeframe === 'MONTH' ? 'BULAN INI' : timeframe === '3MONTHS' ? '3 BULAN TERAKHIR' : 'PERIODE KUSTOM'})
                     </div>
                     <div className="flex-1 p-4 bg-white m-1 border border-gray-300 min-h-[250px]">
-                        <ResponsiveContainer width="99%" height="100%" minHeight={250}>
-                            <LineChart data={currentMonthDailySalesData} margin={{ top: 5, right: 20, bottom: 5, left: 20 }}>
+                        <ResponsiveContainer width="100%" height={255}>
+                            <LineChart data={rangeDailySalesData} margin={{ top: 5, right: 20, bottom: 5, left: 20 }}>
                               <CartesianGrid strokeDasharray="3 3" stroke="#e0e0e0"/>
                               <XAxis dataKey="label" fontSize={11} />
                               <YAxis fontSize={11} tickFormatter={(val) => `Rp ${val/1000}k`} />
@@ -992,7 +1127,7 @@ export const Dashboard = ({ currentTime }: { currentTime: Date }) => {
                        PROYEKSI MINGGUAN
                     </div>
                     <div className="flex-1 p-4 bg-white m-1 border border-gray-300 min-h-[250px]">
-                        <ResponsiveContainer width="99%" height="100%" minHeight={250}>
+                        <ResponsiveContainer width="100%" height={255}>
                             <BarChart data={weeklyProjectionData} margin={{ top: 15, right: 10, bottom: 5, left: 10 }}>
                               <CartesianGrid strokeDasharray="3 3" stroke="#e0e0e0"/>
                               <XAxis dataKey="label" fontSize={10} tick={{ fill: '#4b5563' }} />
