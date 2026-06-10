@@ -713,42 +713,79 @@ export const Dashboard = ({ currentTime }: { currentTime: Date }) => {
             </span>
           </div>
         </div>
-        
-        {/* FITUR 1: WIDGET DANA BEBAS DOMINAN */}
-        <div className="bg-white border-4 border-blue-900 shadow-lg p-6 relative">
-             <div className="absolute top-0 right-0 p-4 opacity-5">
-                 <svg xmlns="http://www.w3.org/2000/svg" width="120" height="120" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-pie-chart"><path d="M21.21 15.89A10 10 0 1 1 8 2.83"/><path d="M22 12A10 10 0 0 0 12 2v10z"/></svg>
-             </div>
-             <h2 className="text-xl font-bold text-gray-700 uppercase tracking-wide border-b-2 border-gray-200 pb-2 mb-4">Indikator Kesehatan Keuangan (Dana Bebas)</h2>
-             
-             <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 relative z-10">
-                 <div className="flex flex-col gap-1 border-r-2 border-gray-200 pr-4">
-                     <span className="text-sm font-bold text-gray-500 uppercase">Total Dana Bebas (Keseluruhan)</span>
-                     <span className="text-2xl font-black text-gray-900">{formatRp(saldoDanaBebasKeseluruhan)}</span>
-                 </div>
-                 <div className="flex flex-col gap-1 border-r-2 border-gray-200 px-4">
-                     <span className="text-sm font-bold text-red-600 uppercase flex items-center gap-1">
-                        (-) Hutang Aktif
-                     </span>
-                     <span className="text-2xl font-black text-red-700">{formatRp(totalHutangSupplierAktif)}</span>
-                 </div>
-                 <div className="flex flex-col gap-1 border-r-2 border-gray-200 px-4">
-                     <span className="text-sm font-bold text-orange-600 uppercase flex items-center gap-1">
-                        (-) Kasbon Karyawan
-                     </span>
-                     <span className="text-2xl font-black text-orange-700">{formatRp(totalKasbonAktif)}</span>
-                 </div>
-                 <div className="flex flex-col gap-1 pl-4 items-end justify-center bg-blue-50 border border-blue-200 p-3 rounded-lg shadow-inner">
-                     <span className="text-sm font-bold text-blue-800 uppercase">Dana Bebas Tersedia</span>
-                     <span className={`text-4xl font-black ${danaBebasReal < 0 ? 'text-red-700' : 'text-blue-900'}`}>{formatRp(danaBebasReal)}</span>
-                     <div className={`mt-2 text-xs font-bold px-3 py-1 bg-white border-2 inline-block rounded-full uppercase
-                          ${danaBebasStatus === 'Aman' ? 'text-green-700 border-green-600' : (danaBebasStatus === 'Waspada' ? 'text-yellow-700 border-yellow-600' : 'text-red-700 border-red-600')}
-                     `}>
-                         Status: {danaBebasStatus}
-                     </div>
-                 </div>
-             </div>
-        </div>
+            {/* FITUR 1: WIDGET DANA BEBAS DOMINAN */}
+        {compactMode ? (
+          /* Mode Compact ON: Hanya terlihat Dana Bebas Tersedia, dklik navigasi ke Cashflow & Keuangan */
+          <div 
+            onClick={() => setActiveTab('cashflow')}
+            title="Sisa Dana Bebas Tersedia. Klik untuk masuk ke menu Cashflow & Keuangan"
+            className="bg-white border-4 border-blue-950 p-4 shadow-md rounded-sm cursor-pointer hover:bg-blue-50 hover:scale-[1.005] active:scale-95 transition-all duration-150 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 max-w-xl group relative overflow-hidden"
+          >
+            <div className="absolute top-0 right-0 p-4 opacity-5 group-hover:scale-110 transition-transform duration-300">
+              <svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-wallet"><path d="M21 12V7H5a2 2 0 0 1-2-2V5M3 10V5v15a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-3a2 2 0 0 0-2-2z"/></svg>
+            </div>
+            <div className="flex flex-col gap-1 relative z-10">
+              <div className="flex items-center gap-1.5">
+                <span className="w-2.5 h-2.5 bg-blue-600 rounded-full animate-ping"></span>
+                <span className="text-[11px] font-black tracking-widest text-[#1e2b6b] uppercase">DANA BEBAS TERSEDIA</span>
+              </div>
+              <span className={`text-3xl font-black ${danaBebasReal < 0 ? 'text-red-700' : 'text-blue-900'} tracking-tight`}>
+                {formatRp(danaBebasReal)}
+              </span>
+              <span className="text-[10px] text-gray-500 font-bold group-hover:text-blue-800 transition-colors uppercase">
+                Klik untuk Kelola Cashflow & Keuangan &rarr;
+              </span>
+            </div>
+            <div className="relative z-10 shrink-0 self-end sm:self-center">
+              <div className={`text-[10px] font-black px-3 py-1 bg-white border-2 rounded-full uppercase tracking-wider
+                   ${danaBebasStatus === 'Aman' ? 'text-green-700 border-green-600' : (danaBebasStatus === 'Waspada' ? 'text-yellow-700 border-yellow-600' : 'text-red-700 border-red-600')}
+              `}>
+                  Status: {danaBebasStatus}
+              </div>
+            </div>
+          </div>
+        ) : (
+          /* Mode Compact OFF: Rata Kiri, Separuh Layar (w-full lg:w-[48%]), Ganti Total Dana Bebas ke Dana Laci */
+          <div className="bg-white border-4 border-blue-900 shadow-lg p-5 relative w-full lg:max-w-[48%] flex flex-col">
+              <div className="absolute top-0 right-0 p-3 opacity-5">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="96" height="96" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-pie-chart"><path d="M21.21 15.89A10 10 0 1 1 8 2.83"/><path d="M22 12A10 10 0 0 0 12 2v10z"/></svg>
+              </div>
+              <h2 className="text-sm font-black text-[#1e2b6b] uppercase tracking-wide border-b-2 border-gray-200 pb-1.5 mb-3">Indikator Kesehatan Keuangan (Dana Bebas)</h2>
+              
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 relative z-10">
+                  {/* Dana Bebas Tersedia pindah ke kiri (rata kiri) */}
+                  <div className="flex flex-col gap-1 items-start text-left justify-center bg-blue-50 border border-blue-200 p-3.5 rounded-lg shadow-inner">
+                      <span className="text-xs font-black text-blue-900 uppercase tracking-wider">Dana Bebas Tersedia</span>
+                      <span className={`text-2xl font-black ${danaBebasReal < 0 ? 'text-red-700' : 'text-blue-900'}`}>{formatRp(danaBebasReal)}</span>
+                      <div className={`mt-2 text-[10px] font-bold px-2 py-0.5 bg-white border-2 inline-block rounded-full uppercase
+                           ${danaBebasStatus === 'Aman' ? 'text-green-700 border-green-600' : (danaBebasStatus === 'Waspada' ? 'text-yellow-700 border-yellow-600' : 'text-red-700 border-red-600')}
+                      `}>
+                          Status: {danaBebasStatus}
+                      </div>
+                  </div>
+
+                  {/* Lainnya di sebelah kanan */}
+                  <div className="flex flex-col gap-2.5 justify-center border-t sm:border-t-0 sm:border-l border-gray-200 pt-3 sm:pt-0 sm:pl-4">
+                      <div className="flex flex-col gap-0.5">
+                          <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wide">Dana Laci</span>
+                          <span className="text-base font-black text-gray-900">{formatRp(saldoDanaLaci)}</span>
+                      </div>
+                      <div className="flex flex-col gap-0.5">
+                          <span className="text-[10px] font-bold text-red-600 uppercase flex items-center gap-1">
+                             (-) Hutang Aktif
+                          </span>
+                          <span className="text-base font-black text-red-700">{formatRp(totalHutangSupplierAktif)}</span>
+                      </div>
+                      <div className="flex flex-col gap-0.5">
+                          <span className="text-[10px] font-bold text-orange-600 uppercase flex items-center gap-1">
+                             (-) Kasbon Karyawan
+                          </span>
+                          <span className="text-base font-black text-[#b45309]">{formatRp(totalKasbonAktif)}</span>
+                      </div>
+                  </div>
+              </div>
+          </div>
+        )}
 
         {/* FITUR 3: WIDGET JATUH TEMPO (Jika ada) */}
         {(hutangSupplier || []).filter((h: any) => h.sisa_hutang > 0).length > 0 && (

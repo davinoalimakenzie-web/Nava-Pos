@@ -5,6 +5,7 @@ import { LegacyWindowHeader } from './LegacyWindowHeader';
 import { formatRp, formatDateDisplay, calculateJatuhTempo } from '../utils';
 
 import { AiCashflowBot } from './AiCashflowBot';
+import { DanaBebas } from './DanaBebas';
 
 export const Cashflow = ({ currentTime }: { currentTime: Date }) => {
     const { transactions, expenses, setExpenses, storeSettings, setActiveTab, setMasterDataTab, cart, setCart, customers, wallets, setWallets } = useAppContext();
@@ -131,6 +132,7 @@ export const Cashflow = ({ currentTime }: { currentTime: Date }) => {
       <div className="flex gap-1 shrink-0 bg-[#ece9d8] p-1 border-b border-gray-400 shadow-sm z-10 overflow-x-auto no-scrollbar">
          <button onClick={() => setCashflowTab('harian')} className={`px-2.5 py-1 text-[10px] md:text-xs md:px-4 md:py-1.5 whitespace-nowrap shrink-0 border border-gray-500 font-bold hover:bg-white ${cashflowTab === 'harian' ? 'bg-white border-b-white text-blue-900' : 'bg-gray-200 text-black'}`}>Cashflow Harian</button>
          <button onClick={() => setCashflowTab('bulanan')} className={`px-2.5 py-1 text-[10px] md:text-xs md:px-4 md:py-1.5 whitespace-nowrap shrink-0 border border-gray-500 font-bold hover:bg-white ${cashflowTab === 'bulanan' ? 'bg-white border-b-white text-blue-900' : 'bg-gray-200 text-black'}`}>Cashflow Bulanan</button>
+         <button onClick={() => setCashflowTab('dana_bebas')} className={`px-2.5 py-1 text-[10px] md:text-xs md:px-4 md:py-1.5 whitespace-nowrap shrink-0 border border-gray-500 font-bold hover:bg-white ${cashflowTab === 'dana_bebas' ? 'bg-white border-b-white text-blue-900' : 'bg-gray-200 text-black'}`}>Dana Bebas</button>
          <button onClick={() => setCashflowTab('promo')} className={`px-2.5 py-1 text-[10px] md:text-xs md:px-4 md:py-1.5 whitespace-nowrap shrink-0 border border-gray-500 font-bold hover:bg-white ${cashflowTab === 'promo' ? 'bg-white border-b-white text-blue-900' : 'bg-gray-200 text-black'}`}>Promo</button>
          <button onClick={() => setCashflowTab('ai_cashflow')} className={`px-2.5 py-1 text-[10px] md:text-xs md:px-4 md:py-1.5 whitespace-nowrap shrink-0 border border-gray-500 font-bold hover:bg-white ${cashflowTab === 'ai_cashflow' ? 'bg-white border-b-white text-blue-900' : 'bg-gray-200 text-black'}`}>Asisten AI Cashflow</button>
       </div>
@@ -424,6 +426,13 @@ export const Cashflow = ({ currentTime }: { currentTime: Date }) => {
                </tbody>
              </table>
              </div>
+         </div>
+      )}
+
+      {/* TAB: DANA BEBAS */}
+      {cashflowTab === 'dana_bebas' && (
+         <div className="flex-1 flex flex-col overflow-hidden">
+             <DanaBebas currentTime={currentTime} headless={true} />
          </div>
       )}
 
