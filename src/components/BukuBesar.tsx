@@ -435,6 +435,24 @@ export const BukuBesar = () => {
       return;
     }
 
+    const isToday = (dateToCheck: Date | null) => {
+      if (!dateToCheck) return false;
+      const today = new Date();
+      return (
+        dateToCheck.getDate() === today.getDate() &&
+        dateToCheck.getMonth() === today.getMonth() &&
+        dateToCheck.getFullYear() === today.getFullYear()
+      );
+    };
+
+    if ((status === 'DONE AMBIL' || status === 'CANCEL AMBIL') && !isToday(tglAmbil)) {
+      setAlertModal({ 
+        open: true, 
+        message: `Peringatan: Khusus status '${status}', TANGGAL AMBIL harus diset ke Tanggal Hari Ini (Today)!` 
+      });
+      return;
+    }
+
     const newRecord: RecordData = {
       id: selectedRecordId || Date.now().toString(),
       nota,
@@ -707,6 +725,7 @@ export const BukuBesar = () => {
                   setBiaya('');
                   setPart('');
                   setCashTf('');
+                  setGaransi('NO');
                 }
               }} 
               className="flex-1 outline-none h-[26px] px-1 py-0.5"
@@ -722,7 +741,12 @@ export const BukuBesar = () => {
           </div>
           <div className="flex items-center">
             <label className="w-24 font-bold shrink-0">GARANSI</label>
-            <select value={garansi} onChange={e => setGaransi(e.target.value)} className="flex-1 bg-white text-black px-1 py-0.5 outline-none h-[26px]">
+            <select 
+              value={garansi} 
+              onChange={e => setGaransi(e.target.value)} 
+              disabled={status === 'CANCEL AMBIL'}
+              className={`flex-1 bg-white text-black px-1 py-0.5 outline-none h-[26px] ${status === 'CANCEL AMBIL' ? 'opacity-50 cursor-not-allowed' : ''}`}
+            >
               <option value=""></option>
               <option value="7 HARI">7 HARI</option>
               <option value="14 HARI">14 HARI</option>
