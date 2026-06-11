@@ -378,6 +378,11 @@ export const DanaBebas = ({ currentTime, headless = false }: { currentTime?: Dat
     showToast('success', `Berhasil memproses Prive Owner sebesar ${formatRp(nominal)}!`);
   };
 
+  // Histories for the archive tables
+  const arsipTarikDana = expenses.filter((e: any) => e.wallet === 'Dana Bebas' && (e.category === 'Tarik Dana Bebas' || e.category === 'Modal Masuk'));
+  const arsipPelunasan = expenses.filter((e: any) => e.wallet === 'Dana Bebas' && e.category === 'Pelunasan Supplier');
+  const arsipPrive = expenses.filter((e: any) => e.wallet === 'Dana Bebas' && e.category === 'Prive Owner');
+
   const selectedHutangItem = listHutangAktif.find((h: any) => h.id === selectedHutangId);
 
   return (
@@ -483,7 +488,8 @@ export const DanaBebas = ({ currentTime, headless = false }: { currentTime?: Dat
         {/* TAB ACTIVE PANEL CONTENT */}
         <div className={`bg-white p-3.5 ${headless ? 'border-b border-gray-400 shadow-sm' : 'border border-gray-300 rounded-b shadow-sm'}`}>
           {activeControl === 'tarik' && (
-            <form onSubmit={handleTarikDanaBebas} className="flex flex-col gap-3">
+            <div className="flex flex-col gap-4">
+              <form onSubmit={handleTarikDanaBebas} className="flex flex-col gap-3">
               <div className="flex items-center justify-between border-b border-gray-200 pb-1.5">
                 <span className="font-bold text-xs text-blue-900 flex items-center gap-1">
                    <ArrowDownToLine className="w-4 h-4" />
@@ -542,10 +548,49 @@ export const DanaBebas = ({ currentTime, headless = false }: { currentTime?: Dat
                 </div>
               </div>
             </form>
+
+            {/* Arsip Table for Tarik Dana */}
+            <div className="flex flex-col gap-2 border-t border-gray-200 pt-4 mt-2">
+               <span className="text-[11px] font-bold text-gray-700 uppercase">Arsip Penarikan & Suntik Dana</span>
+               {arsipTarikDana.length === 0 ? (
+                  <div className="py-4 text-center text-gray-500 border border-dashed border-gray-300 bg-gray-50 rounded text-xs">
+                     Belum ada arsip penarikan / suntik dana bebas.
+                  </div>
+               ) : (
+                  <div className="overflow-x-auto border border-gray-300 rounded max-h-[300px]">
+                    <table className="w-full text-left border-collapse whitespace-nowrap text-xs">
+                      <thead className="bg-gray-100 border-b border-gray-300 text-gray-700 font-bold">
+                        <tr>
+                          <th className="p-2 border-r border-gray-300">Waktu</th>
+                          <th className="p-2 border-r border-gray-300">Deskripsi / Catatan</th>
+                          <th className="p-2 border-r border-gray-300 text-center">Kategori</th>
+                          <th className="p-2 text-right">Nominal (Rp)</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-200">
+                        {arsipTarikDana.slice(0, 50).map((item: any, idx: number) => (
+                           <tr key={item.id || idx} className="hover:bg-gray-50 text-black">
+                             <td className="p-2 border-r border-gray-300">{item.date}</td>
+                             <td className="p-2 border-r border-gray-300">{item.name}</td>
+                             <td className="p-2 border-r border-gray-300 text-center font-bold">
+                               <span className={`px-2 py-0.5 rounded text-[10px] ${item.category === 'Modal Masuk' ? 'bg-green-100 text-green-800' : 'bg-orange-100 text-orange-800'}`}>{item.category}</span>
+                             </td>
+                             <td className={`p-2 text-right font-mono font-bold ${item.amount < 0 ? 'text-green-600' : 'text-red-600'}`}>
+                                {item.amount < 0 ? `+Rp ${Math.abs(item.amount).toLocaleString('id-ID')}` : `-Rp ${item.amount.toLocaleString('id-ID')}`}
+                             </td>
+                           </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+               )}
+            </div>
+          </div>
           )}
 
           {activeControl === 'pelunasan_supplier' && (
-            <form onSubmit={handlePelunasanSupplier} className="flex flex-col gap-3">
+            <div className="flex flex-col gap-4">
+              <form onSubmit={handlePelunasanSupplier} className="flex flex-col gap-3">
               <div className="flex items-center justify-between border-b border-gray-200 pb-1.5">
                 <span className="font-bold text-xs text-amber-800 flex items-center gap-1">
                    <UserCheck className="w-4 h-4" />
@@ -644,6 +689,40 @@ export const DanaBebas = ({ currentTime, headless = false }: { currentTime?: Dat
                 )}
               </div>
             </form>
+
+            {/* Arsip Table for Pelunasan Supplier */}
+            <div className="flex flex-col gap-2 border-t border-gray-200 pt-4 mt-2">
+               <span className="text-[11px] font-bold text-gray-700 uppercase">Arsip Pembayaran Hutang Supplier</span>
+               {arsipPelunasan.length === 0 ? (
+                  <div className="py-4 text-center text-gray-500 border border-dashed border-gray-300 bg-gray-50 rounded text-xs">
+                     Belum ada arsip pembayaran hutang supplier.
+                  </div>
+               ) : (
+                  <div className="overflow-x-auto border border-gray-300 rounded max-h-[300px]">
+                    <table className="w-full text-left border-collapse whitespace-nowrap text-xs">
+                      <thead className="bg-amber-50 border-b border-gray-300 text-amber-900 font-bold">
+                        <tr>
+                          <th className="p-2 border-r border-gray-300">Waktu</th>
+                          <th className="p-2 border-r border-gray-300">Deskripsi / Catatan</th>
+                          <th className="p-2 text-right">Nominal Dibayar (Rp)</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-200">
+                        {arsipPelunasan.slice(0, 50).map((item: any, idx: number) => (
+                           <tr key={item.id || idx} className="hover:bg-amber-50 text-black">
+                             <td className="p-2 border-r border-gray-300">{item.date}</td>
+                             <td className="p-2 border-r border-gray-300 font-bold text-amber-800">{item.name}</td>
+                             <td className="p-2 text-right font-mono font-bold text-red-600">
+                                -Rp {item.amount.toLocaleString('id-ID')}
+                             </td>
+                           </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+               )}
+            </div>
+          </div>
           )}
 
           {activeControl === 'gaji' && (
@@ -774,7 +853,8 @@ export const DanaBebas = ({ currentTime, headless = false }: { currentTime?: Dat
           )}
 
           {activeControl === 'prive' && (
-            <form onSubmit={handlePriveOwner} className="flex flex-col gap-3">
+            <div className="flex flex-col gap-4">
+              <form onSubmit={handlePriveOwner} className="flex flex-col gap-3">
               <div className="flex items-center justify-between border-b border-gray-200 pb-1.5">
                 <span className="font-bold text-xs text-purple-800 flex items-center gap-1">
                    <CircleDollarSign className="w-4 h-4" />
@@ -820,6 +900,44 @@ export const DanaBebas = ({ currentTime, headless = false }: { currentTime?: Dat
                 </div>
               </div>
             </form>
+
+            {/* Arsip Table for Prive Owner */}
+            <div className="flex flex-col gap-2 border-t border-gray-200 pt-4 mt-2">
+               <span className="text-[11px] font-bold text-gray-700 uppercase">Arsip Prive Owner</span>
+               {arsipPrive.length === 0 ? (
+                  <div className="py-4 text-center text-gray-500 border border-dashed border-gray-300 bg-gray-50 rounded text-xs">
+                     Belum ada arsip penarikan prive owner.
+                  </div>
+               ) : (
+                  <div className="overflow-x-auto border border-gray-300 rounded max-h-[300px]">
+                    <table className="w-full text-left border-collapse whitespace-nowrap text-xs">
+                      <thead className="bg-purple-50 border-b border-purple-200 text-purple-900 font-bold">
+                        <tr>
+                          <th className="p-2 border-r border-gray-300">Waktu</th>
+                          <th className="p-2 border-r border-gray-300">Deskripsi / Catatan</th>
+                          <th className="p-2 border-r border-gray-300 text-center">Status</th>
+                          <th className="p-2 text-right">Nominal Prive (Rp)</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-200">
+                        {arsipPrive.slice(0, 50).map((item: any, idx: number) => (
+                           <tr key={item.id || idx} className="hover:bg-purple-50/50 text-black">
+                             <td className="p-2 border-r border-gray-300">{item.date}</td>
+                             <td className="p-2 border-r border-gray-300">{item.name}</td>
+                             <td className="p-2 border-r border-gray-300 text-center font-bold">
+                               <span className="px-2 py-0.5 rounded text-[10px] bg-purple-100 text-purple-800">Selesai</span>
+                             </td>
+                             <td className="p-2 text-right font-mono font-bold text-red-600">
+                                -Rp {item.amount.toLocaleString('id-ID')}
+                             </td>
+                           </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+               )}
+            </div>
+          </div>
           )}
         </div>
 
