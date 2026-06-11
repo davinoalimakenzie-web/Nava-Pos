@@ -942,7 +942,14 @@ export const SettingsPanel = ({ currentTime }: { currentTime: Date }) => {
             <button onClick={() => setShowAddEmpModal(true)} className="bg-blue-600 text-white font-bold py-2 w-48 mb-2 shadow rounded hover:bg-blue-700">+ Tambah Karyawan Baru</button>
             <table className="w-full text-left border-collapse whitespace-nowrap border border-gray-400">
               <thead className="bg-gray-100 border-b border-gray-400">
-                <tr><th className="p-2 border-r w-16">ID</th><th className="p-2 border-r">Nama</th><th className="p-2 border-r">Posisi/Jabatan</th><th className="p-2 border-r">Cabang</th></tr>
+                <tr>
+                  <th className="p-2 border-r w-16">ID</th>
+                  <th className="p-2 border-r">Nama</th>
+                  <th className="p-2 border-r">Posisi/Jabatan</th>
+                  <th className="p-2 border-r">Cabang</th>
+                  <th className="p-2 border-r">No WA</th>
+                  <th className="p-2">Gaji Perhari</th>
+                </tr>
               </thead>
               <tbody>
                 {employees.map((emp: any) => (
@@ -950,7 +957,9 @@ export const SettingsPanel = ({ currentTime }: { currentTime: Date }) => {
                       <td className="p-2 border-r text-gray-500 font-mono">#{emp.id}</td>
                       <td className="p-2 border-r font-bold">{emp.name}</td>
                       <td className="p-2 border-r">{emp.position}</td>
-                      <td className="p-2">{emp.branch || '-'}</td>
+                      <td className="p-2 border-r">{emp.branch || '-'}</td>
+                      <td className="p-2 border-r font-mono">{emp.phone || '-'}</td>
+                      <td className="p-2 font-mono font-bold text-green-700">Rp {(emp.dailySalary || 0).toLocaleString('id-ID')}</td>
                     </tr>
                 ))}
               </tbody>

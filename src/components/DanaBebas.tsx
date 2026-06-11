@@ -15,7 +15,9 @@ export const DanaBebas = ({ currentTime, headless = false }: { currentTime?: Dat
     user,
     storeSettings,
     transactionDate,
-    transactions
+    transactions,
+    waitingPayments,
+    setWaitingPayments
   } = useAppContext();
 
   // Core wallets calculations
@@ -100,10 +102,10 @@ export const DanaBebas = ({ currentTime, headless = false }: { currentTime?: Dat
   const [pelunasanAmount, setPelunasanAmount] = useState('');
   const [pelunasanType, setPelunasanType] = useState<'full' | 'partial'>('full');
 
-  // 3. Gaji Karyawan Form States
-  const [selectedEmployeeId, setSelectedEmployeeId] = useState('');
-  const [gajiAmount, setGajiAmount] = useState('');
-  const [gajiNotes, setGajiNotes] = useState('');
+  // 3. Gaji Karyawan (Waiting list bonuses)
+  const [bonuses, setBonuses] = useState<{ [key: string]: string }>({});
+  const [paymentDates, setPaymentDates] = useState<{ [key: string]: string }>({});
+  const [paymentMethods, setPaymentMethods] = useState<{ [key: string]: 'Cash' | 'Transfer' }>({});
 
   // 4. Prive Owner Form States
   const [priveAmount, setPriveAmount] = useState('');
@@ -267,60 +269,69 @@ export const DanaBebas = ({ currentTime, headless = false }: { currentTime?: Dat
     showToast('success', `Berhasil membayar supplier ${targetHutang.supplier_name} sebesar ${formatRp(amt)}!`);
   };
 
-  // Flow 3: Gaji Karyawan
-  const handleGajiKaryawan = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!selectedEmployeeId) {
-      showToast('error', 'Harap pilih karyawan yang menerima gaji!');
+  // Flow 3: Approve & Pay Salary waitlisted item
+  const handleApproveSalary = (item: any) => {
+    const rawBonus = bonuses[item.id] || '';
+    const bonusVal = parseInt(rawBonus.replace(/\./g, '')) || 0;
+    const totalTHP = item.salary + bonusVal;
+    const payDate = paymentDates[item.id] || new Date().toISOString().split('T')[0];
+    const payMethod = paymentMethods[item.id] || 'Cash';
+
+    if (totalTHP > saldoDanaBebas) {
+      showToast('error', 'Dana Bebas tidak mencukupi untuk melakukan pembayaran gaji ini!');
       return;
     }
 
-    const emp = (employees || []).find((e: any) => String(e.id) === String(selectedEmployeeId));
-    if (!emp) {
-      showToast('error', 'Karyawan tidak ditemukan!');
-      return;
-    }
+    // 1. Deduct Dana Bebas
+    setWallets((prev: any) => ({
+      ...prev,
+      danaBebas: (prev?.danaBebas || 0) - totalTHP
+    }));
 
-    const nominal = parseInputNumber(gajiAmount);
-    if (!nominal || nominal <= 0) {
-      showToast('error', 'Masukkan nominal gaji yang valid!');
-      return;
-    }
-
-    if (nominal > saldoDanaBebas) {
-      showToast('error', 'Dana Bebas tidak mencukupi untuk membayar gaji karyawan!');
-      return;
-    }
-
-    const tDate = transactionDate || new Date().toISOString().split('T')[0];
+    // 2. Create and push new expense
     const newExpense = {
-      id: 'EXP-' + Date.now(),
-      date: `${tDate} ${new Date().toLocaleTimeString('id-ID')}`,
+      id: 'EXP-GAJI-' + Date.now() + '-' + Math.floor(Math.random() * 100),
+      date: `${payDate} ${new Date().toLocaleTimeString('id-ID')}`,
       isoDate: new Date().toISOString(),
-      name: `Gaji Karyawan: ${emp.name} (${gajiNotes || 'Pembayaran Gaji'})`,
-      amount: nominal,
+      name: `Pembayaran Gaji Karyawan - ${item.name} (${item.details || ''})${bonusVal > 0 ? ' + Bonus (Rp ' + bonusVal.toLocaleString('id-ID') + ')' : ''} [${payMethod}]`,
+      amount: totalTHP,
       cashier: user?.name || 'Owner',
       branch: user?.branch || storeSettings?.activeBranch || 'Pusat',
       wallet: 'Dana Bebas',
       category: 'Gaji Karyawan'
     };
-
-    // Update wallet
-    setWallets((prev: any) => ({
-      ...prev,
-      danaBebas: (prev?.danaBebas || 0) - nominal
-    }));
-
-    // Record expense
     setExpenses([newExpense, ...expenses]);
 
-    // Log action
-    addLog('DANA_BEBAS', `Bayar gaji karyawan ${emp.name} sebesar Rp ${nominal.toLocaleString('id-ID')} dari Dana Bebas`);
+    // 3. Add to app logs
+    addLog('PENGGAJIAN', `Setujui & Bayar Gaji ${item.name} sebesar Rp ${totalTHP.toLocaleString('id-ID')} via ${payMethod} (Gaji: Rp ${item.salary.toLocaleString('id-ID')}, Bonus: Rp ${bonusVal.toLocaleString('id-ID')})`);
 
-    setSelectedEmployeeId('');
-    setGajiAmount('');
-    setGajiNotes('');
-    showToast('success', `Berhasil mengirimkan gaji ke ${emp.name} sebesar ${formatRp(nominal)}!`);
+    // 4. Update the item in waiting payments to preserve as archive/report
+    setWaitingPayments((prev: any[]) => {
+      const arr = prev || [];
+      return arr.map((p: any) => {
+        if (p.id === item.id) {
+          return {
+            ...p,
+            approved: true,
+            approvedAt: new Date().toISOString(),
+            approvedDate: payDate,
+            approvedMethod: payMethod,
+            approvedBonus: bonusVal,
+            approvedTotal: totalTHP
+          };
+        }
+        return p;
+      });
+    });
+
+    // 5. Clean up local state
+    setBonuses(prev => {
+      const next = { ...prev };
+      delete next[item.id];
+      return next;
+    });
+
+    showToast('success', `Berhasil membayar gaji ${item.name} via ${payMethod} sebesar Rp ${totalTHP.toLocaleString('id-ID')}!`);
   };
 
   // Flow 4: Prive Owner
@@ -459,7 +470,7 @@ export const DanaBebas = ({ currentTime, headless = false }: { currentTime?: Dat
             onClick={() => setActiveControl('gaji')}
             className={`px-3 py-1.5 text-[11px] font-bold transition-all uppercase outline-none ${activeControl === 'gaji' ? 'bg-[#1e2b6b] text-white rounded-t border-t border-x border-[#1e2b6b]' : 'bg-gray-200 border-x border-t border-gray-300 text-gray-700 hover:bg-gray-300'}`}
           >
-            👷 Gaji Karyawan
+            👷 Daftar Tunggu Gaji Karyawan
           </button>
           <button
             onClick={() => setActiveControl('prive')}
@@ -636,77 +647,130 @@ export const DanaBebas = ({ currentTime, headless = false }: { currentTime?: Dat
           )}
 
           {activeControl === 'gaji' && (
-            <form onSubmit={handleGajiKaryawan} className="flex flex-col gap-3">
+            <div className="flex flex-col gap-3">
               <div className="flex items-center justify-between border-b border-gray-200 pb-1.5">
-                <span className="font-bold text-xs text-emerald-800 flex items-center gap-1">
+                <span className="font-bold text-xs text-emerald-800 flex items-center gap-1 font-sans">
                    <UserCheck className="w-4 h-4" />
-                   MODUL PEMBAYARAN GAJI KARYAWAN
+                   DAFTAR TUNGGU PEMBAYARAN GAJI KARYAWAN
                 </span>
-                <span className="text-[10px] text-gray-500">Membayarkan kompensasi bulanan atau gaji harian</span>
+                <span className="text-[10px] text-gray-500">Kompensasi atau gaji yang diajukan dari absensi</span>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-12 gap-3 items-end">
-                <div className="flex flex-col gap-1 md:col-span-4">
-                  <label className="text-[10px] font-bold text-gray-700">KARYAWAN PENERIMA GAJI :</label>
-                  <select
-                    value={selectedEmployeeId}
-                    onChange={(e) => {
-                      setSelectedEmployeeId(e.target.value);
-                      const empItem = (employees || []).find((v: any) => String(v.id) === String(e.target.value));
-                      if (empItem && empItem.dailySalary) {
-                        setGajiAmount(empItem.dailySalary.toLocaleString('id-ID'));
-                      } else {
-                        setGajiAmount('');
-                      }
-                    }}
-                    required
-                    className="border border-gray-400 px-2 py-1 rounded-sm text-xs text-black font-bold focus:border-blue-900 outline-none bg-white h-[32px] w-full"
-                  >
-                    <option value="">-- PILIH KARYAWAN --</option>
-                    {(employees || []).map((emp: any) => (
-                      <option key={emp.id} value={emp.id}>
-                        {emp.name} ({emp.position || 'Staff'})
-                      </option>
-                    ))}
-                  </select>
+              {(!waitingPayments || waitingPayments.length === 0) ? (
+                <div className="py-8 text-center text-gray-500 border border-dashed border-gray-300 bg-gray-50 rounded text-xs">
+                   Tidak ada daftar tunggu pembayaran gaji karyawan saat ini.
                 </div>
+              ) : (
+                <div className="overflow-x-auto border border-gray-300 rounded">
+                  <table className="w-full text-left border-collapse whitespace-nowrap text-xs">
+                    <thead className="bg-gray-100 border-b border-gray-300 text-gray-700 font-bold">
+                      <tr>
+                        <th className="p-2 border-r border-gray-300">Nama Karyawan</th>
+                        <th className="p-2 border-r border-gray-300 text-center w-36">Tanggal Bayar</th>
+                        <th className="p-2 border-r border-gray-300 text-center w-24">Metode</th>
+                        <th className="p-2 border-r border-gray-300 text-right">Gaji Pokok</th>
+                        <th className="p-2 border-r border-gray-300 text-center w-28">Bonus (Rp)</th>
+                        <th className="p-2 border-r border-gray-300 text-right">Take Home Pay (THP)</th>
+                        <th className="p-2 text-center w-28">Status / Aksi</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-200">
+                      {waitingPayments.map((item: any) => {
+                        const isApproved = !!item.approved;
+                        const displayDate = isApproved 
+                          ? (item.approvedDate || (item.createdAt ? item.createdAt.substring(0, 10) : new Date().toISOString().substring(0, 10))) 
+                          : (paymentDates[item.id] || new Date().toISOString().substring(0, 10));
+                        const displayMethod = isApproved 
+                          ? (item.approvedMethod || 'Cash') 
+                          : (paymentMethods[item.id] || 'Cash');
+                        const displayBonus = isApproved 
+                          ? (item.approvedBonus || 0) 
+                          : (parseInputNumber(bonuses[item.id] || ''));
+                        const displayTHP = isApproved 
+                          ? (item.approvedTotal || (item.salary + displayBonus)) 
+                          : (item.salary + displayBonus);
 
-                <div className="flex flex-col gap-1 md:col-span-3">
-                  <label className="text-[10px] font-bold text-gray-700">NOMINAL GAJI (RP) :</label>
-                  <input
-                    type="text"
-                    required
-                    value={gajiAmount}
-                    onChange={(e) => {
-                      const num = parseInputNumber(e.target.value);
-                      setGajiAmount(num ? num.toLocaleString('id-ID') : '');
-                    }}
-                    className="border border-gray-400 px-2 py-1.5 rounded-sm text-xs text-black font-mono font-bold focus:border-blue-900 outline-none bg-white h-[32px] w-full"
-                    placeholder="Contoh: 1.500.000"
-                  />
+                        return (
+                          <tr key={item.id} className={isApproved ? "bg-gray-50/70 text-gray-500" : "hover:bg-gray-50 text-black"}>
+                            <td className="p-2 border-r border-gray-300">
+                              <span className={`font-bold block ${isApproved ? "text-gray-400" : "text-gray-900"}`}>{item.name}</span>
+                              <span className="text-[10px] text-gray-500 block leading-tight">{item.details}</span>
+                            </td>
+                            <td className="p-2 border-r border-gray-300 text-center">
+                              <input
+                                type="date"
+                                value={displayDate}
+                                disabled={isApproved}
+                                onChange={(e) => {
+                                  setPaymentDates(prev => ({
+                                    ...prev,
+                                    [item.id]: e.target.value
+                                  }));
+                                }}
+                                className="w-32 text-center border border-gray-400 px-1 py-1 text-xs font-mono font-bold focus:border-blue-900 bg-white text-black outline-none rounded-sm disabled:opacity-75 disabled:bg-gray-150 disabled:text-gray-500"
+                              />
+                            </td>
+                            <td className="p-2 border-r border-gray-300 text-center">
+                              <select
+                                value={displayMethod}
+                                disabled={isApproved}
+                                onChange={(e) => {
+                                  setPaymentMethods(prev => ({
+                                    ...prev,
+                                    [item.id]: e.target.value as any
+                                  }));
+                                }}
+                                className="w-20 text-center border border-gray-400 px-1 py-1 text-xs font-bold focus:border-blue-900 bg-white text-black outline-none rounded-sm disabled:opacity-75 disabled:bg-gray-150 disabled:text-gray-500"
+                              >
+                                <option value="Cash">Cash</option>
+                                <option value="Transfer">TF</option>
+                              </select>
+                            </td>
+                            <td className={`p-2 border-r border-gray-300 text-right font-mono font-medium ${isApproved ? "text-gray-400" : "text-gray-700"}`}>
+                              Rp {item.salary.toLocaleString('id-ID')}
+                            </td>
+                            <td className="p-2 border-r border-gray-300 text-center">
+                              <input
+                                type="text"
+                                value={isApproved ? (item.approvedBonus || 0).toLocaleString('id-ID') : (bonuses[item.id] || '')}
+                                disabled={isApproved}
+                                onChange={(e) => {
+                                  const num = parseInputNumber(e.target.value);
+                                  setBonuses(prev => ({
+                                    ...prev,
+                                    [item.id]: num ? num.toLocaleString('id-ID') : ''
+                                  }));
+                                }}
+                                className="w-24 text-center border border-gray-400 px-1 py-1 text-xs font-mono font-bold focus:border-blue-900 bg-white text-black outline-none rounded-sm disabled:opacity-75 disabled:bg-gray-150 disabled:text-gray-500"
+                                placeholder="0"
+                              />
+                            </td>
+                            <td className={`p-2 border-r border-gray-300 text-right font-mono font-bold text-sm ${isApproved ? "text-gray-400" : "text-emerald-700"}`}>
+                              Rp {displayTHP.toLocaleString('id-ID')}
+                            </td>
+                            <td className="p-2 text-center">
+                              {isApproved ? (
+                                <span className="inline-flex items-center gap-1 bg-green-100 text-green-700 border border-green-300 font-bold px-2.5 py-1 text-[10px] rounded shadow-xs uppercase">
+                                  <CheckCircle2 className="w-3.5 h-3.5" />
+                                  DONE
+                                </span>
+                              ) : (
+                                <button
+                                  onClick={() => handleApproveSalary(item)}
+                                  className="px-3 py-1 bg-green-600 hover:bg-green-700 text-white font-bold text-[10px] rounded shadow-sm transition-all"
+                                >
+                                  APPROVE
+                                </button>
+                              )}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
                 </div>
-
-                <div className="flex flex-col gap-1 md:col-span-3">
-                  <label className="text-[10px] font-bold text-gray-700">CATATAN / PERIODE GAJI :</label>
-                  <input
-                    type="text"
-                    value={gajiNotes}
-                    onChange={(e) => setGajiNotes(e.target.value)}
-                    className="border border-gray-400 px-2 py-1.5 rounded-sm text-xs text-black focus:border-blue-900 outline-none bg-white h-[32px] w-full"
-                    placeholder="Contoh: Gaji Juni 2026"
-                  />
-                </div>
-
-                <div className="md:col-span-2">
-                  <button
-                    type="submit"
-                    className="w-full bg-emerald-800 hover:bg-emerald-700 text-white font-bold h-[32px] rounded-sm text-[11px] flex items-center justify-center gap-1 transition-colors shadow-sm uppercase active:translate-y-px"
-                  >
-                    BAYAR GAJI
-                  </button>
-                </div>
-              </div>
-            </form>
+              )}
+            </div>
           )}
 
           {activeControl === 'prive' && (

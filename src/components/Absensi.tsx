@@ -6,10 +6,12 @@ import { currentMonthStr, defaultDate } from '../data';
 
 export const Absensi = ({ currentTime }: { currentTime: Date }) => {
   const { 
-    user, appUsers, employees, setEmployees, attendances, setAttendances, setShowAddEmpModal, appLogs, addLog, expenses, storeSettings
+    user, appUsers, employees, setEmployees, attendances, setAttendances, setShowAddEmpModal, appLogs, addLog, expenses, setExpenses, storeSettings, wallets, setWallets,
+    waitingPayments, setWaitingPayments
   } = useAppContext();
 
   const [absensiSubTab, setAbsensiSubTab] = useState('harian');
+  const [showPayModal, setShowPayModal] = useState(false);
   const [selectedEmployeeAbsensi, setSelectedEmployeeAbsensi] = useState('');
   const { leaveRequests, setLeaveRequests } = useAppContext();
 
@@ -239,24 +241,33 @@ export const Absensi = ({ currentTime }: { currentTime: Date }) => {
                   <option value="clockin">Clock In</option>
                   <option value="clockout">Clock Out</option>
                   <option value="libur">Off / Libur</option>
+                  <option value="hitung_gaji">Hitung Gaji</option>
                </select>
             </div>
          </div>
          <div className="flex flex-col gap-0.5 text-white shrink-0">
             <label className="text-[12px] font-medium">&nbsp;</label>
             <button onClick={() => {
-                if (absenAction === 'clockin') handleClockIn();
-                else if (absenAction === 'clockout') handleClockOut();
-                else if (absenAction === 'libur') handleLibur();
-                else {
+                if (absenAction === 'clockin') {
+                    handleClockIn();
+                    setAbsenAction('');
+                } else if (absenAction === 'clockout') {
+                    handleClockOut();
+                    setAbsenAction('');
+                } else if (absenAction === 'libur') {
+                    handleLibur();
+                    setAbsenAction('');
+                } else if (absenAction === 'hitung_gaji') {
+                    setShowPayModal(true);
+                } else {
                     setFilterStartDate(defaultDate); 
                     setFilterEndDate(defaultDate); 
                     setFilterBranch('Semua'); 
                     setSelectedEmployeeAbsensi('');
+                    setAbsenAction('');
                 }
-                setAbsenAction('');
-            }} className={`h-[28px] ${absensiSubTab === 'harian' && absenAction ? 'bg-green-600 hover:bg-green-700' : 'bg-blue-600 hover:bg-blue-700'} px-3 font-bold text-[12px] rounded-sm shadow-sm transition-colors whitespace-nowrap`}>
-                {absensiSubTab === 'harian' && absenAction ? 'Refresh / Simpan' : 'Refresh'}
+            }} className={`h-[28px] ${absensiSubTab === 'harian' && absenAction === 'hitung_gaji' ? 'bg-green-600 hover:bg-green-700' : (absensiSubTab === 'harian' && absenAction ? 'bg-green-600 hover:bg-green-700' : 'bg-blue-600 hover:bg-blue-700')} px-3 font-bold text-[12px] rounded-sm shadow-sm transition-colors whitespace-nowrap`}>
+                {absensiSubTab === 'harian' && absenAction === 'hitung_gaji' ? 'Bayar Gaji' : (absensiSubTab === 'harian' && absenAction ? 'Refresh / Simpan' : 'Refresh')}
             </button>
          </div>
       </div>
@@ -264,16 +275,55 @@ export const Absensi = ({ currentTime }: { currentTime: Date }) => {
       <div className="flex gap-1 shrink-0 bg-[#f9fafb] p-1 border-b border-gray-300">
           <button onClick={() => setAbsensiSubTab('harian')} className={`px-4 py-1.5 font-bold ${absensiSubTab === 'harian' ? 'bg-blue-100 text-blue-900 border-b-2 border-blue-600' : 'text-gray-600 hover:bg-gray-200'}`}>Absen Hari Ini</button>
           <button onClick={() => setAbsensiSubTab('cuti')} className={`px-4 py-1.5 font-bold ${absensiSubTab === 'cuti' ? 'bg-blue-100 text-blue-900 border-b-2 border-blue-600' : 'text-gray-600 hover:bg-gray-200'}`}>Req Cuti</button>
-          <button onClick={() => setAbsensiSubTab('rekap')} className={`px-4 py-1.5 font-bold ${absensiSubTab === 'rekap' ? 'bg-blue-100 text-blue-900 border-b-2 border-blue-600' : 'text-gray-600 hover:bg-gray-200'}`}>Rekap Bulanan</button>
       </div>
       
       <div className="flex-1 p-2 overflow-auto bg-white">
         {absensiSubTab === 'harian' && (
             <div className="flex flex-col gap-4">
-              <h3 className="font-bold border-b pb-1 text-blue-900">Log Kedatangan</h3>
               <table className="w-full text-left border-collapse whitespace-nowrap border border-gray-400">
                 <thead className="bg-[#ece9d8] border-b border-gray-400">
-                  <tr><th className="p-2 border-r">Nama Karyawan</th><th className="p-2 border-r text-center">Tanggal</th><th className="p-2 border-r text-center">Jam Masuk</th><th className="p-2 border-r text-center">Jam Keluar</th><th className="p-2 border-r text-center">Status</th><th className="p-2 text-center"><Clock className="w-4 h-4 inline-block"/> Keterlambatan</th></tr>
+                  {absenAction === 'hitung_gaji' && (() => {
+                    const rekap = generateRekapAbsen();
+                    const totalTHP = rekap.reduce((sum: number, r: any) => sum + r.finalSalary, 0);
+                    const totalBon = rekap.reduce((sum: number, r: any) => sum + r.totalBon, 0);
+                    const totalPenalty = rekap.reduce((sum: number, r: any) => sum + r.totalPenalty, 0);
+                    const totalLate = rekap.reduce((sum: number, r: any) => sum + r.totalLate, 0);
+                    return (
+                      <tr className="bg-white border-b-2 border-gray-300">
+                        <th className="p-2 border-r text-left bg-white font-bold">
+                          <span className="inline-block bg-green-100 text-green-900 border border-green-300 font-mono text-sm px-2.5 py-0.5 rounded font-bold">
+                            Rp {totalTHP.toLocaleString('id-ID')}
+                          </span>
+                        </th>
+                        <th colSpan={4} className="border-r bg-white"></th>
+                        <th className="p-2 border-r text-center bg-white font-bold">
+                          <span className="inline-block bg-amber-100 text-amber-900 border border-amber-300 font-mono text-sm px-2.5 py-0.5 rounded font-bold">
+                            {totalLate.toLocaleString('id-ID')} Min
+                          </span>
+                        </th>
+                        <th className="p-2 border-r text-center bg-white font-bold">
+                          <span className="inline-block bg-orange-100 text-orange-900 border border-orange-355 font-mono text-sm px-2.5 py-0.5 rounded font-bold">
+                            Rp {totalPenalty.toLocaleString('id-ID')}
+                          </span>
+                        </th>
+                        <th className="p-2 text-center bg-white font-bold">
+                          <span className="inline-block bg-red-100 text-red-900 border border-red-300 font-mono text-sm px-2.5 py-0.5 rounded font-bold">
+                            Rp {totalBon.toLocaleString('id-ID')}
+                          </span>
+                        </th>
+                      </tr>
+                    );
+                  })()}
+                  <tr>
+                    <th className="p-2 border-r">Nama Karyawan</th>
+                    <th className="p-2 border-r text-center">Tanggal</th>
+                    <th className="p-2 border-r text-center">Jam Masuk</th>
+                    <th className="p-2 border-r text-center">Jam Keluar</th>
+                    <th className="p-2 border-r text-center">Status</th>
+                    <th className="p-2 border-r text-center"><Clock className="w-4 h-4 inline-block"/> Keterlambatan</th>
+                    <th className="p-2 border-r text-center text-red-600">Denda Telat</th>
+                    <th className="p-2 text-center text-red-600 font-bold">Kasbon</th>
+                  </tr>
                 </thead>
                 <tbody>
                   {attendances.filter((a: any) => {
@@ -314,7 +364,22 @@ export const Absensi = ({ currentTime }: { currentTime: Date }) => {
                               a.status==='Libur' ? 'bg-gray-200 text-gray-800' : 'bg-green-200 text-green-800'
                            }`}>{a.status}</span>
                         </td>
-                        <td className="p-2 text-center text-red-600 font-bold">{a.lateMins > 0 ? `${a.lateMins} Menit` : '-'}</td>
+                        <td className="p-2 border-r text-center text-red-600 font-bold">{a.lateMins > 0 ? `${a.lateMins} Menit` : '-'}</td>
+                        <td className="p-2 border-r text-center text-red-600">
+                          {a.lateMins > 0 ? `Rp ${Math.round((a.lateMins / 60) * 10000).toLocaleString('id-ID')}` : '-'}
+                        </td>
+                        <td className="p-2 text-center text-red-600 font-bold">
+                          {(() => {
+                            const empBons = expenses?.filter((e: any) => {
+                              return e.isBon && 
+                                     e.bonEmployee === a.user && 
+                                     ((e.date && e.date.startsWith(a.date)) || 
+                                      (e.isoDate && e.isoDate.startsWith(a.date)));
+                            }) || [];
+                            const totalBonVal = empBons.reduce((sum: number, b: any) => sum + (b.amount || 0), 0);
+                            return totalBonVal > 0 ? `Rp ${totalBonVal.toLocaleString('id-ID')}` : '-';
+                          })()}
+                        </td>
                       </tr>
                   ))}
                 </tbody>
@@ -390,38 +455,71 @@ export const Absensi = ({ currentTime }: { currentTime: Date }) => {
                </div>
             </div>
         )}
-        {absensiSubTab === 'rekap' && (
-            <div className="flex flex-col gap-4">
-              <table className="w-full text-left border-collapse whitespace-nowrap border border-gray-400">
-                <thead className="bg-[#ece9d8] border-b border-gray-400">
-                  <tr><th className="p-2 border-r">Nama Karyawan</th><th className="p-2 border-r">Posisi</th><th className="p-2 border-r text-center">Kehadiran</th><th className="p-2 border-r text-center">Gaji Perhari</th><th className="p-2 border-r text-center">Total Telat</th><th className="p-2 border-r text-center text-red-600">Denda Telat</th><th className="p-2 border-r text-center text-red-600">Total Bon</th><th className="p-2 text-right">Gaji Bersih</th></tr>
-                </thead>
-                <tbody>
-                  {generateRekapAbsen().map((rec: any, idx) => (
-                      <tr key={idx} className="border-b hover:bg-gray-50">
-                        <td className="p-2 border-r font-bold">{rec.name}</td>
-                        <td className="p-2 border-r">{rec.position}</td>
-                        <td className="p-2 border-r text-center font-bold text-blue-800">{rec.totalDays} Hari</td>
-                        <td className="p-2 border-r text-center">
-                           <input 
-                              type="number"
-                              value={rec.dailyPay}
-                              onChange={(e) => {
-                                  const newVal = parseInt(e.target.value) || 0;
-                                  setEmployees(employees.map((emp: any) => emp.name === rec.name ? { ...emp, dailySalary: newVal } : emp));
-                              }}
-                              className="w-24 text-center border border-gray-300 p-1 outline-none"
-                           />
-                        </td>
-                        <td className="p-2 border-r text-center text-red-600 font-bold">{rec.totalLate} Min</td>
-                        <td className="p-2 border-r text-center text-red-600 font-bold">-{rec.totalPenalty > 0 ? rec.totalPenalty.toLocaleString('id-ID') : '0'}</td>
-                        <td className="p-2 border-r text-center text-red-600 font-bold">-{rec.totalBon > 0 ? rec.totalBon.toLocaleString('id-ID') : '0'}</td>
-                        <td className="p-2 text-right font-bold text-green-700 text-lg">Rp {rec.finalSalary.toLocaleString('id-ID')}</td>
-                      </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+
+
+        {showPayModal && (
+          <div className="fixed inset-0 bg-black/50 z-[100] flex items-center justify-center p-4 backdrop-blur-sm">
+             <div className="bg-[#ece9d8] border-2 border-gray-400 w-full max-w-md flex flex-col shadow-xl text-black animate-none">
+                <div className="bg-[#000080] text-white px-2 py-1 flex items-center font-bold text-xs justify-between">
+                   <span>Konfirmasi VALIDASI Gaji (THP)</span>
+                   <button onClick={() => setShowPayModal(false)} className="bg-gray-300 text-black px-1.5 font-bold hover:bg-red-500 hover:text-white border border-gray-400">X</button>
+                </div>
+                <div className="p-4 flex flex-col gap-3">
+                   <h3 className="text-sm font-bold border-b pb-1 text-blue-900">Review Nominal THP Karyawan:</h3>
+                   <div className="max-h-48 overflow-y-auto bg-white border p-2 flex flex-col gap-1.5 animate-none">
+                      {generateRekapAbsen().map((emp: any, idx: number) => (
+                         <div key={idx} className="flex justify-between text-xs font-mono border-b pb-1">
+                            <div>
+                               <span className="font-bold text-black">{emp.name}</span>
+                               <span className="text-gray-500 block">({emp.totalDays} Hari kerja, denda: Rp {emp.totalPenalty.toLocaleString('id-ID')}, bon: Rp {emp.totalBon.toLocaleString('id-ID')})</span>
+                            </div>
+                            <span className="font-bold text-green-700">Rp {emp.finalSalary.toLocaleString('id-ID')}</span>
+                         </div>
+                      ))}
+                   </div>
+                   <div className="bg-yellow-50 border border-yellow-200 p-2.5 rounded text-xs text-yellow-900 leading-relaxed">
+                      <p className="font-bold mb-1">Peringatan Dana Bebas:</p>
+                      <p>Saldo Dana Bebas saat ini: <b>Rp {(wallets?.danaBebas || 0).toLocaleString('id-ID')}</b></p>
+                      <p className="mt-1">Dana Bebas setelah pembayaran: <b className="text-blue-900">Rp {((wallets?.danaBebas || 0) - generateRekapAbsen().reduce((sum: number, r: any) => sum + r.finalSalary, 0)).toLocaleString('id-ID')}</b></p>
+                      <p className="mt-2 text-red-700 font-bold">Harap pastikan semua nominal di atas sudah sesuai dan tidak ada kesalahan nominal gaji sebelum melanjutkan!</p>
+                   </div>
+                   
+                   <div className="flex justify-end gap-2 mt-2">
+                      <button onClick={() => setShowPayModal(false)} className="px-4 py-1.5 border border-gray-500 bg-gray-200 hover:bg-gray-300 font-bold text-xs">Batal</button>
+                      <button 
+                         // Tidak ada limit saldo dana bebas saat mengajukan ke waitlist
+                         onClick={() => {
+                            const rekapData = generateRekapAbsen();
+                            if (rekapData.length === 0) {
+                               return alert('Tidak ada data gaji untuk diajukan.');
+                            }
+                            
+                            // Generate and push waitlist items
+                            const newItems = rekapData.map((item: any) => ({
+                               id: 'WP-' + String(item.name).replace(/\s+/g, '-') + '-' + Date.now() + '-' + Math.floor(Math.random() * 1000),
+                               name: item.name,
+                               salary: item.finalSalary,
+                               bonus: 0,
+                               createdAt: new Date().toISOString(),
+                               details: `Kehadiran: ${item.totalDays} Hari, Denda: Rp ${item.totalPenalty.toLocaleString('id-ID')}, Bon: Rp ${item.totalBon.toLocaleString('id-ID')}`
+                            }));
+                            setWaitingPayments((prev: any[]) => [...(prev || []), ...newItems]);
+                            
+                            const amt = rekapData.reduce((sum: number, r: any) => sum + r.finalSalary, 0);
+                            addLog('PENGGAJIAN', `Mengajukan ${rekapData.length} Gaji Karyawan (Total Rp ${amt.toLocaleString('id-ID')}) ke Daftar Tunggu Pembayaran`);
+                            alert(`Berhasil memasukkan ${rekapData.length} Gaji Karyawan ke Daftar Tunggu Pembayaran Gaji! Silakan kelola di menu Dana Bebas.`);
+                            setShowPayModal(false);
+                            setAbsenAction('');
+                            return;
+                         }} 
+                         className="px-4 py-1.5 bg-green-600 text-white hover:bg-green-700 font-bold text-xs shadow-sm"
+                      >
+                         Lanjut Ajukan Gaji
+                      </button>
+                   </div>
+                </div>
+             </div>
+          </div>
         )}
 
       </div>

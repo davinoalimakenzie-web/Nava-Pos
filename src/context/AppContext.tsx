@@ -18,7 +18,7 @@ import {
 
 const AppContext = createContext<any>(null);
 
-const DUMMY_VERSION = "16";
+const DUMMY_VERSION = "17";
 
 const initialHutangSupplier = [
   { id: 'HT01', supplier_id: 1, supplier_name: 'PT Surya Gemilang', tanggal_hutang: '2025-12-15T00:00:00.000Z', jatuh_tempo: '2026-01-15T00:00:00.000Z', nominal: 5000000, sisa_hutang: 5000000, status: 'belum_lunas' },
@@ -145,6 +145,7 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
   const [orderData, setOrderData] = useSyncState<any[]>('order', initialOrderData, storeSettings.syncEnabled);
   const [hutangSupplier, setHutangSupplier] = useSyncState<any[]>('hutangSupplier', initialHutangSupplier, storeSettings.syncEnabled);
   const [kewajibanLain, setKewajibanLain] = useSyncState<any[]>('kewajibanLain', [], storeSettings.syncEnabled);
+  const [waitingPayments, setWaitingPayments] = useSyncState<any[]>('waitingPayments', [], storeSettings.syncEnabled);
 
   const [suppliers, setSuppliers] = useSyncState<any[]>('suppliers', [
     { id: 1, name: 'PT Surya Gemilang', contact: '08123456789', address: 'Jl. Rungkut 1' }
@@ -211,6 +212,7 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
       orderData, setOrderData,
       hutangSupplier, setHutangSupplier,
       kewajibanLain, setKewajibanLain,
+      waitingPayments, setWaitingPayments,
       pendingTransactions, setPendingTransactions,
       cart, setCart,
       amountPaid, setAmountPaid,

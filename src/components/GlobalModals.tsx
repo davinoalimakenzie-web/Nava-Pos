@@ -34,6 +34,8 @@ export const GlobalModals = () => {
     const [newEmpName, setNewEmpName] = useState('');
     const [newEmpPos, setNewEmpPos] = useState('');
     const [newEmpBranch, setNewEmpBranch] = useState(storeSettings?.branches?.[0] || 'Kudus');
+    const [newEmpPhone, setNewEmpPhone] = useState('');
+    const [newEmpSalary, setNewEmpSalary] = useState('');
     const [authPassword, setAuthPassword] = useState('');
     const [pendingSearch, setPendingSearch] = useState('');
     const [selectedPendingId, setSelectedPendingId] = useState<string | null>(null);
@@ -135,9 +137,17 @@ export const GlobalModals = () => {
 
     const handleAddEmployee = (e: React.FormEvent) => {
         e.preventDefault();
-        setEmployees([...employees, { id: Date.now(), name: newEmpName, position: newEmpPos, branch: newEmpBranch, dailySalary: 0, latePenaltyPerMin: 10000/60 }]);
+        setEmployees([...employees, { 
+            id: Date.now(), 
+            name: newEmpName, 
+            position: newEmpPos, 
+            branch: newEmpBranch, 
+            phone: newEmpPhone || '-',
+            dailySalary: parseInt(newEmpSalary) || 0, 
+            latePenaltyPerMin: 10000/60 
+        }]);
         addLog('KARYAWAN', `Karyawan baru ditambahkan: ${newEmpName} (${newEmpBranch})`);
-        setNewEmpName(''); setNewEmpPos(''); setShowAddEmpModal(false);
+        setNewEmpName(''); setNewEmpPos(''); setNewEmpPhone(''); setNewEmpSalary(''); setShowAddEmpModal(false);
         alert('Karyawan baru berhasil ditambahkan!');
     };
 
@@ -489,6 +499,10 @@ export const GlobalModals = () => {
                         <input type="text" required value={newEmpName} onChange={(e) => setNewEmpName(e.target.value)} className="w-full p-1.5 border border-gray-400 mb-3 outline-none focus:border-blue-600" />
                         <label className="block mb-1">Posisi / Jabatan:</label>
                         <input type="text" required value={newEmpPos} onChange={(e) => setNewEmpPos(e.target.value)} className="w-full p-1.5 border border-gray-400 mb-3 outline-none focus:border-blue-600" />
+                        <label className="block mb-1">No WA:</label>
+                        <input type="text" value={newEmpPhone} onChange={(e) => setNewEmpPhone(e.target.value)} className="w-full p-1.5 border border-gray-400 mb-3 outline-none focus:border-blue-600" placeholder="Contoh: 08123456789" />
+                        <label className="block mb-1">Gaji Perhari (Rp):</label>
+                        <input type="number" value={newEmpSalary} onChange={(e) => setNewEmpSalary(e.target.value)} className="w-full p-1.5 border border-gray-400 mb-3 outline-none focus:border-blue-600" placeholder="Contoh: 150000" />
                         <label className="block mb-1">Penempatan Cabang:</label>
                         <select required value={newEmpBranch} onChange={(e) => setNewEmpBranch(e.target.value)} className="w-full p-1.5 border border-gray-400 mb-4 outline-none focus:border-blue-600">
                             {storeSettings?.branches?.map((b: string) => (

@@ -338,52 +338,6 @@ export const Cashflow = ({ currentTime }: { currentTime: Date }) => {
          </div>
       )}
 
-      {/* TAB: PROMO */}
-      {cashflowTab === 'promo' && (
-         <div className="flex-1 flex flex-col overflow-hidden">
-             <div className="bg-yellow-50 p-2.5 border-b border-yellow-250 text-yellow-905 text-xs shrink-0 font-medium">
-                <p><strong>Info Promo:</strong> Menampilkan total belanja pelanggan bulan ini. Pelanggan yang mencapai omzet Rp 5.000.000 berhak mendapatkan cashback 5% (potongan yang wajib dibelanjakan). Promo aktif ketika kasir menekan tombol "Promo" saat bertransaksi dengan pelanggan tersebut.</p>
-             </div>
-             <div className="flex-1 bg-white flex flex-col overflow-auto">
-             <table className="w-full text-left border-collapse whitespace-nowrap">
-               <thead className="bg-[#ece9d8] sticky top-0 border-b-2 border-gray-400 font-bold text-blue-900 shadow-sm z-10 text-sm">
-                 <tr>
-                    <th className="p-3 border-r border-gray-300">Nama Pelanggan</th>
-                    <th className="p-3 border-r border-gray-300">No. WA</th>
-                    <th className="p-3 border-r border-gray-300">Tipe Pelanggan</th>
-                    <th className="p-3 border-r border-gray-300 text-right">Total Transaksi Bulan Ini</th>
-                    <th className="p-3 text-center">Status Promo</th>
-                 </tr>
-               </thead>
-               <tbody className="text-sm">
-                 {customerPromoData.length === 0 ? (
-                   <tr><td colSpan={5} className="text-center p-10 font-bold text-gray-500">Belum ada transaksi bulan ini.</td></tr>
-                 ) : (
-                   customerPromoData.map((c: any, idx: number) => {
-                      const isEligible = c.total >= 5000000;
-                      return (
-                      <tr key={idx} className={`border-b border-gray-200 cursor-pointer text-black ${isEligible ? 'bg-green-50 hover:bg-green-100' : 'hover:bg-blue-50'}`}>
-                         <td className="p-3 border-r border-gray-300 font-bold">{c.name}</td>
-                         <td className="p-3 border-r border-gray-300">{c.phone}</td>
-                         <td className="p-3 border-r border-gray-300">{c.memberType}</td>
-                         <td className="p-3 border-r border-gray-300 text-right font-bold text-blue-800">{formatRp(c.total)}</td>
-                         <td className="p-3 text-center font-bold">
-                             {isEligible ? (
-                                <span className="bg-green-600 text-white px-2 py-1 rounded text-xs shadow-sm">Memenuhi Syarat 5 Juta</span>
-                             ) : (
-                                <span className="text-gray-500">Belum Memenuhi</span>
-                             )}
-                         </td>
-                      </tr>
-                      );
-                   })
-                 )}
-               </tbody>
-             </table>
-             </div>
-         </div>
-      )}
-
     </div>
   );
 };
