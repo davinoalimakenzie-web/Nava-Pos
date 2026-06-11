@@ -20,19 +20,6 @@ export const Cashflow = ({ currentTime }: { currentTime: Date }) => {
 
   const [filterPaymentMethod, setFilterPaymentMethod] = useState('Semua');
   const [searchNota, setSearchNota] = useState('');
-
-  // Promo Calculation
-  const currentMonthIdx = new Date().getMonth();
-  const currentYearVal = new Date().getFullYear();
-  const customerPromoData = (customers || []).map((c: any) => {
-    const total = transactions.filter((t: any) => {
-      if (t.customer !== c.name) return false;
-      if (t.id.includes('PLN') || t.method === 'RETUR') return false;
-      const tDate = new Date(t.isoDate || t.date);
-      return tDate.getMonth() === currentMonthIdx && tDate.getFullYear() === currentYearVal;
-    }).reduce((sum: number, t: any) => sum + (t.total || 0), 0);
-    return { name: c.name, total, memberType: c.level === 2 ? 'Grosir' : 'Ecer', phone: c.phone || '-' };
-  }).filter((c: any) => c.total > 0).sort((a: any, b: any) => b.total - a.total);
   
   const filteredTransactions = transactions.filter((t: any) => {
     if (t.type === 'PEMBELIAN') return false; // Exclude from income logic
@@ -76,12 +63,24 @@ export const Cashflow = ({ currentTime }: { currentTime: Date }) => {
     return true;
   });
 
+  const [showMonthlyReturn, setShowMonthlyReturn] = useState(false);
+  const [showMonthlyNonTunai, setShowMonthlyNonTunai] = useState(false);
+
   const returTunaiTotal = filteredTransactions.filter((t: any) => t.method === 'TUNAI').reduce((sum: number, t: any) => sum + (t.returTotal || 0), 0);
   const returNonTunaiTotal = filteredTransactions.filter((t: any) => t.method !== 'TUNAI').reduce((sum: number, t: any) => sum + (t.returTotal || 0), 0);
+  const totalReturHarianVal = returTunaiTotal + returNonTunaiTotal;
 
   const uangKeluarNonTunai = filteredTransactions.filter((t: any) => t.method !== 'TUNAI').reduce((sum: number, t: any) => sum + (t.total + (t.returTotal || 0)), 0); 
   
-  const totalPengeluaran = filteredExpenses.filter((e: any) => e.amount > 0).reduce((sum: number, e: any) => sum + e.amount, 0) + returTunaiTotal;
+  const totalPengeluaran = filteredExpenses.filter((e: any) => e.amount > 0).reduce((sum: number, e: any) => sum + e.amount, 0);
+
+  const [tY, tM, tD] = filterStartDate.split('-');
+  const monthlyTransactions = transactions.filter((t: any) => {
+    const tDate = new Date(t.timestamp || t.isoDate || new Date().toISOString());
+    return tDate.getMonth() === (parseInt(tM) - 1) && tDate.getFullYear() === parseInt(tY);
+  });
+  const totalReturBulananVal = monthlyTransactions.reduce((sum: number, t: any) => sum + (t.returTotal || 0), 0);
+  const piutangNonTunaiBulananVal = monthlyTransactions.filter((t: any) => t.method !== 'TUNAI').reduce((sum: number, t: any) => sum + (t.total + (t.returTotal || 0)), 0);
 
   const outBulananVal = expenses.filter((e: any) => {
     if (e.wallet !== 'Dana Bebas' && e.name !== 'Setoran Tunai' && !e.name?.includes('Pelunasan') && !e.name?.includes('Gaji') && !e.name?.includes('Prive')) {
@@ -89,8 +88,7 @@ export const Cashflow = ({ currentTime }: { currentTime: Date }) => {
     }
     if (e.wallet !== 'Dana Bebas') return false;
     const eDate = new Date(e.isoDate || e.date || new Date().toISOString());
-    const targetDate = new Date(); // bulanan implies current month
-    return eDate.getMonth() === targetDate.getMonth() && eDate.getFullYear() === targetDate.getFullYear();
+    return eDate.getMonth() === (parseInt(tM) - 1) && eDate.getFullYear() === parseInt(tY);
   }).reduce((sum: number, e: any) => sum + (e.amount > 0 ? e.amount : 0), 0);
 
   return (
@@ -101,7 +99,6 @@ export const Cashflow = ({ currentTime }: { currentTime: Date }) => {
       <div className="flex gap-1 shrink-0 bg-[#ece9d8] px-1 pt-1 border-b border-gray-400 shadow-sm z-10 overflow-x-auto no-scrollbar">
          <button onClick={() => setCashflowTab('harian')} className={`px-2.5 py-1 text-[10px] md:text-xs md:px-4 md:py-1.5 whitespace-nowrap shrink-0 border border-gray-500 font-bold hover:bg-white ${cashflowTab === 'harian' ? 'bg-white border-b-transparent text-blue-900' : 'bg-gray-200 text-black'}`}>Cashflow Harian</button>
          <button onClick={() => setCashflowTab('dana_bebas')} className={`px-2.5 py-1 text-[10px] md:text-xs md:px-4 md:py-1.5 whitespace-nowrap shrink-0 border border-gray-500 font-bold hover:bg-white ${cashflowTab === 'dana_bebas' ? 'bg-white border-b-transparent text-blue-900' : 'bg-gray-200 text-black'}`}>Dana Bebas</button>
-         <button onClick={() => setCashflowTab('promo')} className={`px-2.5 py-1 text-[10px] md:text-xs md:px-4 md:py-1.5 whitespace-nowrap shrink-0 border border-gray-500 font-bold hover:bg-white ${cashflowTab === 'promo' ? 'bg-white border-b-transparent text-blue-900' : 'bg-gray-200 text-black'}`}>Promo</button>
       </div>
 
       {/* Box Rangkuman Statis (Sits seamlessly below Top Tabs) */}
@@ -114,17 +111,31 @@ export const Cashflow = ({ currentTime }: { currentTime: Date }) => {
           <p className="text-gray-500 font-bold mb-0.5 text-[10px] uppercase tracking-wider whitespace-nowrap">Dana Laci</p>
           <div className="text-[14px] font-black text-gray-800">{formatRp(wallets?.danaLaci || 0)}</div>
         </div>
-        <div className="p-2 flex-1 min-w-[125px] bg-white hover:bg-gray-50 transition-colors">
-          <p className="text-gray-500 font-bold mb-0.5 text-[10px] uppercase tracking-wider whitespace-nowrap">Total Retur (Harian)</p>
-          <div className="text-[14px] font-black text-red-600">{formatRp(returTunaiTotal + returNonTunaiTotal)}</div>
+        <div 
+          className="p-2 flex-1 min-w-[125px] bg-white hover:bg-gray-50 transition-colors cursor-pointer"
+          onClick={() => setShowMonthlyReturn(!showMonthlyReturn)}
+        >
+          <p className="text-gray-500 font-bold mb-0.5 text-[10px] uppercase tracking-wider whitespace-nowrap flex items-center gap-1">
+            {showMonthlyReturn ? 'Total Return (Bulan)' : 'Total Return (Harian)'} <span className="text-[8px] border border-gray-300 px-1 rounded bg-gray-100 text-gray-400">klik</span>
+          </p>
+          <div className="text-[14px] font-black text-red-600">{formatRp(showMonthlyReturn ? totalReturBulananVal : totalReturHarianVal)}</div>
+        </div>
+        <div className="p-2 flex-1 min-w-[125px] bg-[#fcfcfc] hover:bg-gray-50 transition-colors">
+          <p className="text-gray-500 font-bold mb-0.5 text-[10px] uppercase tracking-wider whitespace-nowrap">Out Harian</p>
+          <div className="text-[14px] font-black text-black">{formatRp(totalPengeluaran)}</div>
         </div>
         <div className="p-2 flex-1 min-w-[125px] bg-white hover:bg-gray-50 transition-colors">
           <p className="text-gray-500 font-bold mb-0.5 text-[10px] uppercase tracking-wider whitespace-nowrap">Out Bulanan</p>
           <div className="text-[14px] font-black text-orange-600">{formatRp(outBulananVal)}</div>
         </div>
-        <div className="p-2 flex-1 min-w-[125px] bg-[#fcfcfc] hover:bg-gray-50 transition-colors">
-          <p className="text-gray-500 font-bold mb-0.5 text-[10px] uppercase tracking-wider whitespace-nowrap">Out Harian</p>
-          <div className="text-[14px] font-black text-black">{formatRp(totalPengeluaran)}</div>
+        <div 
+          className="p-2 flex-1 min-w-[125px] bg-white hover:bg-gray-50 transition-colors cursor-pointer"
+          onClick={() => setShowMonthlyNonTunai(!showMonthlyNonTunai)}
+        >
+          <p className="text-gray-500 font-bold mb-0.5 text-[10px] uppercase tracking-wider whitespace-nowrap flex items-center gap-1">
+            {showMonthlyNonTunai ? 'Non Tunai (Bulan)' : 'Non Tunai (Harian)'} <span className="text-[8px] border border-gray-300 px-1 rounded bg-gray-100 text-gray-400">klik</span>
+          </p>
+          <div className="text-[14px] font-black text-orange-500">{formatRp(showMonthlyNonTunai ? piutangNonTunaiBulananVal : uangKeluarNonTunai)}</div>
         </div>
       </div>
 

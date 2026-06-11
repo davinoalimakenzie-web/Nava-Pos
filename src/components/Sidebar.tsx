@@ -84,9 +84,9 @@ export const Sidebar = () => {
                   {isExpanded && <span className="whitespace-nowrap">CASHFLOW</span>}
                 </button>
 
-                <button onClick={() => setActiveTab('masterdata')} title="MASTER DATA" className={`flex items-center gap-3 p-2.5 rounded transition-all ${activeTab === 'masterdata' ? 'bg-blue-600 text-white shadow-md' : 'text-slate-300 hover:bg-slate-800'} ${isExpanded ? 'w-full' : 'w-10 justify-center'}`}>
+                <button onClick={() => setActiveTab('masterdata')} title="INVENTORY" className={`flex items-center gap-3 p-2.5 rounded transition-all ${activeTab === 'masterdata' ? 'bg-blue-600 text-white shadow-md' : 'text-slate-300 hover:bg-slate-800'} ${isExpanded ? 'w-full' : 'w-10 justify-center'}`}>
                   <Database className="w-4 h-4 shrink-0" /> 
-                  {isExpanded && <span className="whitespace-nowrap">MASTER DATA</span>}
+                  {isExpanded && <span className="whitespace-nowrap">INVENTORY</span>}
                 </button>
 
                 <button onClick={() => setActiveTab('ai')} title="AI ASSISTANT" className={`flex items-center gap-3 p-2.5 rounded transition-all ${activeTab === 'ai' ? 'bg-purple-600 text-white shadow-lg shadow-purple-900/20' : 'text-purple-300 hover:bg-slate-800 border border-purple-900/30'} ${isExpanded ? 'w-full' : 'w-10 justify-center'}`}>

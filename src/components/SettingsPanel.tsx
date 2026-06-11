@@ -7,9 +7,12 @@ export const SettingsPanel = ({ currentTime }: { currentTime: Date }) => {
   const { 
       user, storeSettings, setStoreSettings, setPendingUser, appUsers, setAppUsers, 
       inventory, setInventory, customers, setCustomers, suppliers, setSuppliers, orderData, setOrderData, supplierReturns, setSupplierReturns, setShowLogoutConfirm,
-      employees, setEmployees, attendances, setAttendances, leaveRequests, setLeaveRequests, transactions, setTransactions, expenses, setExpenses, piutangData, setPiutangData, pendingTransactions, setPendingTransactions, appLogs, addLog
+      employees, setEmployees, attendances, setAttendances, leaveRequests, setLeaveRequests, transactions, setTransactions, expenses, setExpenses, piutangData, setPiutangData, pendingTransactions, setPendingTransactions, appLogs, addLog,
+      setShowAddEmpModal, setShowAddCustomerModal
   } = useAppContext();
   const [settingTab, setSettingTab] = useState('tools');
+  const [showAddSupplierModal, setShowAddSupplierModal] = useState(false);
+  const [newSupplier, setNewSupplier] = useState({ name: '', contact: '', address: '' });
   
   // Backup & Restore states
   const [snapshots, setSnapshots] = useState<any[]>(() => {
@@ -52,6 +55,10 @@ export const SettingsPanel = ({ currentTime }: { currentTime: Date }) => {
       <div className="flex gap-1 shrink-0 bg-[#ece9d8] p-1 border-b border-gray-400 shadow-sm z-10 overflow-x-auto no-scrollbar">
          <button onClick={() => setSettingTab('tools')} className={`px-2.5 py-1 text-[10px] md:text-xs md:px-4 md:py-1.5 whitespace-nowrap shrink-0 border border-gray-500 font-bold hover:bg-white ${settingTab === 'tools' ? 'bg-white border-b-white text-blue-900' : 'bg-gray-200 text-black'}`}>Tools & Backup</button>
          <button onClick={() => setSettingTab('margins')} className={`px-2.5 py-1 text-[10px] md:text-xs md:px-4 md:py-1.5 whitespace-nowrap shrink-0 border border-gray-500 font-bold hover:bg-white ${settingTab === 'margins' ? 'bg-white border-b-white text-blue-900' : 'bg-gray-200 text-black'}`}>Harga Level</button>
+         <button onClick={() => setSettingTab('karyawan')} className={`px-2.5 py-1 text-[10px] md:text-xs md:px-4 md:py-1.5 whitespace-nowrap shrink-0 border border-gray-500 font-bold hover:bg-white ${settingTab === 'karyawan' ? 'bg-white border-b-white text-blue-900' : 'bg-gray-200 text-black'}`}>Data Karyawan</button>
+         <button onClick={() => setSettingTab('pelanggan')} className={`px-2.5 py-1 text-[10px] md:text-xs md:px-4 md:py-1.5 whitespace-nowrap shrink-0 border border-gray-500 font-bold hover:bg-white ${settingTab === 'pelanggan' ? 'bg-white border-b-white text-blue-900' : 'bg-gray-200 text-black'}`}>Data Pelanggan</button>
+         <button onClick={() => setSettingTab('supliyer')} className={`px-2.5 py-1 text-[10px] md:text-xs md:px-4 md:py-1.5 whitespace-nowrap shrink-0 border border-gray-500 font-bold hover:bg-white ${settingTab === 'supliyer' ? 'bg-white border-b-white text-blue-900' : 'bg-gray-200 text-black'}`}>Data Supliyer</button>
+         <button onClick={() => setSettingTab('promo')} className={`px-2.5 py-1 text-[10px] md:text-xs md:px-4 md:py-1.5 whitespace-nowrap shrink-0 border border-gray-500 font-bold hover:bg-white ${settingTab === 'promo' ? 'bg-white border-b-white text-blue-900' : 'bg-gray-200 text-black'}`}>Promo</button>
          {(user?.role === 'owner' || user?.role === 'admin') && (
              <button onClick={() => setSettingTab('akun')} className={`px-2.5 py-1 text-[10px] md:text-xs md:px-4 md:py-1.5 whitespace-nowrap shrink-0 border border-gray-500 font-bold hover:bg-white ${settingTab === 'akun' ? 'bg-white border-b-white text-blue-900' : 'bg-gray-200 text-black'}`}>Akun Login & Hak Akses</button>
          )}
@@ -928,6 +935,137 @@ export const SettingsPanel = ({ currentTime }: { currentTime: Date }) => {
             </div>
           </div>
         </div>
+      )}
+
+      {settingTab === 'karyawan' && (
+          <div className="flex flex-col gap-2">
+            <button onClick={() => setShowAddEmpModal(true)} className="bg-blue-600 text-white font-bold py-2 w-48 mb-2 shadow rounded hover:bg-blue-700">+ Tambah Karyawan Baru</button>
+            <table className="w-full text-left border-collapse whitespace-nowrap border border-gray-400">
+              <thead className="bg-gray-100 border-b border-gray-400">
+                <tr><th className="p-2 border-r w-16">ID</th><th className="p-2 border-r">Nama</th><th className="p-2 border-r">Posisi/Jabatan</th><th className="p-2 border-r">Cabang</th></tr>
+              </thead>
+              <tbody>
+                {employees.map((emp: any) => (
+                    <tr key={emp.id} className="border-b hover:bg-gray-50">
+                      <td className="p-2 border-r text-gray-500 font-mono">#{emp.id}</td>
+                      <td className="p-2 border-r font-bold">{emp.name}</td>
+                      <td className="p-2 border-r">{emp.position}</td>
+                      <td className="p-2">{emp.branch || '-'}</td>
+                    </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+      )}
+
+      {settingTab === 'pelanggan' && (
+          <div className="flex flex-col h-full">
+            <div className="flex justify-between items-center bg-[#ece9d8] border-b border-gray-400 p-2 shadow-sm sticky top-0 z-20">
+              <span className="font-bold">Daftar Pelanggan Terdaftar</span>
+              <button onClick={() => setShowAddCustomerModal(true)} className="bg-gray-200 border border-gray-500 px-3 py-1 font-bold shadow hover:bg-gray-300">+ Tambah Pelanggan</button>
+            </div>
+            <table className="w-full text-left border-collapse whitespace-nowrap">
+              <thead className="bg-slate-50 border-b-2 border-gray-400 font-normal">
+                <tr><th className="p-2 border-r border-gray-300 w-16 text-center">ID</th><th className="p-2 border-r border-gray-300">Nama Pelanggan</th><th className="p-2 border-r border-gray-300">No. Telp / WA</th><th className="p-2 border-r border-gray-300 text-center">Level Harga</th><th className="p-2 text-center">Aksi</th></tr>
+              </thead>
+              <tbody>
+                {customers.map((c: any) => (
+                  <tr key={c.id} className="border-b border-gray-200 hover:bg-blue-50">
+                    <td className="p-2 border-r border-gray-300 text-center font-mono text-gray-500">#{c.id}</td><td className="p-2 border-r border-gray-300 font-bold">{c.name}</td><td className="p-2 border-r border-gray-300">{c.phone || '-'}</td><td className="p-2 border-r border-gray-300 text-center">Level {c.level} {c.level == 1 ? '(NON member)' : ''}</td><td className="p-2 text-center"><button className="px-2 text-blue-700 font-bold hover:underline">Edit</button></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+      )}
+
+      {settingTab === 'supliyer' && (
+          <div className="flex flex-col h-full">
+            <div className="flex justify-between items-center bg-[#ece9d8] border-b border-gray-400 p-2 shadow-sm sticky top-0 z-20">
+              <span className="font-bold">Daftar Supliyer Aktif</span>
+              <button className="bg-gray-200 border border-gray-500 px-3 py-1 font-bold shadow hover:bg-gray-300" onClick={() => setShowAddSupplierModal(true)}>+ Tambah Supliyer</button>
+            </div>
+            {showAddSupplierModal && (
+                 <div className="bg-[#ece9d8] border border-gray-400 p-3 flex gap-2 items-end mb-2 shadow-sm rounded-sm m-2">
+                    <div className="flex flex-col gap-1">
+                        <label className="text-xs font-bold text-gray-700">Nama Supliyer:</label>
+                        <input className="border border-gray-400 p-1" value={newSupplier.name} onChange={e => setNewSupplier({...newSupplier, name: e.target.value})} />
+                    </div>
+                    <div className="flex flex-col gap-1">
+                        <label className="text-xs font-bold text-gray-700">Kontak:</label>
+                        <input className="border border-gray-400 p-1" value={newSupplier.contact} onChange={e => setNewSupplier({...newSupplier, contact: e.target.value})} />
+                    </div>
+                    <div className="flex flex-col gap-1">
+                        <label className="text-xs font-bold text-gray-700">Alamat:</label>
+                        <input className="border border-gray-400 p-1" value={newSupplier.address} onChange={e => setNewSupplier({...newSupplier, address: e.target.value})} />
+                    </div>
+                    <button onClick={() => {
+                        if (!newSupplier.name) return alert('Nama supliyer wajib diisi!');
+                        setSuppliers([...(suppliers || []), { id: Date.now().toString(), name: newSupplier.name, contact: newSupplier.contact, address: newSupplier.address }]);
+                        setNewSupplier({name: '', contact: '', address: ''});
+                        setShowAddSupplierModal(false);
+                    }} className="bg-green-600 text-white font-bold py-1 px-4 shadow hover:bg-green-700">Simpan</button>
+                    <button onClick={() => setShowAddSupplierModal(false)} className="bg-gray-400 text-white font-bold py-1 px-4 shadow hover:bg-gray-500">Batal</button>
+                 </div>
+            )}
+            <table className="w-full text-left border-collapse whitespace-nowrap mt-2">
+               <thead className="bg-slate-50 border-b-2 border-gray-400 font-normal">
+                  <tr><th className="p-2 border-r border-gray-300 text-center w-16">ID Sup</th><th className="p-2 border-r border-gray-300">Nama Lengkap Supliyer</th><th className="p-2 border-r border-gray-300">Kontak Person</th><th className="p-2 border-r border-gray-300">Alamat Lengkap</th></tr>
+               </thead>
+               <tbody>
+                 {suppliers.map((s: any) => (
+                    <tr key={s.id} className="border-b border-gray-200 hover:bg-blue-50">
+                       <td className="p-2 border-r border-gray-300 text-center font-mono text-gray-500">#{s.id}</td>
+                       <td className="p-2 border-r border-gray-300 font-bold">{s.name}</td>
+                       <td className="p-2 border-r border-gray-300">{s.contact || '-'}</td>
+                       <td className="p-2 border-r border-gray-300">{s.address || '-'}</td>
+                    </tr>
+                 ))}
+               </tbody>
+            </table>
+          </div>
+      )}
+
+      {settingTab === 'promo' && (
+          <div className="flex flex-col gap-4">
+             <div className="bg-blue-50 border border-blue-200 p-3 rounded text-sm text-blue-900 leading-relaxed shadow-sm">
+               <p><strong>Info Promo:</strong> Menampilkan total belanja pelanggan bulan ini. Pelanggan yang mencapai omzet Rp 5.000.000 berhak mendapatkan cashback 5% (potongan yang wajib dibelanjakan). Promo aktif ketika kasir menekan tombol "Promo" saat bertransaksi dengan pelanggan tersebut.</p>
+             </div>
+             <table className="w-full text-left border-collapse">
+                <thead className="bg-[#ece9d8] border-b border-gray-400 text-xs">
+                   <tr>
+                     <th className="p-2 border-r border-gray-300 w-16 text-center">ID</th>
+                     <th className="p-2 border-r border-gray-300">Nama Pelanggan</th>
+                     <th className="p-2 border-r border-gray-300">Total Belanja Bulan Ini</th>
+                     <th className="p-2 border-r border-gray-300 text-center">Target Omzet (Rp)</th>
+                     <th className="p-2 text-center">Status Promo</th>
+                   </tr>
+                </thead>
+                <tbody>
+                 {customers.map((c: any, idx: number) => {
+                    // Quick calculation for promo logic (dummy implementation since we lost customerPromoData from Cashflow)
+                    // Let's use the transactions from AppContext!
+                    const customerMonthlyTotal = transactions.filter((t: any) => t.customer === c.name && t.timestamp && new Date(t.timestamp).getMonth() === new Date().getMonth()).reduce((sum: number, t: any) => sum + (t.total || 0), 0);
+                    const isReached = customerMonthlyTotal >= 5000000;
+                    return (
+                       <tr key={idx} className="border-b border-gray-300 hover:bg-gray-100 bg-white">
+                         <td className="p-2 border-r border-gray-300 text-center font-mono text-gray-500">#{c.id}</td>
+                         <td className="p-2 font-bold border-r border-gray-300">{c.name}</td>
+                         <td className={`p-2 font-mono border-r border-gray-300 ${isReached ? 'text-green-700 font-bold' : ''}`}>Rp {customerMonthlyTotal.toLocaleString('id-ID')}</td>
+                         <td className="p-2 font-mono border-r border-gray-300 text-center">5.000.000</td>
+                         <td className="p-2 text-center">
+                            {isReached ? (
+                               <span className="bg-green-600 text-white px-2 py-1 rounded shadow-sm font-bold text-[10px]">CASHBACK 5% AKTIF</span>
+                            ) : (
+                               <span className="bg-gray-200 text-gray-600 px-2 py-1 rounded shadow-sm text-[10px] font-bold">BELUM MENCAPAI</span>
+                            )}
+                         </td>
+                       </tr>
+                    );
+                 })}
+                </tbody>
+             </table>
+          </div>
       )}
 
     </div>

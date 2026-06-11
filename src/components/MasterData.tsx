@@ -52,8 +52,6 @@ export const MasterData = ({ currentTime }: { currentTime: Date }) => {
          <button onClick={() => setMasterDataTab('opname')} className={`px-2.5 py-1 text-[10px] md:text-xs md:px-4 md:py-1.5 whitespace-nowrap shrink-0 border border-gray-500 font-bold hover:bg-white ${masterDataTab === 'opname' ? 'bg-white border-b-white text-blue-900' : 'bg-gray-200 text-black'}`}>Stock Opname</button>
          <button onClick={() => setMasterDataTab('order')} className={`px-2.5 py-1 text-[10px] md:text-xs md:px-4 md:py-1.5 whitespace-nowrap shrink-0 border border-gray-500 font-bold hover:bg-white ${masterDataTab === 'order' ? 'bg-white border-b-white text-blue-900' : 'bg-gray-200 text-black'}`}>Order Stock</button>
          <button onClick={() => setMasterDataTab('return')} className={`px-2.5 py-1 text-[10px] md:text-xs md:px-4 md:py-1.5 whitespace-nowrap shrink-0 border border-gray-500 font-bold hover:bg-white ${masterDataTab === 'return' ? 'bg-white border-b-white text-blue-900' : 'bg-gray-200 text-black'}`}>Retur Supliyer</button>
-         <button onClick={() => setMasterDataTab('pelanggan')} className={`px-2.5 py-1 text-[10px] md:text-xs md:px-4 md:py-1.5 whitespace-nowrap shrink-0 border border-gray-500 font-bold hover:bg-white ${masterDataTab === 'pelanggan' ? 'bg-white border-b-white text-blue-900' : 'bg-gray-200 text-black'}`}>Data Pelanggan</button>
-         <button onClick={() => setMasterDataTab('supliyer')} className={`px-2.5 py-1 text-[10px] md:text-xs md:px-4 md:py-1.5 whitespace-nowrap shrink-0 border border-gray-500 font-bold hover:bg-white ${masterDataTab === 'supliyer' ? 'bg-white border-b-white text-blue-900' : 'bg-gray-200 text-black'}`}>Data Supliyer</button>
          <button onClick={() => setMasterDataTab('hutang')} className={`px-2.5 py-1 text-[10px] md:text-xs md:px-4 md:py-1.5 whitespace-nowrap shrink-0 border border-gray-500 font-bold hover:bg-white ${masterDataTab === 'hutang' ? 'bg-white border-b-white text-blue-900' : 'bg-gray-200 text-black'}`}>Hutang Supplier</button>
       </div>
 
@@ -287,72 +285,6 @@ export const MasterData = ({ currentTime }: { currentTime: Date }) => {
           )}
 
           {/* SUB TAB: DATA PELANGGAN */}
-          {masterDataTab === 'pelanggan' && (
-            <div className="flex flex-col h-full">
-              <div className="flex justify-between items-center bg-[#ece9d8] border-b border-gray-400 p-2 shadow-sm sticky top-0 z-20">
-                <span className="font-bold">Daftar Pelanggan Terdaftar</span>
-                <button onClick={() => setShowAddCustomerModal(true)} className="bg-gray-200 border border-gray-500 px-3 py-1 font-bold shadow hover:bg-gray-300">+ Tambah Pelanggan</button>
-              </div>
-              <table className="w-full text-left border-collapse whitespace-nowrap">
-                <thead className="bg-slate-50 border-b-2 border-gray-400 font-normal">
-                  <tr><th className="p-2 border-r border-gray-300 w-16 text-center">ID</th><th className="p-2 border-r border-gray-300">Nama Pelanggan</th><th className="p-2 border-r border-gray-300">No. Telp / WA</th><th className="p-2 border-r border-gray-300 text-center">Level Harga</th><th className="p-2 text-center">Aksi</th></tr>
-                </thead>
-                <tbody>
-                  {customers.map((c: any) => (
-                    <tr key={c.id} className="border-b border-gray-200 hover:bg-blue-50">
-                      <td className="p-2 border-r border-gray-300 text-center font-mono text-gray-500">#{c.id}</td><td className="p-2 border-r border-gray-300 font-bold">{c.name}</td><td className="p-2 border-r border-gray-300">{c.phone || '-'}</td><td className="p-2 border-r border-gray-300 text-center">Level {c.level} {c.level == 1 ? '(NON member)' : ''}</td><td className="p-2 text-center"><button className="px-2 text-blue-700 font-bold hover:underline">Edit</button></td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-
-          {/* SUB TAB: DATA SUPLIYER */}
-          {masterDataTab === 'supliyer' && (
-            <div className="flex flex-col h-full">
-              <div className="flex justify-between items-center bg-[#ece9d8] border-b border-gray-400 p-2 shadow-sm sticky top-0 z-20">
-                <span className="font-bold">Daftar Supliyer Aktif</span>
-                <button className="bg-gray-200 border border-gray-500 px-3 py-1 font-bold shadow hover:bg-gray-300" onClick={() => setShowAddSupplierModal(true)}>+ Tambah Supliyer</button>
-              </div>
-              {showAddSupplierModal && (
-                 <div className="bg-[#ece9d8] border border-gray-400 p-3 flex gap-2 items-end mb-2 shadow-sm rounded-sm m-2">
-                    <div className="flex flex-col gap-1">
-                        <label className="text-xs font-bold text-gray-700">Nama Supliyer:</label>
-                        <input className="border border-gray-400 p-1" value={newSupplier.name} onChange={e => setNewSupplier({...newSupplier, name: e.target.value})} />
-                    </div>
-                    <div className="flex flex-col gap-1">
-                        <label className="text-xs font-bold text-gray-700">Kontak:</label>
-                        <input className="border border-gray-400 p-1" value={newSupplier.contact} onChange={e => setNewSupplier({...newSupplier, contact: e.target.value})} />
-                    </div>
-                    <div className="flex flex-col gap-1">
-                        <label className="text-xs font-bold text-gray-700">Alamat:</label>
-                        <input className="border border-gray-400 p-1" value={newSupplier.address} onChange={e => setNewSupplier({...newSupplier, address: e.target.value})} />
-                    </div>
-                    <button onClick={() => {
-                        if (!newSupplier.name) return alert('Nama supliyer wajib diisi!');
-                        setSuppliers([...(suppliers || []), { id: Date.now().toString(), name: newSupplier.name, contact: newSupplier.contact, address: newSupplier.address }]);
-                        setNewSupplier({name: '', contact: '', address: ''});
-                        setShowAddSupplierModal(false);
-                    }} className="bg-green-600 text-white font-bold py-1 px-4 shadow hover:bg-green-700">Simpan</button>
-                    <button onClick={() => setShowAddSupplierModal(false)} className="bg-gray-400 text-white font-bold py-1 px-4 shadow hover:bg-gray-500">Batal</button>
-                 </div>
-              )}
-              <table className="w-full text-left border-collapse whitespace-nowrap">
-                <thead className="bg-slate-50 border-b-2 border-gray-400 font-normal">
-                  <tr><th className="p-2 border-r border-gray-300 w-16 text-center">ID</th><th className="p-2 border-r border-gray-300">Nama Supliyer</th><th className="p-2 border-r border-gray-300">Kontak</th><th className="p-2 border-r border-gray-300">Alamat</th><th className="p-2 text-center">Aksi</th></tr>
-                </thead>
-                <tbody>
-                  {suppliers?.map((s: any) => (
-                    <tr key={s.id} className="border-b border-gray-200 hover:bg-blue-50">
-                      <td className="p-2 border-r border-gray-300 text-center font-mono text-gray-500">#{s.id}</td><td className="p-2 border-r border-gray-300 font-bold">{s.name}</td><td className="p-2 border-r border-gray-300">{s.contact}</td><td className="p-2 border-r border-gray-300">{s.address}</td><td className="p-2 text-center"><button className="px-2 text-blue-700 font-bold hover:underline">Edit</button></td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-
           {/* SUB TAB: HUTANG SUPPLIER */}
           {masterDataTab === 'hutang' && (
             <div className="flex flex-col h-full">

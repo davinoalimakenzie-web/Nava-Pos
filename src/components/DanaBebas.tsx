@@ -56,6 +56,15 @@ export const DanaBebas = ({ currentTime, headless = false }: { currentTime?: Dat
 
   const piutangNonTunaiHarianVal = harianTransactions.filter((t: any) => t.method !== 'TUNAI').reduce((sum: number, t: any) => sum + (t.total + (t.returTotal || 0)), 0);
 
+  // Monthly Calculations
+  const [targetY, targetM, targetD] = targetDateStr.split('-');
+  const monthlyTransactions = (transactions || []).filter((t: any) => {
+    const tDate = new Date(t.timestamp || t.isoDate || new Date().toISOString());
+    return tDate.getMonth() === (parseInt(targetM) - 1) && tDate.getFullYear() === parseInt(targetY);
+  });
+  const totalReturBulananVal = monthlyTransactions.reduce((sum: number, t: any) => sum + (t.returTotal || 0), 0);
+  const piutangNonTunaiBulananVal = monthlyTransactions.filter((t: any) => t.method !== 'TUNAI').reduce((sum: number, t: any) => sum + (t.total + (t.returTotal || 0)), 0);
+
   const outBulananVal = (expenses || []).filter((e: any) => {
     if (e.wallet !== 'Dana Bebas' && e.name !== 'Setoran Tunai' && !e.name?.includes('Pelunasan') && !e.name?.includes('Gaji') && !e.name?.includes('Prive')) {
         // Only include expenses from Dana Bebas. Let's strictly check wallet.
@@ -65,13 +74,10 @@ export const DanaBebas = ({ currentTime, headless = false }: { currentTime?: Dat
     
     // Check if current month
     const eDate = new Date(e.isoDate || e.date || new Date().toISOString());
-    const targetDate = new Date(); // or use targetDateStr ? Bulanan means current month. I will use the month of targetDateStr.
-    const [y, m, d] = targetDateStr.split('-');
-    
-    return eDate.getMonth() === (parseInt(m) - 1) && eDate.getFullYear() === parseInt(y);
+    return eDate.getMonth() === (parseInt(targetM) - 1) && eDate.getFullYear() === parseInt(targetY);
   }).reduce((sum: number, e: any) => sum + (e.amount > 0 ? e.amount : 0), 0);
   
-  const pengeluaranHarianVal = harianExpenses.filter((e: any) => e.amount > 0).reduce((sum: number, e: any) => sum + e.amount, 0) + returTunaiTotal;
+  const pengeluaranHarianVal = harianExpenses.filter((e: any) => e.amount > 0).reduce((sum: number, e: any) => sum + e.amount, 0);
 
   // Active sub-control state inside the Dana Bebas panel
   const [activeControl, setActiveControl] = useState<'tarik' | 'pelunasan_supplier' | 'gaji' | 'prive'>('tarik');
@@ -82,8 +88,12 @@ export const DanaBebas = ({ currentTime, headless = false }: { currentTime?: Dat
 
   // 1. Tarik Dana Bebas Form States
   const [tarikNominal, setTarikNominal] = useState('');
-  const [tarikDest, setTarikDest] = useState<'laci' | 'tunai'>('laci');
+  const [tarikDest, setTarikDest] = useState<'laci' | 'tunai' | 'suntik'>('laci');
   const [tarikNotes, setTarikNotes] = useState('');
+
+  // Toggles for monthly views
+  const [showMonthlyReturn, setShowMonthlyReturn] = useState(false);
+  const [showMonthlyNonTunai, setShowMonthlyNonTunai] = useState(false);
 
   // 2. Pelunasan Supplier Form States
   const [selectedHutangId, setSelectedHutangId] = useState('');
@@ -120,15 +130,15 @@ export const DanaBebas = ({ currentTime, headless = false }: { currentTime?: Dat
     return parseInt(str.replace(/\D/g, '') || '0');
   };
 
-  // Flow 1: Tarik Dana Bebas
+  // Flow 1: Tarik Dana Bebas / Suntik
   const handleTarikDanaBebas = (e: React.FormEvent) => {
     e.preventDefault();
     const nominal = parseInputNumber(tarikNominal);
     if (!nominal || nominal <= 0) {
-      showToast('error', 'Masukkan jumlah penarikan nominal yang valid!');
+      showToast('error', 'Masukkan jumlah nominal yang valid!');
       return;
     }
-    if (nominal > saldoDanaBebas) {
+    if (tarikDest !== 'suntik' && nominal > saldoDanaBebas) {
       showToast('error', 'Dana Bebas tidak mencukupi untuk melakukan penarikan ini!');
       return;
     }
@@ -138,20 +148,24 @@ export const DanaBebas = ({ currentTime, headless = false }: { currentTime?: Dat
       id: 'EXP-' + Date.now(),
       date: `${tDate} ${new Date().toLocaleTimeString('id-ID')}`,
       isoDate: new Date().toISOString(),
-      name: `Tarik Dana Bebas: ${tarikDest === 'laci' ? 'Ke Dana Laci' : 'Tunai Umum'}${tarikNotes ? ' (' + tarikNotes + ')' : ''}`,
-      amount: nominal,
+      name: tarikDest === 'suntik' ? `Suntik Dana Bebas${tarikNotes ? ' (' + tarikNotes + ')' : ''}` : `Tarik Dana Bebas: ${tarikDest === 'laci' ? 'Ke Dana Laci' : 'Tunai Umum'}${tarikNotes ? ' (' + tarikNotes + ')' : ''}`,
+      amount: tarikDest === 'suntik' ? -nominal : nominal,
       cashier: user?.name || 'Owner',
       branch: user?.branch || storeSettings?.activeBranch || 'Pusat',
       wallet: 'Dana Bebas',
-      category: 'Tarik Dana Bebas'
+      category: tarikDest === 'suntik' ? 'Modal Masuk' : 'Tarik Dana Bebas'
     };
 
     // Update wallet
     setWallets((prev: any) => {
       const updated = { ...prev };
-      updated.danaBebas = (prev?.danaBebas || 0) - nominal;
-      if (tarikDest === 'laci') {
-        updated.danaLaci = (prev?.danaLaci || 0) + nominal;
+      if (tarikDest === 'suntik') {
+        updated.danaBebas = (prev?.danaBebas || 0) + nominal;
+      } else {
+        updated.danaBebas = (prev?.danaBebas || 0) - nominal;
+        if (tarikDest === 'laci') {
+          updated.danaLaci = (prev?.danaLaci || 0) + nominal;
+        }
       }
       return updated;
     });
@@ -160,11 +174,16 @@ export const DanaBebas = ({ currentTime, headless = false }: { currentTime?: Dat
     setExpenses([newExpense, ...expenses]);
 
     // Log action
-    addLog('DANA_BEBAS', `Tarik Dana Bebas Rp ${nominal.toLocaleString('id-ID')} (${tarikDest === 'laci' ? 'ke laci kasir' : 'tunai umum'})`);
+    if (tarikDest === 'suntik') {
+      addLog('DANA_BEBAS', `Suntik Modal Dana Bebas Rp ${nominal.toLocaleString('id-ID')}`);
+      showToast('success', `Berhasil menyekrupkan ${formatRp(nominal)} ke Dana Bebas!`);
+    } else {
+      addLog('DANA_BEBAS', `Tarik Dana Bebas Rp ${nominal.toLocaleString('id-ID')} (${tarikDest === 'laci' ? 'ke laci kasir' : 'tunai umum'})`);
+      showToast('success', `Berhasil menarik ${formatRp(nominal)} dari Dana Bebas!`);
+    }
 
     setTarikNominal('');
     setTarikNotes('');
-    showToast('success', `Berhasil menarik ${formatRp(nominal)} dari Dana Bebas!`);
   };
 
   // Flow 2: Pelunasan Supplier
@@ -392,17 +411,32 @@ export const DanaBebas = ({ currentTime, headless = false }: { currentTime?: Dat
               <p className="text-gray-500 font-bold mb-0.5 text-[10px] uppercase tracking-wider whitespace-nowrap">Dana Laci</p>
               <div className="text-[14px] font-black text-gray-800">{formatRp(saldoDanaLaci)}</div>
             </div>
+            <div 
+              className="p-2 flex-1 min-w-[120px] bg-white hover:bg-gray-50 transition-colors cursor-pointer"
+              onClick={() => setShowMonthlyReturn(!showMonthlyReturn)}
+            >
+              <p className="text-gray-500 font-bold mb-0.5 text-[10px] uppercase tracking-wider whitespace-nowrap flex items-center gap-1">
+                {showMonthlyReturn ? 'Total Return (Bulan)' : 'Total Return (Harian)'} <span className="text-[8px] border border-gray-300 px-1 rounded bg-gray-100 text-gray-400">klik</span>
+              </p>
+              <div className="text-[14px] font-black text-red-600">{formatRp(showMonthlyReturn ? totalReturBulananVal : totalReturHarianVal)}</div>
+            </div>
+            
             <div className="p-2 flex-1 min-w-[120px] bg-white hover:bg-gray-50 transition-colors">
-              <p className="text-gray-500 font-bold mb-0.5 text-[10px] uppercase tracking-wider whitespace-nowrap">Total Retur (Harian)</p>
-              <div className="text-[14px] font-black text-red-600">{formatRp(totalReturHarianVal)}</div>
+              <p className="text-gray-500 font-bold mb-0.5 text-[10px] uppercase tracking-wider whitespace-nowrap">Out Harian</p>
+              <div className="text-[14px] font-black text-black">{formatRp(pengeluaranHarianVal)}</div>
             </div>
             <div className="p-2 flex-1 min-w-[120px] bg-white hover:bg-gray-50 transition-colors">
               <p className="text-gray-500 font-bold mb-0.5 text-[10px] uppercase tracking-wider whitespace-nowrap">Out Bulanan</p>
               <div className="text-[14px] font-black text-orange-600">{formatRp(outBulananVal)}</div>
             </div>
-            <div className="p-2 flex-1 min-w-[120px] bg-white hover:bg-gray-50 transition-colors">
-              <p className="text-gray-500 font-bold mb-0.5 text-[10px] uppercase tracking-wider whitespace-nowrap">Out Harian</p>
-              <div className="text-[14px] font-black text-black">{formatRp(pengeluaranHarianVal)}</div>
+            <div 
+              className="p-2 flex-1 min-w-[120px] bg-white hover:bg-gray-50 transition-colors cursor-pointer"
+              onClick={() => setShowMonthlyNonTunai(!showMonthlyNonTunai)}
+            >
+              <p className="text-gray-500 font-bold mb-0.5 text-[10px] uppercase tracking-wider whitespace-nowrap flex items-center gap-1">
+                {showMonthlyNonTunai ? 'Non Tunai (Bulan)' : 'Non Tunai (Harian)'} <span className="text-[8px] border border-gray-300 px-1 rounded bg-gray-100 text-gray-400">klik</span>
+              </p>
+              <div className="text-[14px] font-black text-orange-500">{formatRp(showMonthlyNonTunai ? piutangNonTunaiBulananVal : piutangNonTunaiHarianVal)}</div>
             </div>
           </div>
         )}
@@ -467,11 +501,12 @@ export const DanaBebas = ({ currentTime, headless = false }: { currentTime?: Dat
                   <label className="text-[10px] font-bold text-gray-700">TEMPAT TUJUAN ALIRAN DANA :</label>
                   <select
                     value={tarikDest}
-                    onChange={(e) => setTarikDest(e.target.value as 'laci' | 'tunai')}
+                    onChange={(e) => setTarikDest(e.target.value as 'laci' | 'tunai' | 'suntik')}
                     className="border border-gray-400 px-2 py-1 rounded-sm text-[11px] text-black font-bold focus:border-blue-900 outline-none bg-white h-[32px] w-full"
                   >
                     <option value="laci">DANA LACI KASIR (MASUK LACI)</option>
                     <option value="tunai">PENGELUARAN TUNAI (OUT LACI)</option>
+                    <option value="suntik">SUNTIK DANA BEBAS (MODAL / OWNER)</option>
                   </select>
                 </div>
 

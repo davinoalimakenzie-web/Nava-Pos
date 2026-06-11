@@ -265,7 +265,6 @@ export const Absensi = ({ currentTime }: { currentTime: Date }) => {
           <button onClick={() => setAbsensiSubTab('harian')} className={`px-4 py-1.5 font-bold ${absensiSubTab === 'harian' ? 'bg-blue-100 text-blue-900 border-b-2 border-blue-600' : 'text-gray-600 hover:bg-gray-200'}`}>Absen Hari Ini</button>
           <button onClick={() => setAbsensiSubTab('cuti')} className={`px-4 py-1.5 font-bold ${absensiSubTab === 'cuti' ? 'bg-blue-100 text-blue-900 border-b-2 border-blue-600' : 'text-gray-600 hover:bg-gray-200'}`}>Req Cuti</button>
           <button onClick={() => setAbsensiSubTab('rekap')} className={`px-4 py-1.5 font-bold ${absensiSubTab === 'rekap' ? 'bg-blue-100 text-blue-900 border-b-2 border-blue-600' : 'text-gray-600 hover:bg-gray-200'}`}>Rekap Bulanan</button>
-          <button onClick={() => setAbsensiSubTab('karyawan')} className={`px-4 py-1.5 font-bold ${absensiSubTab === 'karyawan' ? 'bg-blue-100 text-blue-900 border-b-2 border-blue-600' : 'text-gray-600 hover:bg-gray-200'}`}>Daftar Karyawan</button>
       </div>
       
       <div className="flex-1 p-2 overflow-auto bg-white">
@@ -425,29 +424,6 @@ export const Absensi = ({ currentTime }: { currentTime: Date }) => {
             </div>
         )}
 
-        {absensiSubTab === 'karyawan' && (
-            <div className="flex flex-col gap-2">
-              <button onClick={() => setShowAddEmpModal(true)} className="bg-blue-600 text-white font-bold py-2 w-48 mb-2 shadow rounded hover:bg-blue-700">+ Tambah Karyawan Baru</button>
-              <table className="w-full text-left border-collapse whitespace-nowrap border border-gray-400">
-                <thead className="bg-gray-100 border-b border-gray-400">
-                  <tr><th className="p-2 border-r w-16">ID</th><th className="p-2 border-r">Nama</th><th className="p-2 border-r">Posisi/Jabatan</th><th className="p-2 border-r">Cabang</th></tr>
-                </thead>
-                <tbody>
-                  {employees
-                    .filter((emp: any) => filterBranch === 'Semua' || emp.branch === filterBranch)
-                    .filter((emp: any) => !selectedEmployeeAbsensi || emp.name === selectedEmployeeAbsensi)
-                    .map((emp: any) => (
-                      <tr key={emp.id} className="border-b hover:bg-gray-50">
-                        <td className="p-2 border-r text-gray-500 font-mono">#{emp.id}</td>
-                        <td className="p-2 border-r font-bold">{emp.name}</td>
-                        <td className="p-2 border-r">{emp.position}</td>
-                        <td className="p-2">{emp.branch || '-'}</td>
-                      </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-        )}
       </div>
     </div>
   );
