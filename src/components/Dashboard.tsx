@@ -1,6 +1,6 @@
 import React, { useMemo, useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Sparkles, Loader2, PartyPopper, RefreshCw } from 'lucide-react';
+import { Sparkles, Loader2, PartyPopper, RefreshCw, Volume2, VolumeX, Bell, BellOff, Target, Trophy, Settings } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { useAppContext } from '../context/AppContext';
 import { LegacyWindowHeader } from './LegacyWindowHeader';
@@ -43,11 +43,42 @@ const CustomMonthlyTooltip = ({ active, payload, label }: any) => {
   return null;
 };
 
+const playGoalReachedSound = () => {
+  try {
+    const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
+    const playNote = (freq: number, start: number, duration: number) => {
+      const osc = audioCtx.createOscillator();
+      const gainNode = audioCtx.createGain();
+      
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(freq, start);
+      
+      gainNode.gain.setValueAtTime(0.15, start);
+      gainNode.gain.exponentialRampToValueAtTime(0.01, start + duration);
+      
+      osc.connect(gainNode);
+      gainNode.connect(audioCtx.destination);
+      
+      osc.start(start);
+      osc.stop(start + duration);
+    };
+    
+    const now = audioCtx.currentTime;
+    playNote(523.25, now, 0.2); // C5
+    playNote(659.25, now + 0.12, 0.2); // E5
+    playNote(783.99, now + 0.24, 0.4); // G5
+  } catch (e) {
+    console.warn("AudioContext error", e);
+  }
+};
+
 export const Dashboard = ({ currentTime }: { currentTime: Date }) => {
   const { 
     transactions, expenses, inventory, wallets,
     hutangSupplier, kewajibanLain, setActiveTab 
   } = useAppContext();
+
+  const monthlyChartScrollRef = useRef<HTMLDivElement>(null);
 
   // Comprehensive Time Filter States
   const [timeframe, setTimeframe] = useState<'WEEK' | 'MONTH' | '3MONTHS' | 'CUSTOM'>('MONTH');
@@ -119,6 +150,12 @@ export const Dashboard = ({ currentTime }: { currentTime: Date }) => {
   });
   const [dailyGoalNote, setDailyGoalNote] = useState(() => {
     return localStorage.getItem('POS_dailyGoalNote') || '';
+  });
+  const [goalAlarmSound, setGoalAlarmSound] = useState(() => {
+    return localStorage.getItem('POS_goalAlarmSound') !== 'false';
+  });
+  const [goalNotification, setGoalNotification] = useState(() => {
+    return localStorage.getItem('POS_goalNotification') !== 'false';
   });
   const [weeklyGoal, setWeeklyGoal] = useState(() => {
     return parseInt(localStorage.getItem('POS_weeklyGoal') || '7000000', 10);
@@ -503,41 +540,151 @@ export const Dashboard = ({ currentTime }: { currentTime: Date }) => {
     return data;
   }, [transactions, expenses]);
 
-  const weeklyProjectionData = useMemo(() => {
+  const monthlyProjectionData = useMemo(() => {
     const today = new Date();
-    today.setHours(23, 59, 59, 999);
+    const currentYear = today.getFullYear();
+    const currentMonth = today.getMonth();
+    const currentDay = today.getDate();
     
-    const bins = [0, 0, 0, 0]; 
-
+    // Find oldest transaction month back to "omzet pertama" (excluding PEMBELIAN)
+    let oldestYear = currentYear;
+    let oldestMonth = currentMonth;
+    let foundAny = false;
+    
     transactions.forEach((t: any) => {
-        if (t.type === 'PEMBELIAN') return; 
-        
-        let tDate = new Date(t.date);
-        if (t.isoDate) tDate = new Date(t.isoDate);
-        
-        const diffTime = today.getTime() - tDate.getTime();
-        if (diffTime < 0) return;
-        
-        const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
-        
-        if (diffDays < 28) {
-            const weekIndex = 3 - Math.floor(diffDays / 7);
-            if (weekIndex >= 0 && weekIndex < 4) {
-               bins[weekIndex] += t.total;
-            }
+      if (t.type === 'PEMBELIAN') return;
+      let tDate = new Date(t.date);
+      if (t.isoDate) tDate = new Date(t.isoDate);
+      
+      const yr = tDate.getFullYear();
+      const mo = tDate.getMonth();
+      if (!foundAny) {
+        oldestYear = yr;
+        oldestMonth = mo;
+        foundAny = true;
+      } else {
+        if (yr < oldestYear || (yr === oldestYear && mo < oldestMonth)) {
+          oldestYear = yr;
+          oldestMonth = mo;
         }
+      }
     });
 
-    const avg = bins.reduce((a, b) => a + b, 0) / 4;
+    // If no transactions, fallback to 11 months before today (so 12 months total)
+    if (!foundAny) {
+      const fallbackDate = new Date(currentYear, currentMonth - 11, 1);
+      oldestYear = fallbackDate.getFullYear();
+      oldestMonth = fallbackDate.getMonth();
+    }
+
+    const monthNames = ["Jan", "Feb", "Mar", "Apr", "Mei", "Jun", "Jul", "Agt", "Sep", "Okt", "Nov", "Des"];
+    const buckets: { year: number; month: number; label: string; sales: number; isFuture: boolean }[] = [];
     
-    return [
-       { label: 'Mg -4', sales: bins[0], projected: 0 },
-       { label: 'Mg -3', sales: bins[1], projected: 0 },
-       { label: 'Mg -2', sales: bins[2], projected: 0 },
-       { label: 'Mg -1', sales: bins[3], projected: 0 },
-       { label: 'Proyeksi (Mg Ini)', sales: 0, projected: avg }
-    ];
+    // 1. Add all months from oldest to current month
+    let tempYr = oldestYear;
+    let tempMo = oldestMonth;
+    
+    while (tempYr < currentYear || (tempYr === currentYear && tempMo <= currentMonth)) {
+      buckets.push({
+        year: tempYr,
+        month: tempMo,
+        label: `${monthNames[tempMo]} '${String(tempYr).slice(-2)}`,
+        sales: 0,
+        isFuture: false
+      });
+      tempMo++;
+      if (tempMo > 11) {
+        tempMo = 0;
+        tempYr++;
+      }
+    }
+
+    // 2. Populate actual sales for past and current months
+    transactions.forEach((t: any) => {
+      if (t.type === 'PEMBELIAN') return;
+      
+      let tDate = new Date(t.date);
+      if (t.isoDate) tDate = new Date(t.isoDate);
+      
+      const tYear = tDate.getFullYear();
+      const tMonth = tDate.getMonth();
+      
+      const bucket = buckets.find(b => b.year === tYear && b.month === tMonth && !b.isFuture);
+      if (bucket) {
+        bucket.sales += t.total;
+      }
+    });
+
+    // 3. Calculate historical average (excluding the current month to prevent low starter numbers)
+    const historicalBuckets = buckets.filter(b => !(b.year === currentYear && b.month === currentMonth));
+    const nonZeroMonths = historicalBuckets.filter(b => b.sales > 0).length;
+    const totalHistoricalSales = historicalBuckets.reduce((sum, b) => sum + b.sales, 0);
+    const avgHistorical = nonZeroMonths > 0 
+      ? totalHistoricalSales / nonZeroMonths 
+      : (totalHistoricalSales / Math.max(1, historicalBuckets.length) || 1500000);
+
+    // 4. Append 12 future months for the "proyeksikan selama setahun" requirement
+    let futYr = currentYear;
+    let futMo = currentMonth + 1;
+    if (futMo > 11) {
+      futMo = 0;
+      futYr++;
+    }
+
+    for (let f = 0; f < 12; f++) {
+      buckets.push({
+        year: futYr,
+        month: futMo,
+        label: `${monthNames[futMo]} '${String(futYr).slice(-2)}`,
+        sales: 0,
+        isFuture: true
+      });
+      futMo++;
+      if (futMo > 11) {
+        futMo = 0;
+        futYr++;
+      }
+    }
+
+    // 5. Map buckets to chart format (showing real sales only for past, projection for current + future)
+    return buckets.map((b) => {
+      if (b.year === currentYear && b.month === currentMonth && !b.isFuture) {
+        const currentSales = b.sales;
+        const projectedFormula = currentSales > 0 
+          ? Math.max(currentSales, Math.round(currentSales * (30 / Math.max(1, currentDay))))
+          : Math.round(avgHistorical);
+        
+        return {
+          label: `${b.label} (Proy)`,
+          sales: currentSales,
+          projected: projectedFormula
+        };
+      } else if (b.isFuture) {
+        return {
+          label: `${b.label} (Proy)`,
+          sales: 0,
+          projected: Math.round(avgHistorical)
+        };
+      } else {
+        return {
+          label: b.label,
+          sales: b.sales,
+          projected: 0
+        };
+      }
+    });
   }, [transactions]);
+
+  useEffect(() => {
+    if (monthlyChartScrollRef.current) {
+      const timer = setTimeout(() => {
+        if (monthlyChartScrollRef.current) {
+          monthlyChartScrollRef.current.scrollLeft = monthlyChartScrollRef.current.scrollWidth;
+        }
+      }, 150);
+      return () => clearTimeout(timer);
+    }
+  }, [monthlyProjectionData]);
 
   const dailyGoalProgress = Math.min(100, Math.round((cashFlowToday.income / dailyGoal) * 100));
   const dailyGoalRadius = 40;
@@ -553,9 +700,32 @@ export const Dashboard = ({ currentTime }: { currentTime: Date }) => {
     const d = new Date(); return localStorage.getItem('POS_celebratedDate') === `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
   });
   const [showGoalToast, setShowGoalToast] = useState(false);
+  useEffect(() => {
+    if (dailyGoalProgress >= 100 && cashFlowToday.income > 0 && !hasCelebrated) {
+      confetti({
+          particleCount: 150,
+          spread: 70,
+          origin: { y: 0.6 },
+          colors: ['#00a651', '#f59e0b', '#3b82f6', '#ec4899']
+      });
+      setHasCelebrated(true);
+      const d = new Date(); localStorage.setItem('POS_celebratedDate', `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`);
+      setShowGoalToast(true);
+      setTimeout(() => setShowGoalToast(false), 5000);
+
+      if (goalAlarmSound) playGoalReachedSound();
+      if (goalNotification && 'Notification' in window && Notification.permission === 'granted') {
+        try {
+          new Notification('Target Harian Tembus! 🎉', {
+            body: `Selamat! Omzet hari ini (${formatRp(cashFlowToday.income)}) telah melampaui target harian Rp ${formatRp(dailyGoal)}!`
+          });
+        } catch (e) { console.warn(e); }
+      }
+    }
+  }, [dailyGoalProgress, cashFlowToday.income, hasCelebrated, goalAlarmSound, goalNotification, dailyGoal]);
 
   useEffect(() => {
-     if (dailyGoalProgress >= 100 && cashFlowToday.income > 0 && !hasCelebrated) {
+     if (false) { // Duplicate disabled; consolidated above
          confetti({
              particleCount: 150,
              spread: 70,
@@ -651,173 +821,155 @@ export const Dashboard = ({ currentTime }: { currentTime: Date }) => {
 
       <div className="p-2 flex flex-col gap-4 overflow-y-auto h-full text-black">
         
-        {/* TIME RANGE SELECTOR BAR */}
-        <div className="bg-[#ece9d8] border border-gray-400 p-2.5 flex flex-wrap items-center justify-between gap-3 shadow-sm select-none shrink-0">
-          <div className="flex items-center gap-2">
-            <span className="text-xs font-bold text-gray-700 uppercase tracking-wider">🗓️ Rentang Analitik:</span>
-            <div className="inline-flex rounded-sm shadow-sm bg-gray-300 p-0.5 border border-gray-400">
-              <button
-                onClick={() => setTimeframe('WEEK')}
-                className={`px-3 py-1 text-xs font-bold transition-all uppercase rounded-sm ${timeframe === 'WEEK' ? 'bg-[#1e2b6b] text-white shadow-sm' : 'text-gray-700 hover:bg-gray-100/70 border border-transparent'}`}
-              >
-                Minggu Ini
-              </button>
-              <button
-                onClick={() => setTimeframe('MONTH')}
-                className={`px-3 py-1 text-xs font-bold transition-all uppercase rounded-sm ${timeframe === 'MONTH' ? 'bg-[#1e2b6b] text-white shadow-sm' : 'text-gray-700 hover:bg-gray-100/70 border border-transparent'}`}
-              >
-                Bulan Ini
-              </button>
-              <button
-                onClick={() => setTimeframe('3MONTHS')}
-                className={`px-3 py-1 text-xs font-bold transition-all uppercase rounded-sm ${timeframe === '3MONTHS' ? 'bg-[#1e2b6b] text-white shadow-sm' : 'text-gray-700 hover:bg-gray-100/70 border border-transparent'}`}
-              >
-                3 Bulan terakhir
-              </button>
-              <button
-                onClick={() => setTimeframe('CUSTOM')}
-                className={`px-3 py-1 text-xs font-bold transition-all uppercase rounded-sm ${timeframe === 'CUSTOM' ? 'bg-[#1e2b6b] text-white shadow-sm' : 'text-gray-700 hover:bg-gray-100/70 border border-transparent'}`}
-              >
-                Kustom
-              </button>
-            </div>
-          </div>
-
-          {timeframe === 'CUSTOM' && (
-            <div className="flex items-center gap-2.5 bg-white/80 p-1 border border-gray-400 rounded-sm shadow-inner">
-              <div className="flex items-center gap-1">
-                <span className="text-[10px] font-bold text-gray-600 uppercase">Dari:</span>
-                <input
-                  type="date"
-                  value={customStart}
-                  onChange={(e) => setCustomStart(e.target.value)}
-                  className="bg-white border border-gray-400 px-1 py-0.5 text-xs text-black outline-none h-6 font-mono"
-                />
-              </div>
-              <div className="flex items-center gap-1">
-                <span className="text-[10px] font-bold text-gray-600 uppercase">Sampai:</span>
-                <input
-                  type="date"
-                  value={customEnd}
-                  onChange={(e) => setCustomEnd(e.target.value)}
-                  className="bg-white border border-gray-400 px-1 py-0.5 text-xs text-black outline-none h-6 font-mono"
-                />
-              </div>
-            </div>
-          )}
-
-          <div className="text-right flex flex-col justify-center bg-white/50 border border-gray-300 px-3 py-1 rounded-sm shadow-inner min-w-[200px]">
-            <span className="text-[9px] text-gray-500 font-bold uppercase tracking-wider leading-none mb-0.5">Periode Tinjau Analitik</span>
-            <span className="text-xs font-black text-blue-900 font-mono">
-              {parsedRange.start.toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' })} - {parsedRange.end.toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' })}
-            </span>
-          </div>
-        </div>
-            {/* FITUR 1: WIDGET DANA BEBAS DOMINAN */}
+        {/* FITUR 1 & FITUR 3: WIDGET DANA BEBAS & JADWAL JATUH TEMPO */}
         {compactMode ? (
-          /* Mode Compact ON: Hanya terlihat Dana Bebas Tersedia, dklik navigasi ke Cashflow & Keuangan */
-          <div 
-            onClick={() => setActiveTab('cashflow')}
-            title="Sisa Dana Bebas Tersedia. Klik untuk masuk ke menu Cashflow & Keuangan"
-            className="bg-white border-4 border-blue-950 p-4 shadow-md rounded-sm cursor-pointer hover:bg-blue-50 hover:scale-[1.005] active:scale-95 transition-all duration-150 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 max-w-xl group relative overflow-hidden"
-          >
-            <div className="absolute top-0 right-0 p-4 opacity-5 group-hover:scale-110 transition-transform duration-300">
-              <svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-wallet"><path d="M21 12V7H5a2 2 0 0 1-2-2V5M3 10V5v15a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-3a2 2 0 0 0-2-2z"/></svg>
-            </div>
-            <div className="flex flex-col gap-1 relative z-10">
-              <div className="flex items-center gap-1.5">
-                <span className="w-2.5 h-2.5 bg-blue-600 rounded-full animate-ping"></span>
-                <span className="text-[11px] font-black tracking-widest text-[#1e2b6b] uppercase">DANA BEBAS TERSEDIA</span>
+          <>
+            {/* Mode Compact ON: Hanya terlihat Dana Bebas Tersedia, dklik navigasi ke Cashflow & Keuangan */}
+            <div 
+              onClick={() => setActiveTab('cashflow')}
+              title="Sisa Dana Bebas Tersedia. Klik untuk masuk ke menu Cashflow & Keuangan"
+              className="bg-white border-4 border-blue-950 p-4 shadow-md rounded-sm cursor-pointer hover:bg-blue-50 hover:scale-[1.005] active:scale-95 transition-all duration-150 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 max-w-xl group relative overflow-hidden"
+            >
+              <div className="absolute top-0 right-0 p-4 opacity-5 group-hover:scale-110 transition-transform duration-300">
+                <svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-wallet"><path d="M21 12V7H5a2 2 0 0 1-2-2V5M3 10V5v15a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-3a2 2 0 0 0-2-2z"/></svg>
               </div>
-              <span className={`text-3xl font-black ${danaBebasReal < 0 ? 'text-red-700' : 'text-blue-900'} tracking-tight`}>
-                {formatRp(danaBebasReal)}
-              </span>
-              <span className="text-[10px] text-gray-500 font-bold group-hover:text-blue-800 transition-colors uppercase">
-                Klik untuk Kelola Cashflow & Keuangan &rarr;
-              </span>
-            </div>
-            <div className="relative z-10 shrink-0 self-end sm:self-center">
-              <div className={`text-[10px] font-black px-3 py-1 bg-white border-2 rounded-full uppercase tracking-wider
-                   ${danaBebasStatus === 'Aman' ? 'text-green-700 border-green-600' : (danaBebasStatus === 'Waspada' ? 'text-yellow-700 border-yellow-600' : 'text-red-700 border-red-600')}
-              `}>
-                  Status: {danaBebasStatus}
-              </div>
-            </div>
-          </div>
-        ) : (
-          /* Mode Compact OFF: Rata Kiri, Separuh Layar (w-full lg:w-[48%]), Ganti Total Dana Bebas ke Dana Laci */
-          <div className="bg-white border-4 border-blue-900 shadow-lg p-5 relative w-full lg:max-w-[48%] flex flex-col">
-              <div className="absolute top-0 right-0 p-3 opacity-5">
-                  <svg xmlns="http://www.w3.org/2000/svg" width="96" height="96" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-pie-chart"><path d="M21.21 15.89A10 10 0 1 1 8 2.83"/><path d="M22 12A10 10 0 0 0 12 2v10z"/></svg>
-              </div>
-              <h2 className="text-sm font-black text-[#1e2b6b] uppercase tracking-wide border-b-2 border-gray-200 pb-1.5 mb-3">Indikator Kesehatan Keuangan (Dana Bebas)</h2>
-              
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 relative z-10">
-                  {/* Dana Bebas Tersedia pindah ke kiri (rata kiri) */}
-                  <div className="flex flex-col gap-1 items-start text-left justify-center bg-blue-50 border border-blue-200 p-3.5 rounded-lg shadow-inner">
-                      <span className="text-xs font-black text-blue-900 uppercase tracking-wider">Dana Bebas Tersedia</span>
-                      <span className={`text-2xl font-black ${danaBebasReal < 0 ? 'text-red-700' : 'text-blue-900'}`}>{formatRp(danaBebasReal)}</span>
-                      <div className={`mt-2 text-[10px] font-bold px-2 py-0.5 bg-white border-2 inline-block rounded-full uppercase
-                           ${danaBebasStatus === 'Aman' ? 'text-green-700 border-green-600' : (danaBebasStatus === 'Waspada' ? 'text-yellow-700 border-yellow-600' : 'text-red-700 border-red-600')}
-                      `}>
-                          Status: {danaBebasStatus}
-                      </div>
-                  </div>
-
-                  {/* Lainnya di sebelah kanan */}
-                  <div className="flex flex-col gap-2.5 justify-center border-t sm:border-t-0 sm:border-l border-gray-200 pt-3 sm:pt-0 sm:pl-4">
-                      <div className="flex flex-col gap-0.5">
-                          <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wide">Dana Laci</span>
-                          <span className="text-base font-black text-gray-900">{formatRp(saldoDanaLaci)}</span>
-                      </div>
-                      <div className="flex flex-col gap-0.5">
-                          <span className="text-[10px] font-bold text-red-600 uppercase flex items-center gap-1">
-                             (-) Hutang Aktif
-                          </span>
-                          <span className="text-base font-black text-red-700">{formatRp(totalHutangSupplierAktif)}</span>
-                      </div>
-                      <div className="flex flex-col gap-0.5">
-                          <span className="text-[10px] font-bold text-orange-600 uppercase flex items-center gap-1">
-                             (-) Kasbon Karyawan
-                          </span>
-                          <span className="text-base font-black text-[#b45309]">{formatRp(totalKasbonAktif)}</span>
-                      </div>
-                  </div>
-              </div>
-          </div>
-        )}
-
-        {/* FITUR 3: WIDGET JATUH TEMPO (Jika ada) */}
-        {(hutangSupplier || []).filter((h: any) => h.sisa_hutang > 0).length > 0 && (
-            <div className="bg-white border text-black border-gray-400 p-4 shadow-sm flex flex-col">
-                <h3 className="font-bold text-lg text-red-800 mb-3 border-b pb-2 flex items-center gap-2">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-calendar-clock"><path d="M21 7.5V6a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h3.5"/><path d="M16 2v4"/><path d="M8 2v4"/><path d="M3 10h5"/><path d="M17.5 17.5 16 16.25V14"/><circle cx="16" cy="16" r="6"/></svg>
-                    Jadwal Jatuh Tempo Supplier
-                </h3>
-                <div className={compactMode ? "flex overflow-x-auto gap-3 pb-2 snap-x" : "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3"}>
-                    {hutangSupplier.filter((h: any) => h.sisa_hutang > 0).sort((a: any, b: any) => new Date(a.jatuh_tempo).getTime() - new Date(b.jatuh_tempo).getTime()).map((h: any) => {
-                        const jtDate = new Date(h.jatuh_tempo);
-                        const diffTime = jtDate.getTime() - todayDate.getTime();
-                        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-                        
-                        let statusColor = '';
-                        let bgColor = '';
-                        if (diffDays < 0) { statusColor = 'text-red-800'; bgColor = 'bg-red-100 border-red-400'; }
-                        else if (diffDays <= 7) { statusColor = 'text-orange-800'; bgColor = 'bg-orange-100 border-orange-400'; }
-                        else if (diffDays <= 14) { statusColor = 'text-yellow-800'; bgColor = 'bg-yellow-100 border-yellow-400'; }
-                        else { statusColor = 'text-green-800'; bgColor = 'bg-green-100 border-green-400'; }
-
-                        return (
-                            <div key={h.id} className={`border p-3 flex flex-col gap-1 cursor-pointer transition-transform hover:-translate-y-1 ${bgColor} ${compactMode ? 'shrink-0 w-[280px] snap-start' : ''}`}>
-                                <div className="text-xs font-bold text-gray-500">{h.jatuh_tempo.split('T')[0]} ({diffDays < 0 ? `Terlambat ${Math.abs(diffDays)} hari` : `${diffDays} hari lagi`})</div>
-                                <div className="font-bold text-sm truncate uppercase">{h.supplier_name}</div>
-                                <div className="text-xs text-gray-600 bg-white border border-gray-300 px-1 font-mono">{h.id}</div>
-                                <div className={`text-lg font-black mt-2 ${statusColor}`}>{formatRp(h.sisa_hutang)}</div>
-                            </div>
-                        );
-                    })}
+              <div className="flex flex-col gap-1 relative z-10">
+                <div className="flex items-center gap-1.5">
+                  <span className="w-2.5 h-2.5 bg-blue-600 rounded-full animate-ping"></span>
+                  <span className="text-[11px] font-black tracking-widest text-[#1e2b6b] uppercase">DANA BEBAS TERSEDIA</span>
                 </div>
+                <span className={`text-3xl font-black ${danaBebasReal < 0 ? 'text-red-700' : 'text-blue-900'} tracking-tight`}>
+                  {formatRp(danaBebasReal)}
+                </span>
+                <span className="text-[10px] text-gray-500 font-bold group-hover:text-blue-800 transition-colors uppercase">
+                  Klik untuk Kelola Cashflow & Keuangan &rarr;
+                </span>
+              </div>
+              <div className="relative z-10 shrink-0 self-end sm:self-center">
+                <div className={`text-[10px] font-black px-3 py-1 bg-white border-2 rounded-full uppercase tracking-wider
+                     ${danaBebasStatus === 'Aman' ? 'text-green-700 border-green-600' : (danaBebasStatus === 'Waspada' ? 'text-yellow-700 border-yellow-600' : 'text-red-700 border-red-600')}
+                `}>
+                    Status: {danaBebasStatus}
+                </div>
+              </div>
             </div>
+
+            {/* FITUR 3: WIDGET JATUH TEMPO (Jika ada) - horizontal scroll di Mode Compact */}
+            {(hutangSupplier || []).filter((h: any) => h.sisa_hutang > 0).length > 0 && (
+                <div className="bg-white border text-black border-gray-400 p-4 shadow-sm flex flex-col">
+                    <h3 className="font-bold text-lg text-red-800 mb-3 border-b pb-2 flex items-center gap-2">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-calendar-clock"><path d="M21 7.5V6a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h3.5"/><path d="M16 2v4"/><path d="M8 2v4"/><path d="M3 10h5"/><path d="M17.5 17.5 16 16.25V14"/><circle cx="16" cy="16" r="6"/></svg>
+                        Jadwal Jatuh Tempo Supplier
+                    </h3>
+                    <div className="flex overflow-x-auto gap-3 pb-2 snap-x">
+                        {hutangSupplier.filter((h: any) => h.sisa_hutang > 0).sort((a: any, b: any) => new Date(a.jatuh_tempo).getTime() - new Date(b.jatuh_tempo).getTime()).map((h: any) => {
+                            const jtDate = new Date(h.jatuh_tempo);
+                            const diffTime = jtDate.getTime() - todayDate.getTime();
+                            const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+                            
+                            let statusColor = '';
+                            let bgColor = '';
+                            if (diffDays < 0) { statusColor = 'text-red-800'; bgColor = 'bg-red-100 border-red-400'; }
+                            else if (diffDays <= 7) { statusColor = 'text-orange-800'; bgColor = 'bg-orange-100 border-orange-400'; }
+                            else if (diffDays <= 14) { statusColor = 'text-yellow-800'; bgColor = 'bg-yellow-100 border-yellow-400'; }
+                            else { statusColor = 'text-green-800'; bgColor = 'bg-green-100 border-green-400'; }
+
+                            return (
+                                <div key={h.id} className={`border p-3 flex flex-col gap-1 cursor-pointer transition-transform hover:-translate-y-1 ${bgColor} shrink-0 w-[280px] snap-start`}>
+                                    <div className="text-xs font-bold text-gray-500">{h.jatuh_tempo.split('T')[0]} ({diffDays < 0 ? `Terlambat ${Math.abs(diffDays)} hari` : `${diffDays} hari lagi`})</div>
+                                    <div className="font-bold text-sm truncate uppercase">{h.supplier_name}</div>
+                                    <div className="text-xs text-gray-600 bg-white border border-gray-300 px-1 font-mono">{h.id}</div>
+                                    <div className={`text-lg font-black mt-2 ${statusColor}`}>{formatRp(h.sisa_hutang)}</div>
+                                </div>
+                            );
+                        })}
+                    </div>
+                </div>
+            )}
+          </>
+        ) : (
+          /* Mode Compact OFF (Full View): Dana Bebas & Jatuh Tempo Supplier side-by-side */
+          <div className="flex flex-col lg:flex-row gap-4 w-full">
+              {/* Left Widget: Indikator Kesehatan Keuangan (Dana Bebas) */}
+              <div className="bg-white border-4 border-blue-900 shadow-lg p-5 relative w-full lg:w-1/2 flex flex-col">
+                  <div className="absolute top-0 right-0 p-3 opacity-5">
+                      <svg xmlns="http://www.w3.org/2000/svg" width="96" height="96" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-pie-chart"><path d="M21.21 15.89A10 10 0 1 1 8 2.83"/><path d="M22 12A10 10 0 0 0 12 2v10z"/></svg>
+                  </div>
+                  <h2 className="text-sm font-black text-[#1e2b6b] uppercase tracking-wide border-b-2 border-gray-200 pb-1.5 mb-3">Indikator Kesehatan Keuangan (Dana Bebas)</h2>
+                  
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 relative z-10 flex-1">
+                      {/* Dana Bebas Tersedia pindah ke kiri (rata kiri) */}
+                      <div className="flex flex-col gap-1 items-start text-left justify-center bg-blue-50 border border-blue-200 p-3.5 rounded-lg shadow-inner">
+                          <span className="text-xs font-black text-blue-900 uppercase tracking-wider">Dana Bebas Tersedia</span>
+                          <span className={`text-2xl font-black ${danaBebasReal < 0 ? 'text-red-700' : 'text-blue-900'}`}>{formatRp(danaBebasReal)}</span>
+                          <div className={`mt-2 text-[10px] font-bold px-2 py-0.5 bg-white border-2 inline-block rounded-full uppercase
+                               ${danaBebasStatus === 'Aman' ? 'text-green-700 border-green-600' : (danaBebasStatus === 'Waspada' ? 'text-yellow-700 border-yellow-600' : 'text-red-700 border-red-600')}
+                          `}>
+                              Status: {danaBebasStatus}
+                          </div>
+                      </div>
+
+                      {/* Lainnya di sebelah kanan */}
+                      <div className="flex flex-col gap-2.5 justify-center border-t sm:border-t-0 sm:border-l border-gray-200 pt-3 sm:pt-0 sm:pl-4">
+                          <div className="flex flex-col gap-0.5">
+                              <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wide">Dana Laci</span>
+                              <span className="text-base font-black text-gray-900">{formatRp(saldoDanaLaci)}</span>
+                          </div>
+                          <div className="flex flex-col gap-0.5">
+                              <span className="text-[10px] font-bold text-red-600 uppercase flex items-center gap-1">
+                                 (-) Hutang Aktif
+                              </span>
+                              <span className="text-base font-black text-red-700">{formatRp(totalHutangSupplierAktif)}</span>
+                          </div>
+                          <div className="flex flex-col gap-0.5">
+                              <span className="text-[10px] font-bold text-orange-600 uppercase flex items-center gap-1">
+                                 (-) Kasbon Karyawan
+                              </span>
+                              <span className="text-base font-black text-[#b45309]">{formatRp(totalKasbonAktif)}</span>
+                          </div>
+                      </div>
+                  </div>
+              </div>
+
+              {/* Right Widget: Jadwal Jatuh Tempo Supplier - Setengah Layout, Vertically Scrollable list */}
+              {(hutangSupplier || []).filter((h: any) => h.sisa_hutang > 0).length > 0 ? (
+                  <div className="bg-white border text-black border-4 border-slate-600 p-5 shadow-lg w-full lg:w-1/2 flex flex-col">
+                      <h3 className="font-bold text-sm text-[#1e2b6b] uppercase tracking-wide border-b-2 border-gray-200 pb-1.5 mb-3 flex items-center gap-2">
+                          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-calendar-clock"><path d="M21 7.5V6a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h3.5"/><path d="M16 2v4"/><path d="M8 2v4"/><path d="M3 10h5"/><path d="M17.5 17.5 16 16.25V14"/><circle cx="16" cy="16" r="6"/></svg>
+                          Jadwal Jatuh Tempo Supplier
+                      </h3>
+                      <div className="flex-1 overflow-y-auto max-h-[160px] pr-1 flex flex-col gap-2">
+                          {hutangSupplier.filter((h: any) => h.sisa_hutang > 0).sort((a: any, b: any) => new Date(a.jatuh_tempo).getTime() - new Date(b.jatuh_tempo).getTime()).map((h: any) => {
+                              const jtDate = new Date(h.jatuh_tempo);
+                              const diffTime = jtDate.getTime() - todayDate.getTime();
+                              const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+                              
+                              let statusColor = '';
+                              let bgColor = '';
+                              if (diffDays < 0) { statusColor = 'text-red-800 font-extrabold'; bgColor = 'bg-red-50 border-red-300'; }
+                              else if (diffDays <= 7) { statusColor = 'text-orange-800 font-bold'; bgColor = 'bg-orange-50 border-orange-300'; }
+                              else if (diffDays <= 14) { statusColor = 'text-yellow-800 font-bold'; bgColor = 'bg-yellow-50 border-yellow-300'; }
+                              else { statusColor = 'text-green-800 font-bold'; bgColor = 'bg-green-50 border-green-300'; }
+
+                              return (
+                                  <div key={h.id} className={`border p-2 flex items-center justify-between gap-3 rounded-sm transition-all hover:translate-x-1 ${bgColor}`}>
+                                      <div className="flex flex-col gap-0.5 min-w-0">
+                                          <div className="font-extrabold text-xs truncate uppercase text-slate-900">{h.supplier_name}</div>
+                                          <div className="text-[10px] text-gray-500 font-mono truncate">{h.id}</div>
+                                          <div className="text-[10px] font-bold text-gray-600 font-sans">{h.jatuh_tempo.split('T')[0]} ({diffDays < 0 ? `Terlambat ${Math.abs(diffDays)} hari` : `${diffDays} hari lagi`})</div>
+                                      </div>
+                                      <div className={`text-sm font-black whitespace-nowrap text-right ${statusColor}`}>{formatRp(h.sisa_hutang)}</div>
+                                  </div>
+                              );
+                          })}
+                      </div>
+                  </div>
+              ) : (
+                  <div className="bg-white border text-gray-500 border-4 border-slate-600 p-5 shadow-lg w-full lg:w-1/2 flex items-center justify-center text-xs italic font-bold">
+                      Tidak ada hutang jatuh tempo supplier yang aktif.
+                  </div>
+              )}
+          </div>
         )}
 
 
@@ -935,6 +1087,113 @@ export const Dashboard = ({ currentTime }: { currentTime: Date }) => {
                 </motion.span>
                 <div className="mt-auto pt-2 relative z-10 flex items-center justify-between">
                     <button onClick={() => setActiveTab('masterdata')} className="text-xs bg-orange-100 hover:bg-orange-200 text-orange-800 px-3 py-1.5 rounded font-bold border border-orange-300 transition-colors shadow-sm">Lihat Data &rarr;</button>
+                </div>
+            </motion.div>
+
+            {/* WIDGET: TARGET HARIAN INTERAKTIF & ALARM */}
+            <motion.div 
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.4, delay: 0.5 }}
+                className="bg-white border border-gray-400 p-4 shadow-sm flex flex-col relative overflow-hidden justify-between h-full min-h-[140px]">
+                <div className="absolute top-0 right-0 p-2 opacity-10">
+                    <Target className="w-12 h-12" />
+                </div>
+                
+                {/* Header Controls */}
+                <div className="flex justify-between items-start mb-1 z-10">
+                  <span className="text-gray-500 font-bold flex items-center gap-1">Target Harian</span>
+                  <div className="flex items-center gap-1">
+                      {/* Alarm Sound Toggle */}
+                      <button 
+                        onClick={() => {
+                          const newVal = !goalAlarmSound;
+                          setGoalAlarmSound(newVal);
+                          localStorage.setItem('POS_goalAlarmSound', String(newVal));
+                        }}
+                        className={`flex items-center justify-center p-1 rounded border transition-colors ${goalAlarmSound ? 'bg-green-100 text-green-800 border-green-300 hover:bg-green-200' : 'bg-gray-100 text-gray-500 border-gray-300 hover:bg-gray-200'}`}
+                        title={goalAlarmSound ? "Alarm Suara: Aktif" : "Alarm Suara: Nonaktif"}
+                      >
+                        {goalAlarmSound ? <Volume2 size={12} className="animate-pulse" /> : <VolumeX size={12} />}
+                      </button>
+
+                      {/* Web Notifications Toggle */}
+                      <button 
+                        onClick={async () => {
+                          if (!goalNotification) {
+                            if ('Notification' in window && Notification.permission !== 'granted') {
+                              const p = await Notification.requestPermission();
+                              if (p !== 'granted') return;
+                            }
+                          }
+                          const newVal = !goalNotification;
+                          setGoalNotification(newVal);
+                          localStorage.setItem('POS_goalNotification', String(newVal));
+                        }}
+                        className={`flex items-center justify-center p-1 rounded border transition-colors ${goalNotification ? 'bg-orange-100 text-orange-850 border-orange-300 hover:bg-orange-200' : 'bg-gray-100 text-gray-400 border-gray-300 hover:bg-gray-200'}`}
+                        title={goalNotification ? "Notifikasi Browser: Aktif" : "Notifikasi Browser: Nonaktif"}
+                      >
+                        {goalNotification ? <Bell size={12} className="animate-bounce" /> : <BellOff size={12} />}
+                      </button>
+                  </div>
+                </div>
+
+                {/* Progress Value & Graphic */}
+                <div className="flex flex-col my-1 z-10">
+                  <div className="flex items-baseline gap-2">
+                    <motion.span 
+                      key={dailyGoalProgress}
+                      initial={{ opacity: 0.5, scale: 0.95 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      transition={{ duration: 0.3 }}
+                      className={`text-2xl font-black ${dailyGoalProgress >= 100 ? 'text-green-600' : 'text-blue-700'}`}
+                    >
+                      {dailyGoalProgress}%
+                    </motion.span>
+                    <span className="text-[9px] uppercase font-bold tracking-wider text-gray-400">
+                      {dailyGoalProgress >= 100 ? 'Tembus! 🎉' : 'Menuju Target'}
+                    </span>
+                  </div>
+
+                  {/* Retro Win95 Style Block Progress Bar */}
+                  <div className="w-full bg-[#d4d0c8] border border-gray-400 h-4 p-[2px] mt-1 flex gap-[2px] overflow-hidden">
+                    {Array.from({ length: 15 }).map((_, i) => {
+                      const fillPercent = (i + 1) * (100 / 15);
+                      const isFilled = dailyGoalProgress >= fillPercent;
+                      return (
+                        <div 
+                          key={i} 
+                          className={`flex-1 h-full transition-all duration-300 ${isFilled ? (dailyGoalProgress >= 100 ? 'bg-green-600' : 'bg-blue-800') : 'bg-transparent'}`}
+                        />
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Footer details & direct adjust input */}
+                <div className="mt-auto pt-1 z-10 flex flex-col gap-1.5">
+                  <div className="flex items-center justify-between text-[11px] text-gray-600">
+                    <span className="font-medium truncate">Omzet: <strong className="text-gray-800 font-bold">{formatRp(cashFlowToday.income)}</strong></span>
+                  </div>
+                  
+                  {/* Inline editable Target Input */}
+                  <div className="flex items-center gap-1 border-t border-dotted border-gray-300 pt-1.5">
+                    <span className="text-gray-500 text-[10px] whitespace-nowrap">Target:</span>
+                    <div className="flex items-center border border-gray-400 bg-white px-1 py-0.5 w-full">
+                      <span className="text-gray-400 text-[9px] mr-1">Rp</span>
+                      <input 
+                        type="number"
+                        value={dailyGoal}
+                        onChange={(e) => {
+                          const val = Math.max(1000, parseInt(e.target.value) || 0);
+                          setDailyGoal(val);
+                          localStorage.setItem('POS_dailyGoal', String(val));
+                        }}
+                        className="bg-transparent text-[10px] font-bold text-gray-800 focus:outline-none text-right w-full font-mono"
+                        title="Klik untuk mengubah nominal target"
+                      />
+                    </div>
+                  </div>
                 </div>
             </motion.div>
         </div>
@@ -1153,31 +1412,37 @@ export const Dashboard = ({ currentTime }: { currentTime: Date }) => {
                 </motion.div>
             )}
 
-            {/* CHART 6: WEEKLY PROJECTION */}
+            {/* CHART 6: MONTHLY PROJECTION */}
             {!compactMode && (
                 <motion.div 
                     initial={{ opacity: 0, scale: 0.95 }}
                     animate={{ opacity: 1, scale: 1 }}
                     transition={{ duration: 0.5, delay: 0.85 }}
-                    className="bg-[#ece9d8] border border-gray-400 shadow-sm flex flex-col lg:col-span-1">
+                    className="bg-[#ece9d8] border border-gray-400 shadow-sm flex flex-col lg:col-span-3 w-full">
                     <div className="bg-blue-900 text-white font-bold px-3 py-1.5 text-sm flex justify-between shadow-sm">
-                       PROYEKSI MINGGUAN
+                       <span>PROYEKSI BULANAN</span>
+                       <span className="text-[10px] bg-blue-800 text-blue-100 px-2 py-0.5 rounded font-mono">Geser Horizontal &larr; &rarr;</span>
                     </div>
-                    <div className="flex-1 p-4 bg-white m-1 border border-gray-300 min-h-[250px]">
-                        <ResponsiveContainer width="100%" height={255}>
-                            <BarChart data={weeklyProjectionData} margin={{ top: 15, right: 10, bottom: 5, left: 10 }}>
-                              <CartesianGrid strokeDasharray="3 3" stroke="#e0e0e0"/>
-                              <XAxis dataKey="label" fontSize={10} tick={{ fill: '#4b5563' }} />
-                              <YAxis fontSize={10} width={40} tickFormatter={(val) => `${val/1000}k`} />
-                              <RechartsTooltip 
-                                 formatter={(value: number, name: string) => [formatRp(value), name === 'sales' ? 'Penjualan' : 'Proyeksi']}
-                                 labelStyle={{color: 'black', fontWeight: 'bold'}}
-                              />
-                              <Legend wrapperStyle={{ fontSize: '11px' }} />
-                              <Bar dataKey="sales" name="Penjualan Riil" fill="#3b82f6" radius={[4, 4, 0, 0]} />
-                              <Bar dataKey="projected" name="Proyeksi" fill="#f59e0b" radius={[4, 4, 0, 0]} />
-                            </BarChart>
-                        </ResponsiveContainer>
+                    <div 
+                        ref={monthlyChartScrollRef}
+                        className="flex-1 p-4 bg-white m-1 border border-gray-300 min-h-[250px] overflow-x-auto scrollbar-thin select-none"
+                    >
+                        <div style={{ width: `${Math.max(1000, monthlyProjectionData.length * 75)}px`, height: '255px' }}>
+                            <ResponsiveContainer width="100%" height="100%">
+                                <BarChart data={monthlyProjectionData} margin={{ top: 15, right: 10, bottom: 5, left: 10 }}>
+                                  <CartesianGrid strokeDasharray="3 3" stroke="#e0e0e0"/>
+                                  <XAxis dataKey="label" fontSize={10} tick={{ fill: '#4b5563' }} />
+                                  <YAxis fontSize={10} width={40} tickFormatter={(val) => `${val/1000}k`} />
+                                  <RechartsTooltip 
+                                     formatter={(value: number, name: string) => [formatRp(value), name === 'sales' ? 'Penjualan' : 'Proyeksi']}
+                                     labelStyle={{color: 'black', fontWeight: 'bold'}}
+                                  />
+                                  <Legend wrapperStyle={{ fontSize: '11px' }} />
+                                  <Bar dataKey="sales" name="Penjualan Riil" fill="#3b82f6" radius={[4, 4, 0, 0]} />
+                                  <Bar dataKey="projected" name="Proyeksi" fill="#f59e0b" radius={[4, 4, 0, 0]} />
+                                </BarChart>
+                            </ResponsiveContainer>
+                        </div>
                     </div>
                 </motion.div>
             )}

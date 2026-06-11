@@ -56,6 +56,21 @@ export const DanaBebas = ({ currentTime, headless = false }: { currentTime?: Dat
 
   const piutangNonTunaiHarianVal = harianTransactions.filter((t: any) => t.method !== 'TUNAI').reduce((sum: number, t: any) => sum + (t.total + (t.returTotal || 0)), 0);
 
+  const outBulananVal = (expenses || []).filter((e: any) => {
+    if (e.wallet !== 'Dana Bebas' && e.name !== 'Setoran Tunai' && !e.name?.includes('Pelunasan') && !e.name?.includes('Gaji') && !e.name?.includes('Prive')) {
+        // Only include expenses from Dana Bebas. Let's strictly check wallet.
+        if (e.wallet !== 'Dana Bebas') return false; 
+    }
+    if (e.wallet !== 'Dana Bebas') return false; // Strict check
+    
+    // Check if current month
+    const eDate = new Date(e.isoDate || e.date || new Date().toISOString());
+    const targetDate = new Date(); // or use targetDateStr ? Bulanan means current month. I will use the month of targetDateStr.
+    const [y, m, d] = targetDateStr.split('-');
+    
+    return eDate.getMonth() === (parseInt(m) - 1) && eDate.getFullYear() === parseInt(y);
+  }).reduce((sum: number, e: any) => sum + (e.amount > 0 ? e.amount : 0), 0);
+  
   const pengeluaranHarianVal = harianExpenses.filter((e: any) => e.amount > 0).reduce((sum: number, e: any) => sum + e.amount, 0) + returTunaiTotal;
 
   // Active sub-control state inside the Dana Bebas panel
@@ -350,89 +365,91 @@ export const DanaBebas = ({ currentTime, headless = false }: { currentTime?: Dat
       )}
 
       {/* Main Container Scrollable Area */}
-      <div className="p-4 flex flex-col gap-4 overflow-y-auto h-full">
+      <div className={`flex flex-col overflow-y-auto h-full ${headless ? 'p-0 gap-0' : 'p-2.5 gap-2.5'}`}>
 
         {/* FEEDBACK STATUS BANNER */}
         {successMsg && (
-          <div className="bg-green-100 border border-green-400 text-green-900 rounded px-4 py-2 flex items-center gap-2 shadow-sm font-bold animate-pulse">
+          <div className={`bg-green-100 border border-green-400 text-green-900 px-4 py-2 flex items-center gap-2 font-bold animate-pulse ${headless ? 'm-2 rounded-sm' : 'rounded shadow-sm'}`}>
             <CheckCircle2 className="w-5 h-5 text-green-600 shrink-0" />
             <span className="text-xs font-bold leading-tight uppercase">{successMsg}</span>
           </div>
         )}
         {errorMsg && (
-          <div className="bg-red-100 border border-red-400 text-red-900 rounded px-4 py-2 flex items-center gap-2 shadow-sm font-bold animate-pulse">
+          <div className={`bg-red-100 border border-red-400 text-red-900 px-4 py-2 flex items-center gap-2 font-bold animate-pulse ${headless ? 'm-2 rounded-sm' : 'rounded shadow-sm'}`}>
             <ShieldAlert className="w-5 h-5 text-red-600 shrink-0" />
             <span className="text-xs font-bold leading-tight uppercase">{errorMsg}</span>
           </div>
         )}
 
         {/* FINANCIAL SUMMARY HIGHLIGHT CARDS (AS REQUESTED IN GAMBAR 2) */}
-        <div className="flex gap-[2px] shrink-0 overflow-x-auto select-none">
-          <div className="bg-white border border-gray-400 p-2 flex-1 shadow-sm min-w-[124px]">
-            <p className="text-gray-800 font-bold mb-1 text-[13px] whitespace-nowrap">Dana Bebas</p>
-            <div className="text-[15px] font-bold text-black">{formatRp(saldoDanaBebas)}</div>
+        {!headless && (
+          <div className="flex shrink-0 overflow-x-auto select-none border border-gray-400 bg-white rounded-sm divide-x divide-gray-300 shadow-sm">
+            <div className="p-2 flex-1 min-w-[120px] bg-white hover:bg-gray-50 transition-colors">
+              <p className="text-gray-500 font-bold mb-0.5 text-[10px] uppercase tracking-wider whitespace-nowrap">Dana Bebas</p>
+              <div className="text-[14px] font-black text-blue-900">{formatRp(saldoDanaBebas)}</div>
+            </div>
+            <div className="p-2 flex-1 min-w-[120px] bg-white hover:bg-gray-50 transition-colors">
+              <p className="text-gray-500 font-bold mb-0.5 text-[10px] uppercase tracking-wider whitespace-nowrap">Dana Laci</p>
+              <div className="text-[14px] font-black text-gray-800">{formatRp(saldoDanaLaci)}</div>
+            </div>
+            <div className="p-2 flex-1 min-w-[120px] bg-white hover:bg-gray-50 transition-colors">
+              <p className="text-gray-500 font-bold mb-0.5 text-[10px] uppercase tracking-wider whitespace-nowrap">Total Retur (Harian)</p>
+              <div className="text-[14px] font-black text-red-600">{formatRp(totalReturHarianVal)}</div>
+            </div>
+            <div className="p-2 flex-1 min-w-[120px] bg-white hover:bg-gray-50 transition-colors">
+              <p className="text-gray-500 font-bold mb-0.5 text-[10px] uppercase tracking-wider whitespace-nowrap">Out Bulanan</p>
+              <div className="text-[14px] font-black text-orange-600">{formatRp(outBulananVal)}</div>
+            </div>
+            <div className="p-2 flex-1 min-w-[120px] bg-white hover:bg-gray-50 transition-colors">
+              <p className="text-gray-500 font-bold mb-0.5 text-[10px] uppercase tracking-wider whitespace-nowrap">Out Harian</p>
+              <div className="text-[14px] font-black text-black">{formatRp(pengeluaranHarianVal)}</div>
+            </div>
           </div>
-          <div className="bg-white border border-gray-400 p-2 flex-1 shadow-sm min-w-[124px]">
-            <p className="text-gray-800 font-bold mb-1 text-[13px] whitespace-nowrap">Dana Laci</p>
-            <div className="text-[15px] font-bold text-black">{formatRp(saldoDanaLaci)}</div>
-          </div>
-          <div className="bg-white border border-gray-400 p-2 flex-1 shadow-sm min-w-[124px]">
-            <p className="text-gray-800 font-bold mb-1 text-[13px] whitespace-nowrap">Total Retur (Harian)</p>
-            <div className="text-[15px] font-bold text-black">{formatRp(totalReturHarianVal)}</div>
-          </div>
-          <div className="bg-white border border-gray-400 p-2 flex-1 shadow-sm min-w-[124px]">
-            <p className="text-gray-800 font-bold mb-1 text-[13px] whitespace-nowrap">Piutang/Non-Tunai (Harian)</p>
-            <div className="text-[15px] font-bold text-black">{formatRp(piutangNonTunaiHarianVal)}</div>
-          </div>
-          <div className="bg-white border border-gray-400 p-2 flex-1 shadow-sm min-w-[124px]">
-            <p className="text-gray-800 font-bold mb-1 text-[13px] whitespace-nowrap">Pengeluaran (-) Harian</p>
-            <div className="text-[15px] font-bold text-black">{formatRp(pengeluaranHarianVal)}</div>
-          </div>
-        </div>
+        )}
 
         {/* OPERATIONS TABS NAVIGATION */}
-        <div className="flex flex-wrap border-b-2 border-gray-300 gap-1 mt-2">
+        <div className={`flex flex-wrap gap-1 ${headless ? 'bg-[#ece9d8] px-2 pt-1 border-b border-gray-400' : 'border-b border-gray-300 mt-1'}`}>
           <button
             onClick={() => setActiveControl('tarik')}
-            className={`px-4 py-2 text-xs font-bold transition-colors uppercase outline-none ${activeControl === 'tarik' ? 'bg-[#1e2b6b] text-white rounded-t-md border-t-2 border-x-2 border-[#1e2b6b]' : 'bg-gray-200 border-x border-t border-gray-300 text-gray-700 hover:bg-gray-300'}`}
+            className={`px-3 py-1.5 text-[11px] font-bold transition-all uppercase outline-none ${activeControl === 'tarik' ? 'bg-[#1e2b6b] text-white rounded-t border-t border-x border-[#1e2b6b]' : 'bg-gray-200 border-x border-t border-gray-300 text-gray-700 hover:bg-gray-300'}`}
           >
             💸 Tarik Dana Bebas
           </button>
           <button
             onClick={() => setActiveControl('pelunasan_supplier')}
-            className={`px-4 py-2 text-xs font-bold transition-colors uppercase outline-none ${activeControl === 'pelunasan_supplier' ? 'bg-[#1e2b6b] text-white rounded-t-md border-t-2 border-x-2 border-[#1e2b6b]' : 'bg-gray-200 border-x border-t border-gray-300 text-gray-700 hover:bg-gray-300'}`}
+            className={`px-3 py-1.5 text-[11px] font-bold transition-all uppercase outline-none ${activeControl === 'pelunasan_supplier' ? 'bg-[#1e2b6b] text-white rounded-t border-t border-x border-[#1e2b6b]' : 'bg-gray-200 border-x border-t border-gray-300 text-gray-700 hover:bg-gray-300'}`}
           >
             🤝 Pelunasan Supplier
           </button>
           <button
             onClick={() => setActiveControl('gaji')}
-            className={`px-4 py-2 text-xs font-bold transition-colors uppercase outline-none ${activeControl === 'gaji' ? 'bg-[#1e2b6b] text-white rounded-t-md border-t-2 border-x-2 border-[#1e2b6b]' : 'bg-gray-200 border-x border-t border-gray-300 text-gray-700 hover:bg-gray-300'}`}
+            className={`px-3 py-1.5 text-[11px] font-bold transition-all uppercase outline-none ${activeControl === 'gaji' ? 'bg-[#1e2b6b] text-white rounded-t border-t border-x border-[#1e2b6b]' : 'bg-gray-200 border-x border-t border-gray-300 text-gray-700 hover:bg-gray-300'}`}
           >
             👷 Gaji Karyawan
           </button>
           <button
             onClick={() => setActiveControl('prive')}
-            className={`px-4 py-2 text-xs font-bold transition-colors uppercase outline-none ${activeControl === 'prive' ? 'bg-[#1e2b6b] text-white rounded-t-md border-t-2 border-x-2 border-[#1e2b6b]' : 'bg-gray-200 border-x border-t border-gray-300 text-gray-700 hover:bg-gray-300'}`}
+            className={`px-3 py-1.5 text-[11px] font-bold transition-all uppercase outline-none ${activeControl === 'prive' ? 'bg-[#1e2b6b] text-white rounded-t border-t border-x border-[#1e2b6b]' : 'bg-gray-200 border-x border-t border-gray-300 text-gray-700 hover:bg-gray-300'}`}
           >
             👤 Prive Owner
           </button>
         </div>
 
         {/* TAB ACTIVE PANEL CONTENT */}
-        <div className="bg-white border-2 border-gray-300 rounded-b-lg p-5 shadow-inner">
+        <div className={`bg-white p-3.5 ${headless ? 'border-b border-gray-400 shadow-sm' : 'border border-gray-300 rounded-b shadow-sm'}`}>
           {activeControl === 'tarik' && (
-            <form onSubmit={handleTarikDanaBebas} className="flex flex-col gap-4">
-              <div className="border-b pb-2 mb-2">
-                <h3 className="font-bold text-sm text-gray-800 flex items-center gap-1">
-                   <ArrowDownToLine className="w-4 h-4 text-blue-900" />
+            <form onSubmit={handleTarikDanaBebas} className="flex flex-col gap-3">
+              <div className="flex items-center justify-between border-b border-gray-200 pb-1.5">
+                <span className="font-bold text-xs text-blue-900 flex items-center gap-1">
+                   <ArrowDownToLine className="w-4 h-4" />
                    MODUL TARIK DANA BEBAS
-                </h3>
-                <p className="text-[11px] text-gray-500">Mencairkan nominal dari cadangan Dana Bebas Anda ke Dana Laci kasir fisik atau pengeluaran tunai langsung.</p>
+                </span>
+                <span className="text-[10px] text-gray-500">Mencairkan nominal dari cadangan Dana Bebas</span>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="flex flex-col gap-1.5">
-                  <label className="text-xs font-bold text-gray-750">NOMINAL PENARIKAN (RP) :</label>
+              <div className="grid grid-cols-1 md:grid-cols-12 gap-3 items-end">
+                <div className="flex flex-col gap-1 md:col-span-3">
+                  <label className="text-[10px] font-bold text-gray-700">NOMINAL PENARIKAN (RP) :</label>
                   <input
                     type="text"
                     required
@@ -441,61 +458,62 @@ export const DanaBebas = ({ currentTime, headless = false }: { currentTime?: Dat
                       const num = parseInputNumber(e.target.value);
                       setTarikNominal(num ? num.toLocaleString('id-ID') : '');
                     }}
-                    className="border-2 border-gray-300 px-3 py-2 rounded text-sm text-black font-mono font-bold focus:border-blue-900 outline-none shadow-inner"
+                    className="border border-gray-400 px-2 py-1.5 rounded-sm text-xs text-black font-mono font-bold focus:border-blue-900 outline-none bg-white h-[32px] w-full"
                     placeholder="Contoh: 1.000.000"
                   />
                 </div>
 
-                <div className="flex flex-col gap-1.5">
-                  <label className="text-xs font-bold text-gray-750">TEMPAT TUJUAN ALIRAN DANA :</label>
+                <div className="flex flex-col gap-1 md:col-span-3">
+                  <label className="text-[10px] font-bold text-gray-700">TEMPAT TUJUAN ALIRAN DANA :</label>
                   <select
                     value={tarikDest}
                     onChange={(e) => setTarikDest(e.target.value as 'laci' | 'tunai')}
-                    className="border-2 border-gray-300 px-3 py-2 rounded text-xs text-black font-bold focus:border-blue-900 outline-none bg-white h-[38px]"
+                    className="border border-gray-400 px-2 py-1 rounded-sm text-[11px] text-black font-bold focus:border-blue-900 outline-none bg-white h-[32px] w-full"
                   >
-                    <option value="laci">DANA LACI KASIR (MENAMBAH SALDO TUNAI LACI)</option>
-                    <option value="tunai">PENGELUARAN TUNAI UMUM / BEBAS (DILUAR LACI)</option>
+                    <option value="laci">DANA LACI KASIR (MASUK LACI)</option>
+                    <option value="tunai">PENGELUARAN TUNAI (OUT LACI)</option>
                   </select>
                 </div>
-              </div>
 
-              <div className="flex flex-col gap-1.5">
-                <label className="text-xs font-bold text-gray-750">CATATAN / KEPERLUAN PENARIKAN :</label>
-                <textarea
-                  value={tarikNotes}
-                  onChange={(e) => setTarikNotes(e.target.value)}
-                  className="border-2 border-gray-300 px-3 py-2 rounded text-xs text-black focus:border-blue-900 outline-none h-16 shadow-inner resize-none"
-                  placeholder="Opsional: Misal penarikan rutin awal pekan, belanja atk darurat, dsb..."
-                />
-              </div>
+                <div className="flex flex-col gap-1 md:col-span-4">
+                  <label className="text-[10px] font-bold text-gray-700">CATATAN / KEPERLUAN PENARIKAN :</label>
+                  <input
+                    type="text"
+                    value={tarikNotes}
+                    onChange={(e) => setTarikNotes(e.target.value)}
+                    className="border border-gray-400 px-2 py-1.5 rounded-sm text-xs text-black focus:border-blue-900 outline-none bg-white h-[32px] w-full"
+                    placeholder="Opsional: belanja atk, bensin, dsb..."
+                  />
+                </div>
 
-              <div className="flex justify-end pt-3 border-t">
-                <button
-                  type="submit"
-                  className="bg-blue-900 hover:bg-blue-800 text-white font-bold px-6 py-2.5 rounded text-xs flex items-center gap-1.5 transition-colors shadow"
-                >
-                  PROSES PENARIKAN DANA
-                </button>
+                <div className="md:col-span-2">
+                  <button
+                    type="submit"
+                    className="w-full bg-[#1e2b6b] hover:bg-blue-800 text-white font-bold h-[32px] rounded-sm text-[11px] flex items-center justify-center gap-1 transition-colors shadow-sm uppercase active:translate-y-px"
+                  >
+                    PROSES DANA
+                  </button>
+                </div>
               </div>
             </form>
           )}
 
           {activeControl === 'pelunasan_supplier' && (
-            <form onSubmit={handlePelunasanSupplier} className="flex flex-col gap-4">
-              <div className="border-b pb-2 mb-2">
-                <h3 className="font-bold text-sm text-gray-800 flex items-center gap-1">
-                   <UserCheck className="w-4 h-4 text-amber-700" />
+            <form onSubmit={handlePelunasanSupplier} className="flex flex-col gap-3">
+              <div className="flex items-center justify-between border-b border-gray-200 pb-1.5">
+                <span className="font-bold text-xs text-amber-800 flex items-center gap-1">
+                   <UserCheck className="w-4 h-4" />
                    MODUL PELUNASAN HUTANG SUPPLIER
-                </h3>
-                <p className="text-[11px] text-gray-500">Membayar tagihan hutang aktif ke pihak pemasok/supplier menggunakan kas Dana Bebas.</p>
+                </span>
+                <span className="text-[10px] text-gray-500">Membayar tagihan hutang supplier</span>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="flex flex-col gap-1.5">
-                  <label className="text-xs font-bold text-gray-750">PILIH HUTANG SUPPLIER AKTIF :</label>
+              <div className="grid grid-cols-1 md:grid-cols-12 gap-3 items-end">
+                <div className="flex flex-col gap-1 md:col-span-4">
+                  <label className="text-[10px] font-bold text-gray-700">PILIH HUTANG SUPPLIER AKTIF :</label>
                   {listHutangAktif.length === 0 ? (
-                    <div className="text-sm p-3 border border-dashed rounded bg-amber-50 text-amber-800 font-bold">
-                      Tidak ada hutang supplier aktif saat ini.
+                    <div className="text-[11px] px-2 py-1 border border-dashed rounded bg-amber-50 text-amber-800 font-bold h-[32px] flex items-center">
+                      Tidak ada hutang supplier aktif.
                     </div>
                   ) : (
                     <select
@@ -504,12 +522,12 @@ export const DanaBebas = ({ currentTime, headless = false }: { currentTime?: Dat
                         setSelectedHutangId(e.target.value);
                         setPelunasanAmount('');
                       }}
-                      className="border-2 border-gray-300 px-3 py-2 rounded text-xs text-black font-bold focus:border-blue-900 outline-none bg-white h-[38px]"
+                      className="border border-gray-400 px-2 py-1 rounded-sm text-xs text-black font-bold focus:border-blue-900 outline-none bg-white h-[32px] w-full"
                     >
                       <option value="">-- PILIH TRANSAKSI HUTANG --</option>
                       {listHutangAktif.map((h: any) => (
                         <option key={h.id} value={h.id}>
-                          {h.id} - {h.supplier_name} [Sisa: {formatRp(h.sisa_hutang)}] - JT: {h.jatuh_tempo.split('T')[0]}
+                          {h.id} - {h.supplier_name} [Sisa: {formatRp(h.sisa_hutang)}]
                         </option>
                       ))}
                     </select>
@@ -517,116 +535,109 @@ export const DanaBebas = ({ currentTime, headless = false }: { currentTime?: Dat
                 </div>
 
                 {selectedHutangItem && (
-                  <div className="bg-amber-50 border border-amber-300 p-3 rounded flex flex-col gap-1 text-[11px]">
-                    <p className="font-bold text-amber-900 text-xs">RINCIAN DATA TAGIHAN SELECTED :</p>
-                    <p><strong>ID Nota Hutang:</strong> {selectedHutangItem.id}</p>
-                    <p><strong>Supplier:</strong> {selectedHutangItem.supplier_name}</p>
-                    <p><strong>Total Pinjaman Awal:</strong> {formatRp(selectedHutangItem.nominal)}</p>
-                    <p><strong>Sisa Hutang:</strong> <span className="font-bold text-red-700 text-sm">{formatRp(selectedHutangItem.sisa_hutang)}</span></p>
-                    <p><strong>Jatuh Tempo:</strong> {selectedHutangItem.jatuh_tempo.split('T')[0]}</p>
+                  <div className="bg-amber-50 border border-amber-300 p-1.5 rounded-sm text-[10px] md:col-span-3 h-[32px] flex items-center justify-between">
+                    <span className="font-medium text-gray-600 pr-1">Sisa:</span>
+                    <span className="font-bold text-red-700 text-xs">{formatRp(selectedHutangItem.sisa_hutang)}</span>
+                  </div>
+                )}
+
+                {selectedHutangItem && (
+                  <div className="flex flex-col gap-1 md:col-span-3">
+                    <label className="text-[10px] font-bold text-gray-700">METODE PEMBAYARAN :</label>
+                    <div className="flex items-center gap-3 h-[32px]">
+                      <label className="flex items-center gap-1 text-[10px] font-bold text-black cursor-pointer">
+                        <input
+                          type="radio"
+                          name="pelunasanType"
+                          checked={pelunasanType === 'full'}
+                          onChange={() => setPelunasanType('full')}
+                          className="text-blue-900 focus:ring-blue-950 w-3 h-3"
+                        />
+                        Lunas
+                      </label>
+                      <label className="flex items-center gap-1 text-[10px] font-bold text-black cursor-pointer">
+                        <input
+                          type="radio"
+                          name="pelunasanType"
+                          checked={pelunasanType === 'partial'}
+                          onChange={() => setPelunasanType('partial')}
+                          className="text-blue-900 focus:ring-blue-950 w-3 h-3"
+                        />
+                        Cicil
+                      </label>
+                    </div>
+                  </div>
+                )}
+
+                {selectedHutangItem && pelunasanType === 'partial' && (
+                  <div className="flex flex-col gap-1 md:col-span-2">
+                    <label className="text-[10px] font-bold text-gray-700">NOMINAL (RP) :</label>
+                    <input
+                      type="text"
+                      required
+                      value={pelunasanAmount}
+                      onChange={(e) => {
+                        const num = parseInputNumber(e.target.value);
+                        setPelunasanAmount(num ? num.toLocaleString('id-ID') : '');
+                      }}
+                      className="border border-gray-400 px-2 py-1.5 rounded-sm text-xs text-black font-mono font-bold focus:border-blue-900 outline-none bg-white h-[32px] w-full"
+                      placeholder="Contoh: 500.000"
+                    />
+                  </div>
+                )}
+
+                {selectedHutangItem && (
+                  <div className={`flex justify-end ${pelunasanType === 'partial' ? 'md:col-span-12' : 'md:col-span-2'}`}>
+                    <button
+                      type="submit"
+                      className="bg-amber-700 hover:bg-amber-800 text-white font-bold h-[32px] px-3 w-full rounded-sm text-[11px] flex items-center justify-center gap-1 transition-colors shadow-sm uppercase active:translate-y-px"
+                    >
+                      BAYAR HUTANG
+                    </button>
                   </div>
                 )}
               </div>
-
-              {selectedHutangItem && (
-                <>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 border-t pt-3">
-                    <div className="flex flex-col gap-1.5">
-                      <label className="text-xs font-bold text-gray-750">METODE PEMBAYARAN :</label>
-                      <div className="flex items-center gap-4 mt-1">
-                        <label className="flex items-center gap-1.5 text-xs font-bold text-black cursor-pointer">
-                          <input
-                            type="radio"
-                            name="pelunasanType"
-                            checked={pelunasanType === 'full'}
-                            onChange={() => setPelunasanType('full')}
-                            className="text-blue-900 focus:ring-blue-950"
-                          />
-                          Bayar Lunas Langsung ({formatRp(selectedHutangItem.sisa_hutang)})
-                        </label>
-                        <label className="flex items-center gap-1.5 text-xs font-bold text-black cursor-pointer">
-                          <input
-                            type="radio"
-                            name="pelunasanType"
-                            checked={pelunasanType === 'partial'}
-                            onChange={() => setPelunasanType('partial')}
-                            className="text-blue-900 focus:ring-blue-950"
-                          />
-                          Bayar Sebagian (Cicilan Manual)
-                        </label>
-                      </div>
-                    </div>
-
-                    {pelunasanType === 'partial' && (
-                      <div className="flex flex-col gap-1.5">
-                        <label className="text-xs font-bold text-gray-750">NOMINAL DICICIL / DIBAYAR (RP) :</label>
-                        <input
-                          type="text"
-                          required
-                          value={pelunasanAmount}
-                          onChange={(e) => {
-                            const num = parseInputNumber(e.target.value);
-                            setPelunasanAmount(num ? num.toLocaleString('id-ID') : '');
-                          }}
-                          className="border-2 border-gray-300 px-3 py-2 rounded text-sm text-black font-mono font-bold focus:border-blue-900 outline-none shadow-inner"
-                          placeholder="Masukkan nilai bayar msl: 500.000"
-                        />
-                      </div>
-                    )}
-                  </div>
-
-                  <div className="flex justify-end pt-3 border-t">
-                    <button
-                      type="submit"
-                      className="bg-amber-700 hover:bg-amber-800 text-white font-bold px-6 py-2.5 rounded text-xs flex items-center gap-1.5 transition-colors shadow"
-                    >
-                      PROSES PEMBAYARAN SUPPLIER
-                    </button>
-                  </div>
-                </>
-              )}
             </form>
           )}
 
           {activeControl === 'gaji' && (
-            <form onSubmit={handleGajiKaryawan} className="flex flex-col gap-4">
-              <div className="border-b pb-2 mb-2">
-                <h3 className="font-bold text-sm text-gray-800 flex items-center gap-1">
-                   <UserCheck className="w-4 h-4 text-emerald-800" />
+            <form onSubmit={handleGajiKaryawan} className="flex flex-col gap-3">
+              <div className="flex items-center justify-between border-b border-gray-200 pb-1.5">
+                <span className="font-bold text-xs text-emerald-800 flex items-center gap-1">
+                   <UserCheck className="w-4 h-4" />
                    MODUL PEMBAYARAN GAJI KARYAWAN
-                </h3>
-                <p className="text-[11px] text-gray-500">Membayarkan kompensasi bulanan atau gaji harian karyawan dari cadangan anggaran Dana Bebas.</p>
+                </span>
+                <span className="text-[10px] text-gray-500">Membayarkan kompensasi bulanan atau gaji harian</span>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="flex flex-col gap-1.5">
-                  <label className="text-xs font-bold text-gray-750">PILIH KARYAWAN PENERIMA GAJI :</label>
+              <div className="grid grid-cols-1 md:grid-cols-12 gap-3 items-end">
+                <div className="flex flex-col gap-1 md:col-span-4">
+                  <label className="text-[10px] font-bold text-gray-700">KARYAWAN PENERIMA GAJI :</label>
                   <select
                     value={selectedEmployeeId}
                     onChange={(e) => {
                       setSelectedEmployeeId(e.target.value);
                       const empItem = (employees || []).find((v: any) => String(v.id) === String(e.target.value));
                       if (empItem && empItem.dailySalary) {
-                        // set default recommendation based on salary config if exists
                         setGajiAmount(empItem.dailySalary.toLocaleString('id-ID'));
                       } else {
                         setGajiAmount('');
                       }
                     }}
                     required
-                    className="border-2 border-gray-300 px-3 py-2 rounded text-xs text-black font-bold focus:border-blue-900 outline-none bg-white h-[38px]"
+                    className="border border-gray-400 px-2 py-1 rounded-sm text-xs text-black font-bold focus:border-blue-900 outline-none bg-white h-[32px] w-full"
                   >
                     <option value="">-- PILIH KARYAWAN --</option>
                     {(employees || []).map((emp: any) => (
                       <option key={emp.id} value={emp.id}>
-                        {emp.name} ({emp.position || 'Staff'}) [Cabang: {emp.branch || 'Pusat'}]
+                        {emp.name} ({emp.position || 'Staff'})
                       </option>
                     ))}
                   </select>
                 </div>
 
-                <div className="flex flex-col gap-1.5">
-                  <label className="text-xs font-bold text-gray-750">NOMINAL GAJI DIBAYAR (RP) :</label>
+                <div className="flex flex-col gap-1 md:col-span-3">
+                  <label className="text-[10px] font-bold text-gray-700">NOMINAL GAJI (RP) :</label>
                   <input
                     type="text"
                     required
@@ -635,47 +646,47 @@ export const DanaBebas = ({ currentTime, headless = false }: { currentTime?: Dat
                       const num = parseInputNumber(e.target.value);
                       setGajiAmount(num ? num.toLocaleString('id-ID') : '');
                     }}
-                    className="border-2 border-gray-300 px-3 py-2 rounded text-sm text-black font-mono font-bold focus:border-blue-900 outline-none shadow-inner"
-                    placeholder="Contoh: 1.500.050"
+                    className="border border-gray-400 px-2 py-1.5 rounded-sm text-xs text-black font-mono font-bold focus:border-blue-900 outline-none bg-white h-[32px] w-full"
+                    placeholder="Contoh: 1.500.000"
                   />
                 </div>
-              </div>
 
-              <div className="flex flex-col gap-1.5">
-                <label className="text-xs font-bold text-gray-750">DESKRIPSI / PERIODE GAJI (CATATAN) :</label>
-                <input
-                  type="text"
-                  value={gajiNotes}
-                  onChange={(e) => setGajiNotes(e.target.value)}
-                  className="border-2 border-gray-300 px-3 py-2 rounded text-xs text-black focus:border-blue-900 outline-none shadow-inner"
-                  placeholder="Contoh: Pembayaran Gaji Karyawan Bulan Juni 2026 atau Gaji Harian Bonus Lembur"
-                />
-              </div>
+                <div className="flex flex-col gap-1 md:col-span-3">
+                  <label className="text-[10px] font-bold text-gray-700">CATATAN / PERIODE GAJI :</label>
+                  <input
+                    type="text"
+                    value={gajiNotes}
+                    onChange={(e) => setGajiNotes(e.target.value)}
+                    className="border border-gray-400 px-2 py-1.5 rounded-sm text-xs text-black focus:border-blue-900 outline-none bg-white h-[32px] w-full"
+                    placeholder="Contoh: Gaji Juni 2026"
+                  />
+                </div>
 
-              <div className="flex justify-end pt-3 border-t">
-                <button
-                  type="submit"
-                  className="bg-emerald-800 hover:bg-emerald-700 text-white font-bold px-6 py-2.5 rounded text-xs flex items-center gap-1.5 transition-colors shadow"
-                >
-                  PROSES GAJI KARYAWAN
-                </button>
+                <div className="md:col-span-2">
+                  <button
+                    type="submit"
+                    className="w-full bg-emerald-800 hover:bg-emerald-700 text-white font-bold h-[32px] rounded-sm text-[11px] flex items-center justify-center gap-1 transition-colors shadow-sm uppercase active:translate-y-px"
+                  >
+                    BAYAR GAJI
+                  </button>
+                </div>
               </div>
             </form>
           )}
 
           {activeControl === 'prive' && (
-            <form onSubmit={handlePriveOwner} className="flex flex-col gap-4">
-              <div className="border-b pb-2 mb-2">
-                <h3 className="font-bold text-sm text-gray-800 flex items-center gap-1">
-                   <CircleDollarSign className="w-4 h-4 text-purple-800" />
-                   MODUL PRIVE / TARIK OWNER DRAWINGS
-                </h3>
-                <p className="text-[11px] text-gray-500">Mencatat penarikan kas modal/keuntungan (prive) untuk kebutuhan ekuitas pribadi pemilih toko (Owner).</p>
+            <form onSubmit={handlePriveOwner} className="flex flex-col gap-3">
+              <div className="flex items-center justify-between border-b border-gray-200 pb-1.5">
+                <span className="font-bold text-xs text-purple-800 flex items-center gap-1">
+                   <CircleDollarSign className="w-4 h-4" />
+                   MODUL PRIVE / OWNER DRAWINGS
+                </span>
+                <span className="text-[10px] text-gray-500">Mencatat penarikan kas owner</span>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="flex flex-col gap-1.5">
-                  <label className="text-xs font-bold text-gray-750">NOMINAL PRIVE OWNER (RP) :</label>
+              <div className="grid grid-cols-1 md:grid-cols-12 gap-3 items-end">
+                <div className="flex flex-col gap-1 md:col-span-4">
+                  <label className="text-[10px] font-bold text-gray-700">NOMINAL PRIVE OWNER (RP) :</label>
                   <input
                     type="text"
                     required
@@ -684,30 +695,30 @@ export const DanaBebas = ({ currentTime, headless = false }: { currentTime?: Dat
                       const num = parseInputNumber(e.target.value);
                       setPriveAmount(num ? num.toLocaleString('id-ID') : '');
                     }}
-                    className="border-2 border-gray-300 px-3 py-2 rounded text-sm text-black font-mono font-bold focus:border-blue-900 outline-none shadow-inner"
-                    placeholder="Contoh: 15.000.000"
+                    className="border border-gray-400 px-2 py-1.5 rounded-sm text-xs text-black font-mono font-bold focus:border-blue-900 outline-none bg-white h-[32px] w-full"
+                    placeholder="Contoh: 5.000.000"
                   />
                 </div>
 
-                <div className="flex flex-col gap-1.5">
-                  <label className="text-xs font-bold text-gray-750">KELUARAN ALASAN PRIVE / OPTIONAL NOTE :</label>
+                <div className="flex flex-col gap-1 md:col-span-6">
+                  <label className="text-[10px] font-bold text-gray-700">DISKLAMER ALASAN / CATATAN :</label>
                   <input
                     type="text"
                     value={priveNotes}
                     onChange={(e) => setPriveNotes(e.target.value)}
-                    className="border-2 border-gray-300 px-3 py-2 rounded text-xs text-black focus:border-blue-900 outline-none shadow-inner"
+                    className="border border-gray-400 px-2 py-1.5 rounded-sm text-xs text-black focus:border-blue-900 outline-none bg-white h-[32px] w-full"
                     placeholder="Contoh: Prive Rutin Pribadi Owner"
                   />
                 </div>
-              </div>
 
-              <div className="flex justify-end pt-3 border-t">
-                <button
-                  type="submit"
-                  className="bg-purple-900 hover:bg-purple-800 text-white font-bold px-6 py-2.5 rounded text-xs flex items-center gap-1.5 transition-colors shadow"
-                >
-                  PROSES PRIVE OWNER
-                </button>
+                <div className="md:col-span-2">
+                  <button
+                    type="submit"
+                    className="w-full bg-purple-900 hover:bg-purple-800 text-white font-bold h-[32px] rounded-sm text-[11px] flex items-center justify-center gap-1 transition-colors shadow-sm uppercase active:translate-y-px"
+                  >
+                    PROSES PRIVE
+                  </button>
+                </div>
               </div>
             </form>
           )}
