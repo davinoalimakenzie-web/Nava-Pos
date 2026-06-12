@@ -29,8 +29,14 @@ export const AiCashflowBot = () => {
 
         // Extract today's petty cash & income to help AI
         const today = new Date().toISOString().split('T')[0];
-        const todayIncome = transactions.filter((t:any) => t.method === 'TUNAI' && t.date.includes(today)).reduce((sum: number, t:any) => sum + t.total, 0);
-        // Exclude 'PEMBELIAN' since that is for stok which uses Dana Bebas by default? Or let the AI decide.
+        const harianTransactions = (transactions || []).filter((t: any) => {
+            if (t.type === 'PEMBELIAN') return false;
+            if (t.date && t.date.includes(today)) return true;
+            if (t.isoDate && t.isoDate.includes(today)) return true;
+            return false;
+        });
+        const todayFiktif = harianTransactions.filter((t: any) => t.method !== 'TUNAI').reduce((sum: number, t: any) => sum + (t.total + (t.returTotal || 0)), 0);
+        const todayOmzet = currentLaci + todayFiktif;
 
         const systemPrompt = `
 Kamu adalah AI Cashflow di aplikasi Nava POS. Tugas utamamu adalah membantu pemilik usaha mengelola dua dompet utama: Dana Laci dan Dana Bebas, dengan aturan ketat agar tidak terjadi minus. 
@@ -39,14 +45,16 @@ ATURAN:
 1. Dana Laci
    - Saldo fisik saat ini tercatat di sistem: Rp${currentLaci}
    - Saldo awal setiap hari: Rp500.000.
+   - Transaksi Fiktif (Non-Tunai) hari ini: Rp${todayFiktif}
+   - Omzet hari ini (Saldo Laci + Fiktif): Rp${todayOmzet}
    - Sumber pemasukan: penjualan tunai, bon, piutang, dll.
-   - Pengeluaran yg diizinkan: operasional harian kecil (parkir, konsumsi).
-   - Saat tutup toko: Setoran = (Saldo Laci saat ini) - Rp500.000. Laci harus disisakan tepat Rp500.000.
+   - Pengeluaran yg diizinkan: harian kecil (parkir, konsumsi).
+   - Saat tutup toko / tutup buku harian: yang termigrasi ke Dana Bebas adalah Omzet dikurangi Rp500.000 (modal laci besok), bukan Dana Laci saja seperti sebelumnya. Formula: Setoran = (Saldo Laci + Fiktif) - Rp500.000. Setelah migrasi, Dana Laci harus disisakan tepat Rp500.000 (modal laci besok).
    - Dilarang bayar gaji, supplier, atau prive dari Dana Laci.
 
 2. Dana Bebas
    - Saldo saat ini tercatat di sistem: Rp${currentBebas}
-   - Sumber pemasukan: Setoran Laci.
+   - Sumber pemasukan: Setoran / Migrasi Laci.
    - Pengeluaran prioritas: operasional bulanan, gaji, supplier. Terakhir Prive. Prive hanya diizinkan jika saldo aman.
    - Tidak boleh minus! Beri peringatan keras jika akan minus.
 
@@ -62,7 +70,7 @@ contoh: [AKSI_SISTEM: PENGELUARAN_BEBAS = 500000]
 
 Jika melakukan Setoran/Tutup Toko, sisipkan:
 [AKSI_SISTEM: SETOR_KE_BEBAS = <NOMINAL_YANG_DISETOR>]
-*(Dimana <NOMINAL_YANG_DISETOR> adalah Saldo Laci minus 500000)*
+*(Dimana <NOMINAL_YANG_DISETOR> adalah Omzet minus 500000)*
 
 Jangan berikan tag [AKSI_SISTEM] jika pengguna hanya bertanya atau jika kamu MENOLAK transaksinya!
         `;
@@ -105,7 +113,11 @@ Jangan berikan tag [AKSI_SISTEM] jika pengguna hanya bertanya atau jika kamu MEN
             const setorMatch = aiText.match(/\[AKSI_SISTEM:\s*SETOR_KE_BEBAS\s*=\s*(\d+)\]/i);
             if (setorMatch) {
                 const amount = parseInt(setorMatch[1]);
-                setWallets((prev: any) => ({...prev, danaLaci: prev.danaLaci - amount, danaBebas: prev.danaBebas + amount}));
+                setWallets((prev: any) => ({
+                    ...prev, 
+                    danaLaci: 500000, 
+                    danaBebas: (prev?.danaBebas || 0) + amount
+                }));
                 addLog('AI_CASHFLOW', `Tutup toko / Setor ke Dana Bebas Rp ${amount}`);
                 aiText = aiText.replace(setorMatch[0], '');
                 actionProcessed = true;

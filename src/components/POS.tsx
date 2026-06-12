@@ -14,7 +14,7 @@ export const POS = ({ currentTime }: { currentTime: Date }) => {
     piutangData, setPiutangData,
     expenses, setExpenses,
     orderData, setOrderData,
-    customers, suppliers,
+    customers, suppliers, hutangSupplier, setHutangSupplier,
     cart, setCart,
     amountPaid, setAmountPaid,
     activeReturTrx, setActiveReturTrx,
@@ -27,7 +27,8 @@ export const POS = ({ currentTime }: { currentTime: Date }) => {
     setMasterDataTab, setPendingUser, setShowAuthModal, storeSettings,
     appLogs, addLog, employees,
     isInputStockMode, setIsInputStockMode,
-    wallets, setWallets
+    wallets, setWallets,
+    setReprintTx
   } = useAppContext();
 
   const selectedCustomer = customers.find((c: any) => String(c.id) === String(selectedCustomerId));
@@ -273,11 +274,19 @@ export const POS = ({ currentTime }: { currentTime: Date }) => {
             const oTrxIdx = currentTrxData.findIndex(t => t.id === cartItem.originalTrxId);
             if (oTrxIdx >= 0) {
                  const returValue = Math.abs(cartItem.price) * cartItem.qty;
-                 currentTrxData[oTrxIdx].returTotal = (currentTrxData[oTrxIdx].returTotal || 0) + returValue;
+                 // Simpan nominal return khusus untuk popup agar tidak double-count pada return harian
+                 currentTrxData[oTrxIdx].returTotalPopupOnly = (currentTrxData[oTrxIdx].returTotalPopupOnly || 0) + returValue;
                  currentTrxData[oTrxIdx].total -= returValue;
                  
                  const oItemIdx = currentTrxData[oTrxIdx].items.findIndex((i: any) => i.id === cartItem.originalItemId);
-                 if(oItemIdx >= 0) currentTrxData[oTrxIdx].items[oItemIdx].qty -= cartItem.qty;
+                 if (oItemIdx >= 0) {
+                     const itemToMutate = currentTrxData[oTrxIdx].items[oItemIdx];
+                     if (itemToMutate.originalQtyBeforeReturn === undefined) {
+                         itemToMutate.originalQtyBeforeReturn = itemToMutate.qty;
+                     }
+                     itemToMutate.totalReturnedQty = (itemToMutate.totalReturnedQty || 0) + cartItem.qty;
+                     itemToMutate.qty -= cartItem.qty;
+                 }
             }
         } else {
             const invIdx = currentInv.findIndex(i => i.id === cartItem.id);
@@ -299,6 +308,7 @@ export const POS = ({ currentTime }: { currentTime: Date }) => {
   };
 
   const processTransaction = (shouldPrint = false) => {
+    setReprintTx(null);
     const isPiutang = paymentMethod === 'Qriss/TF' || paymentMethod === 'DP' || paymentMethod === '1 Minggu';
     const noFaktur = `FAK-${(() => { const d = new Date(); return String(d.getFullYear()).slice(2) + String(d.getMonth()+1).padStart(2,'0') + String(d.getDate()).padStart(2,'0'); })()}-${Math.floor(Math.random() * 10000).toString().padStart(4, '0')}`;
     
@@ -368,9 +378,40 @@ export const POS = ({ currentTime }: { currentTime: Date }) => {
            setWallets((prev: any) => ({ ...prev, danaBebas: (prev?.danaBebas || 0) - finalTotalCost }));
        }
 
+       // Automatically create tagihan supplier sesuai nota faktur (Hutang Supplier)
+       if (totalBelanjaBaru > 0) {
+           const jtDate = (() => {
+              try {
+                const parts = transactionDate.split('-'); // YYYY-MM-DD
+                const d = new Date(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, parseInt(parts[2], 10));
+                d.setDate(d.getDate() + 30); // 30-day default credit term (due date)
+                const yyyy = d.getFullYear();
+                const mm = String(d.getMonth() + 1).padStart(2, '0');
+                const dd = String(d.getDate()).padStart(2, '0');
+                return `${yyyy}-${mm}-${dd}`;
+              } catch (e) {
+                return transactionDate;
+              }
+           })();
+
+           const newHutangEntry = {
+               id: 'HTG' + Date.now().toString() + Math.floor(Math.random() * 1000).toString(),
+               nomor_nota: purchaseFaktur,
+               supplier_id: stockSupplierId,
+               supplier_nama: supplier?.name || 'Unknown',
+               tanggal_beli: transactionDate,
+               tanggal_jatuh_tempo: jtDate,
+               nilai_hutang: totalBelanjaBaru,
+               sisa_hutang: totalBelanjaBaru,
+               status: 'belum_jatuh_tempo'
+           };
+
+           setHutangSupplier((prev: any) => [...(prev || []), newHutangEntry]);
+       }
+
        setInventory([...newInvItems, ...currentInv]);
        setTransactions((prev: any) => [newTransaction, ...(prev || [])]);
-       addLog('PEMBELIAN_STOK', `No: ${purchaseFaktur} Total: Rp ${finalTotalCost.toLocaleString('id-ID')}`);
+       addLog('PEMBELIAN_STOK', `No: ${purchaseFaktur} Total: Rp ${finalTotalCost.toLocaleString('id-ID')} (Hutang supplier dibuat: Rp ${totalBelanjaBaru.toLocaleString('id-ID')})`);
        if (shouldPrint) setConfirmAction({message: `Pembelian Stok Tersimpan & Dicetak! (Faktur: ${purchaseFaktur})`, isAlert: true});
        else setConfirmAction({message: 'Pembelian Stok Tersimpan!', isAlert: true});
        setIsInputStockMode(false);
@@ -472,9 +513,7 @@ export const POS = ({ currentTime }: { currentTime: Date }) => {
     
     if (paymentMethod !== 'Qriss/TF') {
        const cashReceived = finalType === 'PIUTANG' ? paid : (paid - kembalian);
-       if (cashReceived > 0) {
-           setWallets((prev: any) => ({ ...prev, danaLaci: (prev?.danaLaci || 0) + cashReceived }));
-       }
+       setWallets((prev: any) => ({ ...prev, danaLaci: (prev?.danaLaci || 0) + cashReceived }));
     }
 
     updateStockAndSave(newTransaction);
@@ -653,7 +692,7 @@ export const POS = ({ currentTime }: { currentTime: Date }) => {
         handleSimpan();
       } else if (e.key === 'F9') {
         e.preventDefault();
-        if (!cart.some(c => c.isReturn)) handleCetakButton();
+        handleCetakButton();
       } else if (e.key === 'F5') {
         e.preventDefault();
         handleResetBaru();
@@ -775,7 +814,7 @@ export const POS = ({ currentTime }: { currentTime: Date }) => {
                  {showInputMenu && (
                     <div className="absolute top-full right-0 mt-1 bg-[#ece9d8] border-2 border-gray-400 shadow-xl z-[999] w-56 flex flex-col text-left text-black font-normal">
                        <button onClick={() => { setShowExpenseModal(true); setShowInputMenu(false); }} className="px-3 py-2 hover:bg-blue-100 text-left border-b border-gray-300 font-bold">Input Pengeluaran</button>
-                       <button onClick={() => { setIsInputStockMode(true); setCart([]); setShowInputMenu(false); }} className="px-3 py-2 hover:bg-blue-100 text-left border-b border-gray-300 font-bold">Input Stock Baru</button>
+                       <button onClick={() => { setIsInputStockMode(true); setCart([]); setStockDiscount(100); setShowInputMenu(false); }} className="px-3 py-2 hover:bg-blue-100 text-left border-b border-gray-300 font-bold">Input Stock Baru</button>
                        <button onClick={() => { setActiveTab('masterdata'); setMasterDataTab('order'); setShowInputMenu(false); }} className="px-3 py-2 hover:bg-blue-100 text-left border-b border-gray-300 font-bold">Order Supliyer</button>
                     </div>
                  )}
@@ -1026,7 +1065,20 @@ export const POS = ({ currentTime }: { currentTime: Date }) => {
              {isInputStockMode ? (
                  <div className="flex items-center h-[26px]">
                    <span className="w-[110px] font-semibold text-blue-900 shrink-0 text-xs tracking-wide">DISKON %</span>
-                   <input type="number" value={stockDiscount} onChange={e => setStockDiscount(parseInt(e.target.value)||0)} className="border border-gray-400 bg-white px-1 leading-none text-right flex-1 min-w-0 h-full outline-none font-bold text-sm shadow-inner text-black" />
+                   <input 
+                     type="number" 
+                     readOnly 
+                     value={stockDiscount} 
+                     className="border border-gray-400 bg-gray-200 px-1 leading-none text-right flex-1 min-w-0 h-full outline-none font-bold text-sm shadow-inner text-gray-700 cursor-not-allowed" 
+                   />
+                   <button 
+                     type="button"
+                     onClick={() => setStockDiscount(100)} 
+                     className="bg-red-600 hover:bg-red-700 text-white font-bold px-1.5 h-full text-[10px] rounded shrink-0"
+                     title="Klik untuk set diskon 100%"
+                   >
+                     % 100
+                   </button>
                  </div>
              ) : (
                  <>
@@ -1108,7 +1160,7 @@ export const POS = ({ currentTime }: { currentTime: Date }) => {
               <div className="flex gap-1.5">
                 <div className="flex flex-col gap-1 w-[120px]">
                   <button onClick={handleSimpan} className="border-2 border-gray-500 bg-gray-200 px-3 py-1.5 w-full hover:bg-gray-300 text-black font-bold shadow-sm text-xs">Simpan [F8]</button>
-                    <button onClick={handleCetakButton} disabled={cart.some(c => c.isReturn)} className={`border-2 border-gray-500 bg-gray-200 px-3 py-1.5 w-full text-black font-bold shadow-sm text-xs ${cart.some(c => c.isReturn) ? 'opacity-50 cursor-not-allowed' : 'hover:bg-gray-300'}`}>Cetak [F9]</button>
+                    <button onClick={handleCetakButton} className="border-2 border-gray-500 bg-gray-200 px-3 py-1.5 w-full hover:bg-gray-300 text-black font-bold shadow-sm text-xs">Cetak [F9]</button>
                     <button onClick={handleResetBaru} className={`border-2 border-gray-500 bg-gray-200 px-3 py-1.5 w-full text-black font-bold shadow-sm text-xs ${cart.some(c => c.isReturn) ? 'opacity-50 hover:bg-red-200' : 'hover:bg-gray-300'}`}>Baru [F5]</button>
                     <button onClick={() => setShowHistoryModal(true)} disabled={cart.some(c => c.isReturn)} className={`border-2 border-gray-500 bg-gray-200 px-3 py-1.5 w-full text-black font-bold shadow-sm text-xs ${cart.some(c => c.isReturn) ? 'opacity-50 cursor-not-allowed' : 'hover:bg-gray-300'}`}>Return</button>
                     <button onClick={() => setShowBonModal(true)} disabled={cart.some(c => c.isReturn)} className={`border-2 border-gray-500 bg-gray-200 px-3 py-1.5 w-full text-black font-bold text-red-700 shadow-sm text-xs ${cart.some(c => c.isReturn) ? 'opacity-50 cursor-not-allowed' : 'hover:bg-gray-300'}`}>Kasbon</button>

@@ -20,7 +20,8 @@ export const GlobalModals = () => {
         appUsers, attendances, leaveRequests,
         setInventory, setTransactions, setOrderData,
         appLogs, addLog,
-        wallets, setWallets
+        wallets, setWallets,
+        reprintTx, setReprintTx
     } = useAppContext();
 
     const [newExpenseName, setNewExpenseName] = useState('');
@@ -471,52 +472,56 @@ export const GlobalModals = () => {
 
             {/* Print Section (Hidden on screen, visible on print) */}
             <div id="print-section" className="hidden print:block text-black bg-white p-4 font-mono text-[10px] w-[80mm] mx-auto absolute top-0 left-0">
-                {transactions.length > 0 && (
-                    <div className="flex flex-col gap-1 items-center pb-8">
-                        <h2 className="font-bold text-base text-center">{storeSettings.storeName || 'Toko Saya'}</h2>
-                        <p className="text-center">{storeSettings.address || 'Alamat Toko'}</p>
-                        <p className="text-center">{storeSettings.phone || '0812xxxxxx'}</p>
-                        <p className="border-b border-dashed border-black w-full pb-1 mb-1 mt-1 text-center">Faktur: {transactions[0].id}</p>
-                        
-                        <div className="w-full flex justify-between mb-2">
-                            <span>Kasir: {transactions[0].cashier}</span>
-                            <span>{new Date(transactions[0].isoDate).toLocaleDateString('id-ID')}</span>
-                        </div>
-                        
-                        <div className="w-full border-b border-black mb-1"></div>
-                        {transactions[0].items.map((item: any, idx: number) => (
-                            <div key={idx} className="w-full flex flex-col mb-1">
-                                <span>{item.name}</span>
-                                <div className="flex justify-between w-full pl-2">
-                                    <span>{item.qty} x {item.price.toLocaleString('id-ID')}</span>
-                                    <span>{(item.qty * item.price).toLocaleString('id-ID')}</span>
-                                </div>
+                {(() => {
+                    const activePrintTrx = reprintTx || transactions[0];
+                    if (!activePrintTrx) return null;
+                    return (
+                        <div className="flex flex-col gap-1 items-center pb-8">
+                            <h2 className="font-bold text-base text-center">{storeSettings.storeName || 'Toko Saya'}</h2>
+                            <p className="text-center">{storeSettings.address || 'Alamat Toko'}</p>
+                            <p className="text-center">{storeSettings.phone || '0812xxxxxx'}</p>
+                            <p className="border-b border-dashed border-black w-full pb-1 mb-1 mt-1 text-center">Faktur: {activePrintTrx.id}</p>
+                            
+                            <div className="w-full flex justify-between mb-2">
+                                <span>Kasir: {activePrintTrx.cashier}</span>
+                                <span>{activePrintTrx.isoDate ? new Date(activePrintTrx.isoDate).toLocaleDateString('id-ID') : (activePrintTrx.date || '')}</span>
                             </div>
-                        ))}
-                        <div className="w-full border-b border-black mt-1 mb-1"></div>
-                        
-                        {transactions[0].globalDiscount > 0 && (
-                        <div className="w-full flex justify-between font-bold">
-                            <span>Diskon:</span>
-                            <span>- {transactions[0].globalDiscount.toLocaleString('id-ID')}</span>
-                        </div>
-                        )}
-                        <div className="w-full flex justify-between font-bold text-sm">
-                            <span>Total:</span>
-                            <span>{transactions[0].total.toLocaleString('id-ID')}</span>
-                        </div>
-                        <div className="w-full flex justify-between mt-1">
-                            <span>Bayar:</span>
-                            <span>{(transactions[0].paid || transactions[0].amountPaid || 0).toLocaleString('id-ID')}</span>
-                        </div>
-                        <div className="w-full flex justify-between mb-2">
-                            <span>Kembali:</span>
-                            <span>{transactions[0].change.toLocaleString('id-ID')}</span>
-                        </div>
+                            
+                            <div className="w-full border-b border-black mb-1"></div>
+                            {(activePrintTrx.items || []).map((item: any, idx: number) => (
+                                <div key={idx} className="w-full flex flex-col mb-1">
+                                    <span>{item.name}</span>
+                                    <div className="flex justify-between w-full pl-2">
+                                        <span>{item.qty} x {item.price.toLocaleString('id-ID')}</span>
+                                        <span>{(item.qty * item.price).toLocaleString('id-ID')}</span>
+                                    </div>
+                                </div>
+                            ))}
+                            <div className="w-full border-b border-black mt-1 mb-1"></div>
+                            
+                            {(activePrintTrx.globalDiscount || 0) > 0 && (
+                            <div className="w-full flex justify-between font-bold">
+                                <span>Diskon:</span>
+                                <span>- {(activePrintTrx.globalDiscount || 0).toLocaleString('id-ID')}</span>
+                            </div>
+                            )}
+                            <div className="w-full flex justify-between font-bold text-sm">
+                                <span>Total:</span>
+                                <span>{(activePrintTrx.total || 0).toLocaleString('id-ID')}</span>
+                            </div>
+                            <div className="w-full flex justify-between mt-1">
+                                <span>Bayar:</span>
+                                <span>{(activePrintTrx.paid || activePrintTrx.amountPaid || 0).toLocaleString('id-ID')}</span>
+                            </div>
+                            <div className="w-full flex justify-between mb-2">
+                                <span>Kembali:</span>
+                                <span>{(activePrintTrx.change || 0).toLocaleString('id-ID')}</span>
+                            </div>
 
-                        <p className="text-center italic mt-4">Terima Kasih!</p>
-                    </div>
-                )}
+                            <p className="text-center italic mt-4">Terima Kasih!</p>
+                        </div>
+                    );
+                })()}
             </div>
 
              {showAddCustomerModal && (

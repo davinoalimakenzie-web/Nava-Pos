@@ -6,10 +6,80 @@ import { formatRp, calculateJatuhTempo, smartSort } from '../utils';
 import { DanaBebas } from './DanaBebas';
 
 export const Cashflow = ({ currentTime }: { currentTime: Date }) => {
-  const { transactions, expenses, storeSettings, setActiveTab, setMasterDataTab, cart, setCart, customers, wallets } = useAppContext();
+  const { 
+    transactions, setTransactions,
+    expenses, 
+    storeSettings, 
+    setActiveTab, 
+    setMasterDataTab, 
+    cart, setCart, 
+    customers, 
+    wallets, setWallets,
+    setReprintTx,
+    setInventory,
+    setPiutangData,
+    addLog
+  } = useAppContext();
   
   const [cashflowTab, setCashflowTab] = useState('harian');
   const [cashflowHarianSubTab, setCashflowHarianSubTab] = useState('laporan');
+  
+  const [selectedTrxPopup, setSelectedTrxPopup] = useState<any>(null);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  
+  const handleDeleteTransaction = () => {
+    if (!selectedTrxPopup) return;
+    
+    const trx = selectedTrxPopup;
+
+    // 1. Restore Inventory Stock count
+    if (trx.items && trx.items.length > 0) {
+      setInventory((prevInv: any[]) => {
+        const newInv = [...(prevInv || [])];
+        trx.items.forEach((item: any) => {
+          const foundIdx = newInv.findIndex((i: any) => i.id === item.id);
+          if (foundIdx >= 0) {
+            newInv[foundIdx].stock = (newInv[foundIdx].stock || 0) + item.qty;
+          }
+        });
+        return newInv;
+      });
+    }
+
+    // 2. Adjust Wallets (Dana Laci) if cash entered laci
+    let computedLaciMasuk = 0;
+    if (trx.method !== 'Qriss/TF') {
+      if (trx.type === 'PIUTANG') {
+        computedLaciMasuk = trx.paid || 0;
+      } else {
+        const paid = trx.paid || 0;
+        const change = trx.change || 0;
+        computedLaciMasuk = paid - change;
+      }
+    }
+    if (computedLaciMasuk > 0) {
+      setWallets((prev: any) => ({
+        ...prev,
+        danaLaci: Math.max(0, (prev?.danaLaci || 0) - computedLaciMasuk)
+      }));
+    }
+
+    // 3. Delete from Piutang database if it was a Piutang transaction
+    if (trx.method === 'PIUTANG' || trx.type === 'PIUTANG') {
+      setPiutangData((prev: any[]) => (prev || []).filter((p: any) => p.id !== trx.id));
+    }
+
+    // 4. Remove from transactions list
+    setTransactions((prev: any[]) => (prev || []).filter((t: any) => t.id !== trx.id));
+
+    // 5. Post System Log
+    addLog?.('TRANSAKSI_DIHAPUS', `Transaksi harian ${trx.id} dihapus. Stok produk di-restore & Laci disesuaikan.`);
+
+    // 6. Reset popup states
+    setShowDeleteConfirm(false);
+    setSelectedTrxPopup(null);
+    alert(`Transaksi ${trx.id} berhasil dihapus.`);
+  };
   
   const defaultDateStr = (() => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; })();
   const [filterUseStart, setFilterUseStart] = useState(true);
@@ -79,9 +149,32 @@ export const Cashflow = ({ currentTime }: { currentTime: Date }) => {
     }
   };
 
+  const mappedTransactions = React.useMemo(() => {
+    return (filteredTransactions || []).map((trx: any) => {
+      let laciMasuk = 0;
+      if (trx.method !== 'Qriss/TF') {
+        if (trx.type === 'PIUTANG') {
+          laciMasuk = trx.paid || 0;
+        } else {
+          const paid = trx.paid || 0;
+          const change = trx.change || 0;
+          laciMasuk = paid - change;
+        }
+      }
+      const displayRetur = trx.returTotal || trx.returTotalPopupOnly || 0;
+      const totalGross = (trx.total || 0) + displayRetur;
+      return {
+        ...trx,
+        laciMasuk,
+        totalGross,
+        displayRetur
+      };
+    });
+  }, [filteredTransactions]);
+
   const sortedTransactions = React.useMemo(() => {
-    return smartSort(filteredTransactions || [], txSortKey, txSortDirection);
-  }, [filteredTransactions, txSortKey, txSortDirection]);
+    return smartSort(mappedTransactions || [], txSortKey, txSortDirection);
+  }, [mappedTransactions, txSortKey, txSortDirection]);
 
   const [expSortKey, setExpSortKey] = useState('date');
   const [expSortDirection, setExpSortDirection] = useState<'asc' | 'desc'>('desc');
@@ -112,7 +205,7 @@ export const Cashflow = ({ currentTime }: { currentTime: Date }) => {
   };
 
   const returnTransactions = React.useMemo(() => {
-    return filteredTransactions.filter((t: any) => t.returTotal > 0 || (t.items && t.items.some((i: any) => i.isReturn)));
+    return filteredTransactions.filter((t: any) => t.returTotal > 0 || t.returTotalPopupOnly > 0 || (t.items && t.items.some((i: any) => i.isReturn || i.totalReturnedQty > 0)));
   }, [filteredTransactions]);
 
   const sortedReturnTransactions = React.useMemo(() => {
@@ -121,6 +214,8 @@ export const Cashflow = ({ currentTime }: { currentTime: Date }) => {
 
   const [showMonthlyReturn, setShowMonthlyReturn] = useState(false);
   const [showMonthlyNonTunai, setShowMonthlyNonTunai] = useState(false);
+  const [showMonthlyOmzet, setShowMonthlyOmzet] = useState(false);
+  const [showMonthlyExpense, setShowMonthlyExpense] = useState(false);
 
   const returTunaiTotal = filteredTransactions.filter((t: any) => t.method === 'TUNAI').reduce((sum: number, t: any) => sum + (t.returTotal || 0), 0);
   const returNonTunaiTotal = filteredTransactions.filter((t: any) => t.method !== 'TUNAI').reduce((sum: number, t: any) => sum + (t.returTotal || 0), 0);
@@ -148,11 +243,7 @@ export const Cashflow = ({ currentTime }: { currentTime: Date }) => {
   const totalReturBulananVal = monthlyTransactions.reduce((sum: number, t: any) => sum + (t.returTotal || 0), 0);
   const piutangNonTunaiBulananVal = monthlyTransactions.filter((t: any) => t.method !== 'TUNAI').reduce((sum: number, t: any) => sum + (t.total + (t.returTotal || 0)), 0);
 
-  const outBulananVal = expenses.filter((e: any) => {
-    if (e.wallet !== 'Dana Bebas' && e.name !== 'Setoran Tunai' && !e.name?.includes('Pelunasan') && !e.name?.includes('Gaji') && !e.name?.includes('Prive')) {
-        if (e.wallet !== 'Dana Bebas') return false; 
-    }
-    if (e.wallet !== 'Dana Bebas') return false;
+  const pengeluaranBulananVal = expenses.filter((e: any) => {
     const eDate = new Date(e.isoDate || e.date || new Date().toISOString());
     return eDate.getMonth() === (parseInt(tM) - 1) && eDate.getFullYear() === parseInt(tY);
   }).reduce((sum: number, e: any) => sum + (e.amount > 0 ? e.amount : 0), 0);
@@ -168,40 +259,69 @@ export const Cashflow = ({ currentTime }: { currentTime: Date }) => {
       </div>
 
       {/* Box Rangkuman Statis (Sits seamlessly below Top Tabs) */}
-      <div className="flex shrink-0 overflow-x-auto select-none border-b border-gray-400 bg-white divide-x divide-gray-300 shadow-sm z-10 no-scrollbar">
-        <div className="p-2 flex-1 min-w-[120px] bg-white hover:bg-gray-50 transition-colors">
-          <p className="text-gray-500 font-bold mb-0.5 text-[10px] uppercase tracking-wider whitespace-nowrap">Dana Bebas</p>
-          <div className="text-[14px] font-black text-blue-900">{formatRp(wallets?.danaBebas || 0)}</div>
+      <div className="grid grid-cols-6 divide-x divide-gray-300 border-b border-gray-400 bg-white shadow-sm z-10 w-full select-none shrink-0 no-scrollbar overflow-x-auto text-center">
+        {/* 1. DANA BEBAS */}
+        <div className="p-1.5 md:p-2.5 bg-white hover:bg-gray-50 transition-colors flex flex-col justify-center min-w-0">
+          <p className="text-gray-500 font-bold mb-0.5 text-[10px] uppercase tracking-wider truncate">Dana Bebas</p>
+          <div className="text-[14px] font-black text-blue-900 truncate">{formatRp(wallets?.danaBebas || 0)}</div>
         </div>
-        <div className="p-2 flex-1 min-w-[120px] bg-white hover:bg-gray-50 transition-colors">
-          <p className="text-gray-500 font-bold mb-0.5 text-[10px] uppercase tracking-wider whitespace-nowrap">Dana Laci</p>
-          <div className="text-[14px] font-black text-gray-800">{formatRp(wallets?.danaLaci || 0)}</div>
+        
+        {/* 2. DANA LACI */}
+        <div className="p-1.5 md:p-2.5 bg-white hover:bg-gray-50 transition-colors flex flex-col justify-center min-w-0">
+          <p className="text-gray-500 font-bold mb-0.5 text-[10px] uppercase tracking-wider truncate">Dana Laci</p>
+          <div className="text-[14px] font-black text-gray-800 truncate">{formatRp(wallets?.danaLaci || 0)}</div>
         </div>
+
+        {/* 3. OMZET */}
         <div 
-          className="p-2 flex-1 min-w-[125px] bg-white hover:bg-gray-50 transition-colors cursor-pointer"
-          onClick={() => setShowMonthlyReturn(!showMonthlyReturn)}
+          className="p-1.5 md:p-2.5 bg-white hover:bg-gray-50 transition-colors cursor-pointer flex flex-col justify-center min-w-0"
+          onClick={() => setShowMonthlyOmzet(!showMonthlyOmzet)}
         >
-          <p className="text-gray-500 font-bold mb-0.5 text-[10px] uppercase tracking-wider whitespace-nowrap flex items-center gap-1">
-            {showMonthlyReturn ? 'Total Return (Bulan)' : 'Total Return (Harian)'} <span className="text-[8px] border border-gray-300 px-1 rounded bg-gray-100 text-gray-400">klik</span>
+          <p className="text-gray-500 font-bold mb-0.5 text-[10px] uppercase tracking-wider flex items-center justify-center gap-1 shrink-0 truncate">
+            {showMonthlyOmzet ? 'OMZET (BULAN)' : 'OMZET (HARIAN)'} <span className="text-[8px] border border-gray-300 px-1 rounded bg-gray-100 text-gray-400">klik</span>
           </p>
-          <div className="text-[14px] font-black text-red-600">{formatRp(showMonthlyReturn ? totalReturBulananVal : totalReturHarianVal)}</div>
+          <div className="text-[14px] font-black text-teal-700 truncate">
+            {formatRp(showMonthlyOmzet ? ((wallets?.danaLaci || 0) + piutangNonTunaiBulananVal) : ((wallets?.danaLaci || 0) + uangKeluarNonTunai))}
+          </div>
         </div>
-        <div className="p-2 flex-1 min-w-[125px] bg-[#fcfcfc] hover:bg-gray-50 transition-colors">
-          <p className="text-gray-500 font-bold mb-0.5 text-[10px] uppercase tracking-wider whitespace-nowrap">Out Harian</p>
-          <div className="text-[14px] font-black text-black">{formatRp(totalPengeluaran)}</div>
-        </div>
-        <div className="p-2 flex-1 min-w-[125px] bg-white hover:bg-gray-50 transition-colors">
-          <p className="text-gray-500 font-bold mb-0.5 text-[10px] uppercase tracking-wider whitespace-nowrap">Out Bulanan</p>
-          <div className="text-[14px] font-black text-orange-600">{formatRp(outBulananVal)}</div>
-        </div>
+
+        {/* 4. FIKTIF */}
         <div 
-          className="p-2 flex-1 min-w-[125px] bg-white hover:bg-gray-50 transition-colors cursor-pointer"
+          className="p-1.5 md:p-2.5 bg-white hover:bg-gray-50 transition-colors cursor-pointer flex flex-col justify-center min-w-0"
           onClick={() => setShowMonthlyNonTunai(!showMonthlyNonTunai)}
         >
-          <p className="text-gray-500 font-bold mb-0.5 text-[10px] uppercase tracking-wider whitespace-nowrap flex items-center gap-1">
-            {showMonthlyNonTunai ? 'Non Tunai (Bulan)' : 'Non Tunai (Harian)'} <span className="text-[8px] border border-gray-300 px-1 rounded bg-gray-100 text-gray-400">klik</span>
+          <p className="text-gray-500 font-bold mb-0.5 text-[10px] uppercase tracking-wider flex items-center justify-center gap-1 shrink-0 truncate">
+            {showMonthlyNonTunai ? 'FIKTIF (BULAN)' : 'FIKTIF (HARIAN)'} <span className="text-[8px] border border-gray-300 px-1 rounded bg-gray-100 text-gray-400">klik</span>
           </p>
-          <div className="text-[14px] font-black text-orange-500">{formatRp(showMonthlyNonTunai ? piutangNonTunaiBulananVal : uangKeluarNonTunai)}</div>
+          <div className="text-[14px] font-black text-orange-500 truncate">
+            {formatRp(showMonthlyNonTunai ? piutangNonTunaiBulananVal : uangKeluarNonTunai)}
+          </div>
+        </div>
+
+        {/* 5. RETURN */}
+        <div 
+          className="p-1.5 md:p-2.5 bg-white hover:bg-gray-50 transition-colors cursor-pointer flex flex-col justify-center min-w-0"
+          onClick={() => setShowMonthlyReturn(!showMonthlyReturn)}
+        >
+          <p className="text-gray-500 font-bold mb-0.5 text-[10px] uppercase tracking-wider flex items-center justify-center gap-1 shrink-0 truncate">
+            {showMonthlyReturn ? 'RETURN (BULAN)' : 'RETURN (HARIAN)'} <span className="text-[8px] border border-gray-300 px-1 rounded bg-gray-100 text-gray-400">klik</span>
+          </p>
+          <div className="text-[14px] font-black text-red-600 truncate">
+            {formatRp(showMonthlyReturn ? totalReturBulananVal : totalReturHarianVal)}
+          </div>
+        </div>
+
+        {/* 6. PENGELUARAN */}
+        <div 
+          className="p-1.5 md:p-2.5 bg-white hover:bg-gray-50 transition-colors cursor-pointer flex flex-col justify-center min-w-0"
+          onClick={() => setShowMonthlyExpense(!showMonthlyExpense)}
+        >
+          <p className="text-gray-500 font-bold mb-0.5 text-[10px] uppercase tracking-wider flex items-center justify-center gap-1 shrink-0 truncate">
+            {showMonthlyExpense ? 'PENGELUARAN (BULAN)' : 'PENGELUARAN (HARIAN)'} <span className="text-[8px] border border-gray-300 px-1 rounded bg-gray-100 text-gray-400">klik</span>
+          </p>
+          <div className="text-[14px] font-black text-black truncate">
+            {formatRp(showMonthlyExpense ? pengeluaranBulananVal : totalPengeluaran)}
+          </div>
         </div>
       </div>
 
@@ -311,19 +431,25 @@ export const Cashflow = ({ currentTime }: { currentTime: Date }) => {
                             </div>
                           </th>
                         )}
-                        <th className="p-3 border-r border-gray-300 text-right cursor-pointer hover:bg-gray-200" onClick={() => handleTxSort('total')} title="Urutkan Total Harga">
+                        <th className="p-3 border-r border-gray-300 text-right cursor-pointer hover:bg-gray-200" onClick={() => handleTxSort('totalGross')} title="Urutkan Total Harga">
                           <div className="flex items-center justify-end gap-1 bg-white/40 px-1 py-0.5 rounded">
                             <span>Total Harga</span>
-                            <span className="font-mono text-[9px] text-[#000080]">{txSortKey === 'total' ? (txSortDirection === 'asc' ? '▲' : '▼') : '↕'}</span>
+                            <span className="font-mono text-[9px] text-[#000080]">{txSortKey === 'totalGross' ? (txSortDirection === 'asc' ? '▲' : '▼') : '↕'}</span>
                           </div>
                         </th>
-                        <th className="p-3 border-r border-gray-300 text-right text-red-650 cursor-pointer hover:bg-gray-200" onClick={() => handleTxSort('returTotal')} title="Urutkan Retur">
+                        <th className="p-3 border-r border-gray-300 text-right text-red-650 cursor-pointer hover:bg-gray-200" onClick={() => handleTxSort('displayRetur')} title="Urutkan Retur">
                           <div className="flex items-center justify-end gap-1 bg-white/40 px-1 py-0.5 rounded">
                             <span>Retur Rp</span>
-                            <span className="font-mono text-[9px] text-[#000080]">{txSortKey === 'returTotal' ? (txSortDirection === 'asc' ? '▲' : '▼') : '↕'}</span>
+                            <span className="font-mono text-[9px] text-[#000080]">{txSortKey === 'displayRetur' ? (txSortDirection === 'asc' ? '▲' : '▼') : '↕'}</span>
                           </div>
                         </th>
-                        <th className="p-3 text-center cursor-pointer hover:bg-gray-200 font-bold" onClick={() => handleTxSort('cashier')} title="Urutkan Kasir">
+                        <th className="p-3 border-r border-gray-300 text-right text-green-700 cursor-pointer hover:bg-gray-200" onClick={() => handleTxSort('laciMasuk')} title="Urutkan Laci Masuk">
+                          <div className="flex items-center justify-end gap-1 bg-white/40 px-1 py-0.5 rounded">
+                            <span>Laci Masuk</span>
+                            <span className="font-mono text-[9px] text-[#000080]">{txSortKey === 'laciMasuk' ? (txSortDirection === 'asc' ? '▲' : '▼') : '↕'}</span>
+                          </div>
+                        </th>
+                        <th className="p-3 border-r border-gray-300 text-center cursor-pointer hover:bg-gray-200 font-bold" onClick={() => handleTxSort('cashier')} title="Urutkan Kasir">
                           <div className="flex items-center justify-center gap-1 bg-white/40 px-1 py-0.5 rounded">
                             <span>User</span>
                             <span className="font-mono text-[9px] text-[#000080]">{txSortKey === 'cashier' ? (txSortDirection === 'asc' ? '▲' : '▼') : '↕'}</span>
@@ -336,7 +462,8 @@ export const Cashflow = ({ currentTime }: { currentTime: Date }) => {
                          <tr 
                            key={trx.id} 
                            className="border-b border-gray-200 hover:bg-blue-100 cursor-pointer text-black"
-                           title="Klik 2x untuk membuka faktur di mode Retur"
+                           title="Klik sekali untuk Detail POS (Mini), klik 2x untuk mode Retur"
+                           onClick={() => setSelectedTrxPopup(trx)}
                            onDoubleClick={() => {
                                const returnItems = (trx.items || []).map((item: any) => ({
                                    ...item,
@@ -362,9 +489,10 @@ export const Cashflow = ({ currentTime }: { currentTime: Date }) => {
                                {calculateJatuhTempo(trx.isoDate, trx.method)}
                              </td>
                            )}
-                           <td className="p-3 border-r border-gray-300 text-right font-bold text-blue-800">{formatRp(trx.total)}</td>
-                           <td className="p-3 border-r border-gray-300 text-right font-bold text-red-600">{formatRp(trx.returTotal || 0)}</td>
-                           <td className="p-3 text-center text-gray-600">{trx.cashier}</td>
+                           <td className="p-3 border-r border-gray-300 text-right font-bold text-blue-800">{formatRp(trx.totalGross)}</td>
+                           <td className="p-3 border-r border-gray-300 text-right font-bold text-red-600">{formatRp(trx.displayRetur || 0)}</td>
+                           <td className={`p-3 border-r border-gray-300 text-right font-bold ${trx.laciMasuk < 0 ? 'text-red-700' : 'text-green-700'}`}>{formatRp(trx.laciMasuk || 0)}</td>
+                           <td className="p-3 border-gray-300 text-center text-gray-600">{trx.cashier}</td>
                          </tr>
                       ))}
                     </tbody>
@@ -465,12 +593,15 @@ export const Cashflow = ({ currentTime }: { currentTime: Date }) => {
                             <td className="p-3 border-r border-gray-300">{trx.date} <span className="text-gray-400 font-mono">({trx.id})</span></td>
                             <td className="p-3 border-r border-gray-300 font-bold">{trx.customer}</td>
                             <td className="p-3 border-r border-gray-300 text-sm">
-                               {(trx.items || []).filter((i: any) => i.isReturn).map((item: any, idx: number) => (
-                                 <div key={idx}>- {item.name?.replace('(Retur) ', '')} ({item.qty} pcs)</div>
-                               ))}
+                               {(trx.items || []).filter((i: any) => i.isReturn || (i.totalReturnedQty && i.totalReturnedQty > 0)).map((item: any, idx: number) => {
+                                 const qtyToShow = item.isReturn ? item.qty : item.totalReturnedQty;
+                                 return (
+                                   <div key={idx}>- {item.name?.replace('(Retur) ', '')} ({qtyToShow} pcs)</div>
+                                 );
+                               })}
                             </td>
                             <td className="p-3 text-right font-bold text-red-600">
-                               {formatRp(trx.returTotal || 0)}
+                               {formatRp(trx.returTotal || trx.returTotalPopupOnly || 0)}
                             </td>
                          </tr>
                       ))}
@@ -489,6 +620,214 @@ export const Cashflow = ({ currentTime }: { currentTime: Date }) => {
          <div className="flex-1 flex flex-col overflow-hidden">
              <DanaBebas currentTime={currentTime} headless={true} />
          </div>
+      )}
+
+      {/* POPUP DETAIL TRANSAKSI POS MINI */}
+      {selectedTrxPopup && (
+         <div id="popup-mini-pos-modal" className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center z-50 p-4 transition-all">
+             <div id="popup-card-container" className="bg-[#ece9d8] border-2 border-white shadow-[4px_4px_16px_rgba(0,0,0,0.6)] w-full max-w-lg overflow-hidden flex flex-col font-sans border-b-gray-600 border-r-gray-600">
+                 
+                 {/* Standard Windows Classical Title Bar */}
+                 <div className="bg-[#000080] text-white p-2 flex items-center justify-between font-bold text-sm select-none shrink-0">
+                     <span className="flex items-center gap-1.5 pl-1">🛍️ POS DETAIL TRANSAKSI (MINI)</span>
+                     <button 
+                         id="btn-popup-top-close"
+                         onClick={() => setSelectedTrxPopup(null)} 
+                         className="bg-[#ece9d8] text-black border border-white hover:bg-gray-300 font-bold px-2 py-0.5 text-xs select-none shadow-[inset_1px_1px_0px_#fff,1px_1px_1px_rgba(0,0,0,0.5)]"
+                     >
+                         X
+                     </button>
+                 </div>
+
+                 {/* Modal Body Container */}
+                 <div className="p-4 flex flex-col gap-4 overflow-y-auto max-h-[80vh]">
+                     
+                     {/* 2-Column Info Grid */}
+                     <div className="grid grid-cols-2 gap-2.5 text-xs border border-gray-400 p-2.5 bg-white rounded shadow-inner">
+                         <div>
+                             <p className="text-gray-400 font-bold uppercase text-[9px] tracking-wide">Faktur / Nota</p>
+                             <p className="font-mono font-bold text-blue-900 text-[13px]">{selectedTrxPopup.id}</p>
+                         </div>
+                         <div>
+                             <p className="text-gray-400 font-bold uppercase text-[9px] tracking-wide">Pelanggan</p>
+                             <p className="font-bold text-gray-800 text-[13px]">{selectedTrxPopup.customer || 'Pelanggan Umum'}</p>
+                         </div>
+                         <div>
+                             <p className="text-gray-400 font-bold uppercase text-[9px] tracking-wide">Waktu Transaksi</p>
+                             <p className="font-semibold text-gray-700">{selectedTrxPopup.date}</p>
+                         </div>
+                         <div>
+                             <p className="text-gray-400 font-bold uppercase text-[9px] tracking-wide">Operator (Kasir)</p>
+                             <p className="font-bold text-emerald-700">{selectedTrxPopup.cashier || 'System'}</p>
+                         </div>
+                         <div>
+                             <p className="text-gray-400 font-bold uppercase text-[9px] tracking-wide">Metode Pembayaran</p>
+                             <span className={`inline-block px-1.5 py-0.5 rounded text-[10px] font-black ${selectedTrxPopup.method === 'TUNAI' ? 'bg-green-100 text-green-800' : 'bg-amber-100 text-amber-800'}`}>
+                                 {selectedTrxPopup.method}
+                             </span>
+                         </div>
+                         <div>
+                             <p className="text-gray-400 font-bold uppercase text-[9px] tracking-wide">Cabang Toko</p>
+                             <p className="font-semibold text-purple-700">{selectedTrxPopup.branch || 'Pusat'}</p>
+                         </div>
+                     </div>
+
+                     {/* Itemized Table */}
+                     <div>
+                         <p className="text-gray-600 font-bold text-[10px] uppercase mb-1 tracking-wider">Daftar Item Belanjaan</p>
+                         <div className="border border-gray-400 rounded bg-white overflow-hidden shadow-inner max-h-[180px] overflow-y-auto">
+                             <table className="w-full text-xs text-left border-collapse">
+                                 <thead className="bg-[#ece9d8] border-b border-gray-300 text-blue-900 font-bold sticky top-0 text-[10px] uppercase">
+                                     <tr>
+                                         <th className="p-1 px-2 border-r border-gray-200">Nama Barang</th>
+                                         <th className="p-1 text-center w-[55px] border-r border-gray-200">Qty</th>
+                                         <th className="p-1 text-right w-[85px] border-r border-gray-200">Harga</th>
+                                         <th className="p-1 text-right w-[95px]">Total</th>
+                                     </tr>
+                                 </thead>
+                                 <tbody>
+                                     {(selectedTrxPopup.items || []).map((item: any, idx: number) => {
+                                          const hasRetur = item.originalQtyBeforeReturn !== undefined && item.originalQtyBeforeReturn !== item.qty;
+                                          return (
+                                         <tr key={idx} className="border-b border-gray-200 hover:bg-slate-50 text-black">
+                                             <td className="p-1.5 px-2 font-medium text-gray-800">{item.name}</td>
+                                             <td className="p-1.5 text-center font-bold text-blue-950">
+                                                      {hasRetur ? (
+                                                          <div className="flex flex-col items-center justify-center leading-normal">
+                                                              <span className="text-[12px] font-bold">{item.qty}</span>
+                                                              <span className="text-[9px] text-gray-500 font-normal">Awal: {item.originalQtyBeforeReturn}</span>
+                                                              <span className="text-[9px] text-red-650 font-bold leading-none mt-0.5">Retur: {item.totalReturnedQty || (item.originalQtyBeforeReturn - item.qty)}</span>
+                                                          </div>
+                                                      ) : (
+                                                          item.qty
+                                                      )}
+                                                  </td>
+                                             <td className="p-1.5 text-right font-mono text-gray-500">{formatRp(item.price)}</td>
+                                             <td className="p-1.5 text-right font-mono font-bold text-gray-900">{formatRp(item.qty * item.price)}</td>
+                                         </tr>
+                                           );
+                                      })}`
+                                 </tbody>
+                             </table>
+                         </div>
+                     </div>
+
+                     {/* Math Breakdown Box */}
+                     <div className="border border-gray-400 p-3 bg-[#fcfbe9] rounded text-xs flex flex-col gap-1.5 shadow-inner font-mono text-black">
+                         <div className="flex justify-between text-gray-600">
+                             <span>Subtotal Barang:</span>
+                             <span className="font-bold">{formatRp((selectedTrxPopup.items || []).reduce((sum: number, i: any) => sum + (i.qty * i.price), 0))}</span>
+                         </div>
+                         {(selectedTrxPopup.globalDiscount || 0) > 0 && (
+                             <div className="flex justify-between text-rose-600 font-bold">
+                                 <span>Potongan Diskon:</span>
+                                 <span>-{formatRp(selectedTrxPopup.globalDiscount)}</span>
+                             </div>
+                         )}
+                         {(selectedTrxPopup.returTotal > 0 || selectedTrxPopup.returTotalPopupOnly > 0) && (
+                              <div className="flex justify-between text-red-650 font-bold mb-1">
+                                  <span>Potongan Retur:</span>
+                                  <span>-{formatRp(selectedTrxPopup.returTotal || selectedTrxPopup.returTotalPopupOnly)}</span>
+                              </div>
+                          )}
+                          <div className="border-t border-dashed border-gray-300 my-1"></div>
+                         <div className="flex justify-between text-[13px] font-black text-blue-900">
+                             <span>TOTAL TRANSAKSI:</span>
+                             <span>{formatRp(selectedTrxPopup.total)}</span>
+                         </div>
+                         <div className="flex justify-between text-gray-600">
+                             <span>Uang Tunai Diterima:</span>
+                             <span className="font-semibold">{formatRp(selectedTrxPopup.paid || selectedTrxPopup.amountPaid || 0)}</span>
+                         </div>
+                         
+                         {selectedTrxPopup.method === 'PIUTANG' ? (
+                             <div className="flex justify-between text-red-650 font-bold mt-0.5">
+                                 <span>Sisa Piutang (Kredit):</span>
+                                 <span>{formatRp(selectedTrxPopup.sisa || 0)}</span>
+                             </div>
+                         ) : (
+                             <div className="flex justify-between text-gray-600 mt-0.5">
+                                 <span>Uang Kembalian (Laci):</span>
+                                 <span>{formatRp(selectedTrxPopup.change || 0)}</span>
+                             </div>
+                         )}
+                     </div>
+
+                 </div>
+
+                 {/* Action Buttons Footer (Hapus, Cetak, Batal) */}
+                 <div className="bg-[#ece9d8] border-t border-gray-300 p-3 flex justify-end gap-2.5 text-xs font-bold shrink-0">
+                     <button 
+                         id="btn-popup-delete"
+                         onClick={() => setShowDeleteConfirm(true)} 
+                         className="bg-rose-600 hover:bg-rose-700 text-white border border-rose-750 px-4 py-2 rounded flex items-center gap-1 shadow-sm transition-colors cursor-pointer"
+                         title="Hapus Transaksi & Kembalikan Stok"
+                     >
+                         🗑️ Hapus
+                     </button>
+                     <button 
+                         id="btn-popup-print"
+                         onClick={() => {
+                             setReprintTx(selectedTrxPopup);
+                             setTimeout(() => {
+                                 window.print();
+                             }, 150);
+                         }} 
+                         className="bg-blue-600 hover:bg-blue-700 text-white border border-blue-700 px-4 py-2 rounded flex items-center gap-1 shadow-sm transition-colors cursor-pointer"
+                         title="Cetak Ulang Dokumen Nota"
+                     >
+                         🖨️ Cetak
+                     </button>
+                     <button 
+                         id="btn-popup-cancel"
+                         onClick={() => setSelectedTrxPopup(null)} 
+                         className="bg-gray-400 hover:bg-gray-500 text-black hover:text-white border border-gray-500 px-4 py-2 rounded flex items-center gap-1 shadow-sm transition-colors cursor-pointer"
+                         title="Tutup Jendela Detail"
+                     >
+                         🚫 Batal
+                     </button>
+                 </div>
+
+             </div>
+         </div>
+      )}
+
+      {/* SUB-MODAL SAFETY CONFIRMATION */}
+      {showDeleteConfirm && selectedTrxPopup && (
+          <div id="sub-modal-confirm-delete" className="fixed inset-0 bg-black/70 flex items-center justify-center z-[60] p-4 transition-all">
+              <div className="bg-white border-2 border-red-600 shadow-2xl max-w-sm w-full rounded overflow-hidden font-sans text-black">
+                  <div className="bg-red-600 text-white p-2.5 font-bold flex items-center gap-2 select-none text-sm">
+                      <span>⚠️ PERINGATAN HAPUS DATA</span>
+                  </div>
+                  <div className="p-4">
+                      <div className="text-xs text-gray-700 mb-4 leading-relaxed">
+                          Apakah Anda benar-benar yakin ingin menghapus data transaksi <strong className="text-blue-900">{selectedTrxPopup.id}</strong>? <br /><br />
+                          Tindakan ini akan memicu efek balik otomatis di sistem:
+                          <ul className="list-disc pl-4 mt-2 mb-2 gap-1 flex flex-col text-gray-800">
+                              <li>Stok item belanjaan akan <strong>dikembalikan (ditambahkan)</strong> ke gudang secara otomatis.</li>
+                              <li>Saldo kasir / <strong>Dana Laci</strong> akan dikurangi atau disesuaikan otomatis.</li>
+                          </ul>
+                          Tindakan penghapusan bersifat permanen dan tidak dapat dibatalkan.
+                      </div>
+                      <div className="flex justify-end gap-2 text-xs font-bold pt-2 border-t border-gray-100">
+                          <button 
+                              id="btn-confirm-delete-yes"
+                              onClick={handleDeleteTransaction}
+                              className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded border border-red-750 transition-colors cursor-pointer"
+                          >
+                              Ya, Hapus Permanen
+                          </button>
+                          <button 
+                              id="btn-confirm-delete-no"
+                              onClick={() => setShowDeleteConfirm(false)}
+                              className="bg-gray-200 hover:bg-gray-300 text-gray-800 px-4 py-2 rounded border border-gray-300 transition-colors cursor-pointer"
+                          >
+                              Batal
+                          </button>
+                      </div>
+                  </div>
+              </div>
+          </div>
       )}
 
     </div>

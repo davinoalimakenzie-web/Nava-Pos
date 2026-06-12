@@ -182,6 +182,7 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
   const [masterDataTab, setMasterDataTab] = useState('stock');
   const [isInputStockMode, setIsInputStockMode] = useState(false);
   const [isKalkulatorOpen, setIsKalkulatorOpen] = useState(false);
+  const [reprintTx, setReprintTx] = useState<any>(null);
 
   return (
     <AppContext.Provider value={{
@@ -225,7 +226,8 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
       storeSettings, setStoreSettings,
       appLogs, addLog,
       isInputStockMode, setIsInputStockMode,
-      isKalkulatorOpen, setIsKalkulatorOpen
+      isKalkulatorOpen, setIsKalkulatorOpen,
+      reprintTx, setReprintTx
     }}>
       {children}
     </AppContext.Provider>

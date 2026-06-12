@@ -68,14 +68,7 @@ export const DanaBebas = ({ currentTime, headless = false }: { currentTime?: Dat
   const totalReturBulananVal = monthlyTransactions.reduce((sum: number, t: any) => sum + (t.returTotal || 0), 0);
   const piutangNonTunaiBulananVal = monthlyTransactions.filter((t: any) => t.method !== 'TUNAI').reduce((sum: number, t: any) => sum + (t.total + (t.returTotal || 0)), 0);
 
-  const outBulananVal = (expenses || []).filter((e: any) => {
-    if (e.wallet !== 'Dana Bebas' && e.name !== 'Setoran Tunai' && !e.name?.includes('Pelunasan') && !e.name?.includes('Gaji') && !e.name?.includes('Prive')) {
-        // Only include expenses from Dana Bebas. Let's strictly check wallet.
-        if (e.wallet !== 'Dana Bebas') return false; 
-    }
-    if (e.wallet !== 'Dana Bebas') return false; // Strict check
-    
-    // Check if current month
+  const pengeluaranBulananVal = (expenses || []).filter((e: any) => {
     const eDate = new Date(e.isoDate || e.date || new Date().toISOString());
     return eDate.getMonth() === (parseInt(targetM) - 1) && eDate.getFullYear() === parseInt(targetY);
   }).reduce((sum: number, e: any) => sum + (e.amount > 0 ? e.amount : 0), 0);
@@ -97,6 +90,8 @@ export const DanaBebas = ({ currentTime, headless = false }: { currentTime?: Dat
   // Toggles for monthly views
   const [showMonthlyReturn, setShowMonthlyReturn] = useState(false);
   const [showMonthlyNonTunai, setShowMonthlyNonTunai] = useState(false);
+  const [showMonthlyOmzet, setShowMonthlyOmzet] = useState(false);
+  const [showMonthlyExpense, setShowMonthlyExpense] = useState(false);
 
   // 2. Pelunasan Supplier Form States
   const [selectedHutangId, setSelectedHutangId] = useState('');
@@ -574,41 +569,69 @@ export const DanaBebas = ({ currentTime, headless = false }: { currentTime?: Dat
 
         {/* FINANCIAL SUMMARY HIGHLIGHT CARDS (AS REQUESTED IN GAMBAR 2) */}
         {!headless && (
-          <div className="flex shrink-0 overflow-x-auto select-none border border-gray-400 bg-white rounded-sm divide-x divide-gray-300 shadow-sm">
-            <div className="p-2 flex-1 min-w-[120px] bg-white hover:bg-gray-50 transition-colors">
-              <p className="text-gray-500 font-bold mb-0.5 text-[10px] uppercase tracking-wider whitespace-nowrap">Dana Bebas</p>
-              <div className="text-[14px] font-black text-blue-900">{formatRp(saldoDanaBebas)}</div>
-            </div>
-            <div className="p-2 flex-1 min-w-[120px] bg-white hover:bg-gray-50 transition-colors">
-              <p className="text-gray-500 font-bold mb-0.5 text-[10px] uppercase tracking-wider whitespace-nowrap">Dana Laci</p>
-              <div className="text-[14px] font-black text-gray-800">{formatRp(saldoDanaLaci)}</div>
-            </div>
-            <div 
-              className="p-2 flex-1 min-w-[120px] bg-white hover:bg-gray-50 transition-colors cursor-pointer"
-              onClick={() => setShowMonthlyReturn(!showMonthlyReturn)}
-            >
-              <p className="text-gray-500 font-bold mb-0.5 text-[10px] uppercase tracking-wider whitespace-nowrap flex items-center gap-1">
-                {showMonthlyReturn ? 'Total Return (Bulan)' : 'Total Return (Harian)'} <span className="text-[8px] border border-gray-300 px-1 rounded bg-gray-100 text-gray-400">klik</span>
-              </p>
-              <div className="text-[14px] font-black text-red-600">{formatRp(showMonthlyReturn ? totalReturBulananVal : totalReturHarianVal)}</div>
+          <div className="grid grid-cols-6 divide-x divide-gray-300 border border-gray-400 bg-white shadow-sm z-10 w-full select-none shrink-0 no-scrollbar overflow-x-auto text-center rounded-sm">
+            {/* 1. DANA BEBAS */}
+            <div className="p-1.5 md:p-2.5 bg-white hover:bg-gray-50 transition-colors flex flex-col justify-center min-w-0">
+              <p className="text-gray-500 font-bold mb-0.5 text-[10px] uppercase tracking-wider truncate">Dana Bebas</p>
+              <div className="text-[14px] font-black text-blue-900 truncate">{formatRp(saldoDanaBebas)}</div>
             </div>
             
-            <div className="p-2 flex-1 min-w-[120px] bg-white hover:bg-gray-50 transition-colors">
-              <p className="text-gray-500 font-bold mb-0.5 text-[10px] uppercase tracking-wider whitespace-nowrap">Out Harian</p>
-              <div className="text-[14px] font-black text-black">{formatRp(pengeluaranHarianVal)}</div>
+            {/* 2. DANA LACI */}
+            <div className="p-1.5 md:p-2.5 bg-white hover:bg-gray-50 transition-colors flex flex-col justify-center min-w-0">
+              <p className="text-gray-500 font-bold mb-0.5 text-[10px] uppercase tracking-wider truncate">Dana Laci</p>
+              <div className="text-[14px] font-black text-gray-800 truncate">{formatRp(saldoDanaLaci)}</div>
             </div>
-            <div className="p-2 flex-1 min-w-[120px] bg-white hover:bg-gray-50 transition-colors">
-              <p className="text-gray-500 font-bold mb-0.5 text-[10px] uppercase tracking-wider whitespace-nowrap">Out Bulanan</p>
-              <div className="text-[14px] font-black text-orange-600">{formatRp(outBulananVal)}</div>
-            </div>
+
+            {/* 3. OMZET */}
             <div 
-              className="p-2 flex-1 min-w-[120px] bg-white hover:bg-gray-50 transition-colors cursor-pointer"
+              className="p-1.5 md:p-2.5 bg-white hover:bg-gray-50 transition-colors cursor-pointer flex flex-col justify-center min-w-0"
+              onClick={() => setShowMonthlyOmzet(!showMonthlyOmzet)}
+            >
+              <p className="text-gray-500 font-bold mb-0.5 text-[10px] uppercase tracking-wider flex items-center justify-center gap-1 shrink-0 truncate">
+                {showMonthlyOmzet ? 'OMZET (BULAN)' : 'OMZET (HARIAN)'} <span className="text-[8px] border border-gray-300 px-1 rounded bg-gray-100 text-gray-400">klik</span>
+              </p>
+              <div className="text-[14px] font-black text-teal-700 truncate">
+                {formatRp(showMonthlyOmzet ? (saldoDanaLaci + piutangNonTunaiBulananVal) : (saldoDanaLaci + piutangNonTunaiHarianVal))}
+              </div>
+            </div>
+
+            {/* 4. FIKTIF */}
+            <div 
+              className="p-1.5 md:p-2.5 bg-white hover:bg-gray-50 transition-colors cursor-pointer flex flex-col justify-center min-w-0"
               onClick={() => setShowMonthlyNonTunai(!showMonthlyNonTunai)}
             >
-              <p className="text-gray-500 font-bold mb-0.5 text-[10px] uppercase tracking-wider whitespace-nowrap flex items-center gap-1">
-                {showMonthlyNonTunai ? 'Non Tunai (Bulan)' : 'Non Tunai (Harian)'} <span className="text-[8px] border border-gray-300 px-1 rounded bg-gray-100 text-gray-400">klik</span>
+              <p className="text-gray-500 font-bold mb-0.5 text-[10px] uppercase tracking-wider flex items-center justify-center gap-1 shrink-0 truncate">
+                {showMonthlyNonTunai ? 'FIKTIF (BULAN)' : 'FIKTIF (HARIAN)'} <span className="text-[8px] border border-gray-300 px-1 rounded bg-gray-100 text-gray-400">klik</span>
               </p>
-              <div className="text-[14px] font-black text-orange-500">{formatRp(showMonthlyNonTunai ? piutangNonTunaiBulananVal : piutangNonTunaiHarianVal)}</div>
+              <div className="text-[14px] font-black text-orange-500 truncate">
+                {formatRp(showMonthlyNonTunai ? piutangNonTunaiBulananVal : piutangNonTunaiHarianVal)}
+              </div>
+            </div>
+
+            {/* 5. RETURN */}
+            <div 
+              className="p-1.5 md:p-2.5 bg-white hover:bg-gray-50 transition-colors cursor-pointer flex flex-col justify-center min-w-0"
+              onClick={() => setShowMonthlyReturn(!showMonthlyReturn)}
+            >
+              <p className="text-gray-500 font-bold mb-0.5 text-[10px] uppercase tracking-wider flex items-center justify-center gap-1 shrink-0 truncate">
+                {showMonthlyReturn ? 'RETURN (BULAN)' : 'RETURN (HARIAN)'} <span className="text-[8px] border border-gray-300 px-1 rounded bg-gray-100 text-gray-400">klik</span>
+              </p>
+              <div className="text-[14px] font-black text-red-650 truncate">
+                {formatRp(showMonthlyReturn ? totalReturBulananVal : totalReturHarianVal)}
+              </div>
+            </div>
+
+            {/* 6. PENGELUARAN */}
+            <div 
+              className="p-1.5 md:p-2.5 bg-white hover:bg-gray-50 transition-colors cursor-pointer flex flex-col justify-center min-w-0"
+              onClick={() => setShowMonthlyExpense(!showMonthlyExpense)}
+            >
+              <p className="text-gray-500 font-bold mb-0.5 text-[10px] uppercase tracking-wider flex items-center justify-center gap-1 shrink-0 truncate">
+                {showMonthlyExpense ? 'PENGELUARAN (BULAN)' : 'PENGELUARAN (HARIAN)'} <span className="text-[8px] border border-gray-300 px-1 rounded bg-gray-100 text-gray-400">klik</span>
+              </p>
+              <div className="text-[14px] font-black text-black truncate">
+                {formatRp(showMonthlyExpense ? pengeluaranBulananVal : pengeluaranHarianVal)}
+              </div>
             </div>
           </div>
         )}
