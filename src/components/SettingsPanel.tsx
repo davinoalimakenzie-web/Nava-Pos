@@ -98,7 +98,7 @@ export const SettingsPanel = ({ currentTime }: { currentTime: Date }) => {
          )}
       </div>
 
-      <div className="flex-1 p-4 md:p-6 flex flex-col h-full gap-2 overflow-y-auto w-full max-w-5xl bg-white border border-gray-400 shadow-inner mx-2 my-2">
+      <div className="flex-1 p-4 md:p-6 flex flex-col h-full gap-2 overflow-y-auto w-full max-w-5xl bg-[#ece9d8] border border-gray-400 shadow-inner mx-2 my-2">
            
            {settingTab === 'margins' && (
               <div className="flex flex-col gap-4">

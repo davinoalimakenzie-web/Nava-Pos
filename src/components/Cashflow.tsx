@@ -31,18 +31,22 @@ export const Cashflow = ({ currentTime }: { currentTime: Date }) => {
     
     if (searchNota && !t.id.toLowerCase().includes(searchNota.toLowerCase())) return false;
 
-    const tDate = new Date(t.isoDate || new Date().toISOString());
-    tDate.setHours(0,0,0,0);
+    // Safely extract YYYY-MM-DD string for comparison
+    let dPart = '';
+    if (t.date) {
+        let p = t.date.split(' ')[0];
+        // Handle if date is DD-MM-YYYY or DD/MM/YYYY
+        if (p.includes('/')) p = p.split('/').reverse().join('-');
+        else if (p.split('-')[0].length === 2) p = p.split('-').reverse().join('-');
+        dPart = p;
+    } else if (t.isoDate) {
+        dPart = t.isoDate.split('T')[0];
+    } else {
+        dPart = new Date().toISOString().split('T')[0];
+    }
     
-    // Safely parse YYYY-MM-DD to local date
-    const [sY, sM, sD] = filterStartDate.split('-');
-    const start = new Date(parseInt(sY), parseInt(sM) - 1, parseInt(sD), 0, 0, 0, 0);
-    
-    const [eY, eM, eD] = filterEndDate.split('-');
-    const end = new Date(parseInt(eY), parseInt(eM) - 1, parseInt(eD), 0, 0, 0, 0);
-
-    if (filterUseStart && tDate < start) return false;
-    if (filterUseEnd && tDate > end) return false;
+    if (filterUseStart && dPart < filterStartDate) return false;
+    if (filterUseEnd && dPart > filterEndDate) return false;
     return true;
   });
 
@@ -128,8 +132,18 @@ export const Cashflow = ({ currentTime }: { currentTime: Date }) => {
 
   const [tY, tM, tD] = filterStartDate.split('-');
   const monthlyTransactions = transactions.filter((t: any) => {
-    const tDate = new Date(t.timestamp || t.isoDate || new Date().toISOString());
-    return tDate.getMonth() === (parseInt(tM) - 1) && tDate.getFullYear() === parseInt(tY);
+    let dPart = '';
+    if (t.date) {
+        let p = t.date.split(' ')[0];
+        if (p.includes('/')) p = p.split('/').reverse().join('-');
+        else if (p.split('-')[0].length === 2) p = p.split('-').reverse().join('-');
+        dPart = p;
+    } else if (t.isoDate) {
+        dPart = t.isoDate.split('T')[0];
+    } else {
+        dPart = new Date().toISOString().split('T')[0];
+    }
+    return dPart.startsWith(`${tY}-${tM}`);
   });
   const totalReturBulananVal = monthlyTransactions.reduce((sum: number, t: any) => sum + (t.returTotal || 0), 0);
   const piutangNonTunaiBulananVal = monthlyTransactions.filter((t: any) => t.method !== 'TUNAI').reduce((sum: number, t: any) => sum + (t.total + (t.returTotal || 0)), 0);

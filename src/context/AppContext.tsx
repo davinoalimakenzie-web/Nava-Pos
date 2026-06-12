@@ -18,18 +18,9 @@ import {
 
 const AppContext = createContext<any>(null);
 
-const DUMMY_VERSION = "17";
+const DUMMY_VERSION = "18";
 
-const initialHutangSupplier = [
-  { id: 'HT01', supplier_id: 1, supplier_name: 'PT Surya Gemilang', tanggal_hutang: '2025-12-15T00:00:00.000Z', jatuh_tempo: '2026-01-15T00:00:00.000Z', nominal: 5000000, sisa_hutang: 5000000, status: 'belum_lunas' },
-  { id: 'HT02', supplier_id: 1, supplier_name: 'PT Surya Gemilang', tanggal_hutang: '2026-01-15T00:00:00.000Z', jatuh_tempo: '2026-02-15T00:00:00.000Z', nominal: 2500000, sisa_hutang: 2500000, status: 'belum_lunas' },
-  { id: 'HT03', supplier_id: 1, supplier_name: 'PT Surya Gemilang', tanggal_hutang: '2026-02-15T00:00:00.000Z', jatuh_tempo: '2026-03-15T00:00:00.000Z', nominal: 3200000, sisa_hutang: 3200000, status: 'belum_lunas' },
-  { id: 'HT04', supplier_id: 1, supplier_name: 'PT Surya Gemilang', tanggal_hutang: '2026-03-15T00:00:00.000Z', jatuh_tempo: '2026-04-15T00:00:00.000Z', nominal: 4000000, sisa_hutang: 4000000, status: 'belum_lunas' },
-  { id: 'HT05', supplier_id: 1, supplier_name: 'PT Surya Gemilang', tanggal_hutang: '2026-04-15T00:00:00.000Z', jatuh_tempo: '2026-05-15T00:00:00.000Z', nominal: 1500000, sisa_hutang: 1500000, status: 'belum_lunas' },
-  { id: 'HT06', supplier_id: 1, supplier_name: 'PT Surya Gemilang', tanggal_hutang: '2026-05-15T00:00:00.000Z', jatuh_tempo: '2026-06-15T00:00:00.000Z', nominal: 6800000, sisa_hutang: 6800000, status: 'belum_lunas' },
-  { id: 'HT07', supplier_id: 1, supplier_name: 'PT Surya Gemilang', tanggal_hutang: '2026-06-15T00:00:00.000Z', jatuh_tempo: '2026-07-15T00:00:00.000Z', nominal: 2100000, sisa_hutang: 2100000, status: 'belum_lunas' },
-  { id: 'HT08', supplier_id: 1, supplier_name: 'PT Surya Gemilang', tanggal_hutang: '2026-07-15T00:00:00.000Z', jatuh_tempo: '2026-08-15T00:00:00.000Z', nominal: 3000000, sisa_hutang: 3000000, status: 'belum_lunas' },
-];
+const initialHutangSupplier: any[] = [];
 
 function useSyncState<T>(key: string, initial: T, syncEnabled: boolean) {
   const [state, setState] = useState<T>(() => {
@@ -133,7 +124,7 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
   }, [storeSettings]);
 
   const [appUsers, setAppUsers] = useSyncState<any[]>('appUsers', initialUsers, storeSettings.syncEnabled);
-  const [wallets, setWallets] = useSyncState<any>('wallets', { danaLaci: 1242406, danaBebas: 86905291, lastClosedDate: '' }, storeSettings.syncEnabled);
+  const [wallets, setWallets] = useSyncState<any>('wallets', { danaLaci: 0, danaBebas: 0, lastClosedDate: '' }, storeSettings.syncEnabled);
   const [inventory, setInventory] = useSyncState<any[]>('inventory', initialInventory, storeSettings.syncEnabled);
   const [customers, setCustomers] = useSyncState<any[]>('customers', initialCustomers, storeSettings.syncEnabled);
   const [employees, setEmployees] = useSyncState<any[]>('employees', initialEmployees, storeSettings.syncEnabled);
@@ -147,9 +138,7 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
   const [kewajibanLain, setKewajibanLain] = useSyncState<any[]>('kewajibanLain', [], storeSettings.syncEnabled);
   const [waitingPayments, setWaitingPayments] = useSyncState<any[]>('waitingPayments', [], storeSettings.syncEnabled);
 
-  const [suppliers, setSuppliers] = useSyncState<any[]>('suppliers', [
-    { id: 1, name: 'PT Surya Gemilang', contact: '08123456789', address: 'Jl. Rungkut 1' }
-  ], storeSettings.syncEnabled);
+  const [suppliers, setSuppliers] = useSyncState<any[]>('suppliers', [], storeSettings.syncEnabled);
   const [supplierReturns, setSupplierReturns] = useSyncState<any[]>('supplierReturns', [], storeSettings.syncEnabled);
 
   const [botMemory, setBotMemory] = useSyncState<string>('botMemory', 'Saya adalah AI bot asisten cerdas untuk Nava POS.', storeSettings.syncEnabled);

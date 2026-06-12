@@ -649,7 +649,7 @@ export const DanaBebas = ({ currentTime, headless = false }: { currentTime?: Dat
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-12 gap-3 items-end">
-                <div className="flex flex-col gap-1 md:col-span-3">
+                <div className="flex flex-col gap-1 md:col-span-3 lg:col-span-2">
                   <label className="text-[10px] font-bold text-gray-700">NOMINAL PENARIKAN (RP) :</label>
                   <input
                     type="text"
@@ -677,23 +677,34 @@ export const DanaBebas = ({ currentTime, headless = false }: { currentTime?: Dat
                   </select>
                 </div>
 
-                <div className="flex flex-col gap-1 md:col-span-4">
+                <div className="flex flex-col gap-1 md:col-span-3">
                   <label className="text-[10px] font-bold text-gray-700">CATATAN / KEPERLUAN PENARIKAN :</label>
                   <input
                     type="text"
                     value={tarikNotes}
                     onChange={(e) => setTarikNotes(e.target.value)}
                     className="border border-gray-400 px-2 py-1.5 rounded-sm text-xs text-black focus:border-blue-900 outline-none bg-white h-[32px] w-full"
-                    placeholder="Opsional: belanja atk, bensin, dsb..."
+                    placeholder="Opsional: belanja atk, bensin..."
                   />
                 </div>
 
-                <div className="md:col-span-2">
+                <div className="md:col-span-3 lg:col-span-4 grid grid-cols-2 gap-2">
                   <button
                     type="submit"
                     className="w-full bg-[#1e2b6b] hover:bg-blue-800 text-white font-bold h-[32px] rounded-sm text-[11px] flex items-center justify-center gap-1 transition-colors shadow-sm uppercase active:translate-y-px"
                   >
                     PROSES DANA
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                       setTarikNominal('');
+                       setTarikDest('laci');
+                       setTarikNotes('');
+                    }}
+                    className="w-full bg-red-600 hover:bg-red-700 text-white font-bold h-[32px] rounded-sm text-[11px] flex items-center justify-center gap-1 transition-colors shadow-sm uppercase active:translate-y-px"
+                  >
+                    HAPUS
                   </button>
                 </div>
               </div>

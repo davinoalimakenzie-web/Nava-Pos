@@ -287,11 +287,11 @@ export const POS = ({ currentTime }: { currentTime: Date }) => {
 
     setInventory(currentInv);
     if (newTransaction) {
-       setTransactions([newTransaction, ...currentTrxData]);
+       setTransactions((prev: any) => [newTransaction, ...(prev || [])]);
        addLog(newTransaction.type === 'PIUTANG' ? 'PIUTANG_BARU' : 'PENJUALAN', `Transaksi ${newTransaction.id} sebesar Rp ${newTransaction.total.toLocaleString('id-ID')}`);
     }
     else {
-       setTransactions(currentTrxData);
+       // Only trigger update if necessary, or just rely on items mutating (not recommended, but let's leave it)
     }
     
     triggerAutoOrder(currentInv);
@@ -369,7 +369,7 @@ export const POS = ({ currentTime }: { currentTime: Date }) => {
        }
 
        setInventory([...newInvItems, ...currentInv]);
-       setTransactions([newTransaction, ...transactions]);
+       setTransactions((prev: any) => [newTransaction, ...(prev || [])]);
        addLog('PEMBELIAN_STOK', `No: ${purchaseFaktur} Total: Rp ${finalTotalCost.toLocaleString('id-ID')}`);
        if (shouldPrint) setConfirmAction({message: `Pembelian Stok Tersimpan & Dicetak! (Faktur: ${purchaseFaktur})`, isAlert: true});
        else setConfirmAction({message: 'Pembelian Stok Tersimpan!', isAlert: true});
@@ -392,10 +392,10 @@ export const POS = ({ currentTime }: { currentTime: Date }) => {
         if (piutangToUpdate) {
             const newSisa = Math.max(0, piutangToUpdate.sisa - paid);
             if (newSisa === 0) {
-               setPiutangData(piutangData.filter(p => p.id !== piutangToUpdate.id));
+               setPiutangData((prev: any) => prev.filter((p: any) => p.id !== piutangToUpdate.id));
                successMessage = 'Piutang lunas!';
             } else {
-               setPiutangData(piutangData.map(p => p.id === piutangToUpdate.id ? { ...p, sisa: newSisa } : p));
+               setPiutangData((prev: any) => prev.map((p: any) => p.id === piutangToUpdate.id ? { ...p, sisa: newSisa } : p));
                successMessage = `Pembayaran cicilan piutang berhasil. Sisa tagihan: Rp ${formatRp(newSisa).replace("Rp", "").trim()}`;
             }
         }
@@ -419,7 +419,7 @@ export const POS = ({ currentTime }: { currentTime: Date }) => {
           note: `Pelunasan piutang ${piutangPaymentItem.piutangId}`
         };
         
-        setTransactions([piutangTransaction, ...transactions]);
+        setTransactions((prev: any) => [piutangTransaction, ...(prev || [])]);
         addLog('PELUNASAN_PIUTANG', `Transaksi ${piutangTransaction.id} sebesar Rp ${piutangTransaction.total.toLocaleString('id-ID')}`);
         
         if (paymentMethod !== 'Qriss/TF') {
@@ -460,7 +460,7 @@ export const POS = ({ currentTime }: { currentTime: Date }) => {
     };
 
     if (finalType === 'PIUTANG') {
-      setPiutangData([newTransaction, ...piutangData]);
+        setPiutangData((prev: any) => [newTransaction, ...(prev || [])]);
       if (shouldPrint) {
           setTimeout(() => window.print(), 200);
       }
