@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useAppContext } from '../context/AppContext';
 import { LegacyWindowHeader } from './LegacyWindowHeader';
-import { formatRp, calculateJatuhTempo } from '../utils';
+import { formatRp, calculateJatuhTempo, smartSort } from '../utils';
 
 import { DanaBebas } from './DanaBebas';
 
@@ -62,6 +62,58 @@ export const Cashflow = ({ currentTime }: { currentTime: Date }) => {
     if (filterUseEnd && eDate > end) return false;
     return true;
   });
+
+  const [txSortKey, setTxSortKey] = useState('date');
+  const [txSortDirection, setTxSortDirection] = useState<'asc' | 'desc'>('desc');
+
+  const handleTxSort = (key: string) => {
+    if (txSortKey === key) {
+      setTxSortDirection(prev => (prev === 'asc' ? 'desc' : 'asc'));
+    } else {
+      setTxSortKey(key);
+      setTxSortDirection('asc');
+    }
+  };
+
+  const sortedTransactions = React.useMemo(() => {
+    return smartSort(filteredTransactions || [], txSortKey, txSortDirection);
+  }, [filteredTransactions, txSortKey, txSortDirection]);
+
+  const [expSortKey, setExpSortKey] = useState('date');
+  const [expSortDirection, setExpSortDirection] = useState<'asc' | 'desc'>('desc');
+
+  const handleExpSort = (key: string) => {
+    if (expSortKey === key) {
+      setExpSortDirection(prev => (prev === 'asc' ? 'desc' : 'asc'));
+    } else {
+      setExpSortKey(key);
+      setExpSortDirection('asc');
+    }
+  };
+
+  const sortedExpenses = React.useMemo(() => {
+    return smartSort(filteredExpenses || [], expSortKey, expSortDirection);
+  }, [filteredExpenses, expSortKey, expSortDirection]);
+
+  const [retSortKey, setRetSortKey] = useState('id');
+  const [retSortDirection, setRetSortDirection] = useState<'asc' | 'desc'>('desc');
+
+  const handleRetSort = (key: string) => {
+    if (retSortKey === key) {
+      setRetSortDirection(prev => (prev === 'asc' ? 'desc' : 'asc'));
+    } else {
+      setRetSortKey(key);
+      setRetSortDirection('asc');
+    }
+  };
+
+  const returnTransactions = React.useMemo(() => {
+    return filteredTransactions.filter((t: any) => t.returTotal > 0 || (t.items && t.items.some((i: any) => i.isReturn)));
+  }, [filteredTransactions]);
+
+  const sortedReturnTransactions = React.useMemo(() => {
+    return smartSort(returnTransactions || [], retSortKey, retSortDirection);
+  }, [returnTransactions, retSortKey, retSortDirection]);
 
   const [showMonthlyReturn, setShowMonthlyReturn] = useState(false);
   const [showMonthlyNonTunai, setShowMonthlyNonTunai] = useState(false);
@@ -205,21 +257,68 @@ export const Cashflow = ({ currentTime }: { currentTime: Date }) => {
                   <div className="text-center text-gray-500 p-10 font-bold text-lg">Tidak ada data transaksi pada rentang waktu ini.</div>
                 ) : (
                   <table className="w-full text-left border-collapse whitespace-nowrap">
-                    <thead className="bg-[#ece9d8] sticky top-0 border-b-2 border-gray-400 font-bold text-blue-900 shadow-sm z-10 text-sm">
+                    <thead className="bg-[#ece9d8] sticky top-0 border-b-2 border-gray-400 font-bold text-blue-900 shadow-sm z-10 text-sm select-none">
                       <tr>
-                        <th className="p-3 border-r border-gray-300">Tanggal</th>
-                        <th className="p-3 border-r border-gray-300">Faktur</th>
-                        <th className="p-3 border-r border-gray-300 text-center">Qty</th>
-                        <th className="p-3 border-r border-gray-300">Pelanggan</th>
-                        <th className="p-3 border-r border-gray-300 text-center">Metode</th>
-                        {filterPaymentMethod !== 'TUNAI' && <th className="p-3 border-r border-gray-300 text-center">Jatuh Tempo</th>}
-                        <th className="p-3 border-r border-gray-300 text-right">Total Harga</th>
-                        <th className="p-3 border-r border-gray-300 text-right text-red-600">Retur Rp</th>
-                        <th className="p-3 text-center">User</th>
+                        <th className="p-3 border-r border-gray-300 cursor-pointer hover:bg-gray-200" onClick={() => handleTxSort('date')} title="Urutkan Tanggal">
+                          <div className="flex items-center gap-1 bg-white/40 px-1 py-0.5 rounded">
+                            <span>Tanggal</span>
+                            <span className="font-mono text-[9px] text-[#000080]" id="sort-indicator-tx-date">{txSortKey === 'date' ? (txSortDirection === 'asc' ? '▲' : '▼') : '↕'}</span>
+                          </div>
+                        </th>
+                        <th className="p-3 border-r border-gray-300 cursor-pointer hover:bg-gray-200" onClick={() => handleTxSort('id')} title="Urutkan Faktur">
+                          <div className="flex items-center gap-1 bg-white/40 px-1 py-0.5 rounded">
+                            <span>Faktur</span>
+                            <span className="font-mono text-[9px] text-[#000080]" id="sort-indicator-tx-id">{txSortKey === 'id' ? (txSortDirection === 'asc' ? '▲' : '▼') : '↕'}</span>
+                          </div>
+                        </th>
+                        <th className="p-3 border-r border-gray-300 text-center cursor-pointer hover:bg-gray-200" onClick={() => handleTxSort('total')} title="Urutkan Qty">
+                          <div className="flex items-center justify-center gap-1 bg-white/40 px-1 py-0.5 rounded">
+                            <span>Qty</span>
+                            <span className="font-mono text-[9px] text-[#000080]">{txSortKey === 'total' ? (txSortDirection === 'asc' ? '▲' : '▼') : '↕'}</span>
+                          </div>
+                        </th>
+                        <th className="p-3 border-r border-gray-300 cursor-pointer hover:bg-gray-200" onClick={() => handleTxSort('customer')} title="Urutkan Pelanggan">
+                          <div className="flex items-center gap-1 justify-between bg-white/40 px-1 py-0.5 rounded">
+                            <span>Pelanggan</span>
+                            <span className="font-mono text-[9px] text-[#000080]" id="sort-indicator-tx-customer">{txSortKey === 'customer' ? (txSortDirection === 'asc' ? '▲' : '▼') : '↕'}</span>
+                          </div>
+                        </th>
+                        <th className="p-3 border-r border-gray-300 text-center cursor-pointer hover:bg-gray-200" onClick={() => handleTxSort('method')} title="Urutkan Metode">
+                          <div className="flex items-center justify-center gap-1 bg-white/40 px-1 py-0.5 rounded">
+                            <span>Metode</span>
+                            <span className="font-mono text-[9px] text-[#000080]">{txSortKey === 'method' ? (txSortDirection === 'asc' ? '▲' : '▼') : '↕'}</span>
+                          </div>
+                        </th>
+                        {filterPaymentMethod !== 'TUNAI' && (
+                          <th className="p-3 border-r border-gray-300 text-center cursor-pointer hover:bg-gray-200" onClick={() => handleTxSort('isoDate')} title="Urutkan Jatuh Tempo">
+                            <div className="flex items-center justify-center gap-1 bg-white/40 px-1 py-0.5 rounded">
+                              <span>Jatuh Tempo</span>
+                              <span className="font-mono text-[9px] text-[#000080]">{txSortKey === 'isoDate' ? (txSortDirection === 'asc' ? '▲' : '▼') : '↕'}</span>
+                            </div>
+                          </th>
+                        )}
+                        <th className="p-3 border-r border-gray-300 text-right cursor-pointer hover:bg-gray-200" onClick={() => handleTxSort('total')} title="Urutkan Total Harga">
+                          <div className="flex items-center justify-end gap-1 bg-white/40 px-1 py-0.5 rounded">
+                            <span>Total Harga</span>
+                            <span className="font-mono text-[9px] text-[#000080]">{txSortKey === 'total' ? (txSortDirection === 'asc' ? '▲' : '▼') : '↕'}</span>
+                          </div>
+                        </th>
+                        <th className="p-3 border-r border-gray-300 text-right text-red-650 cursor-pointer hover:bg-gray-200" onClick={() => handleTxSort('returTotal')} title="Urutkan Retur">
+                          <div className="flex items-center justify-end gap-1 bg-white/40 px-1 py-0.5 rounded">
+                            <span>Retur Rp</span>
+                            <span className="font-mono text-[9px] text-[#000080]">{txSortKey === 'returTotal' ? (txSortDirection === 'asc' ? '▲' : '▼') : '↕'}</span>
+                          </div>
+                        </th>
+                        <th className="p-3 text-center cursor-pointer hover:bg-gray-200 font-bold" onClick={() => handleTxSort('cashier')} title="Urutkan Kasir">
+                          <div className="flex items-center justify-center gap-1 bg-white/40 px-1 py-0.5 rounded">
+                            <span>User</span>
+                            <span className="font-mono text-[9px] text-[#000080]">{txSortKey === 'cashier' ? (txSortDirection === 'asc' ? '▲' : '▼') : '↕'}</span>
+                          </div>
+                        </th>
                       </tr>
                     </thead>
                     <tbody className="text-sm">
-                      {filteredTransactions.slice(0, 100).map((trx: any) => (
+                      {sortedTransactions.slice(0, 100).map((trx: any) => (
                          <tr 
                            key={trx.id} 
                            className="border-b border-gray-200 hover:bg-blue-100 cursor-pointer text-black"
@@ -266,17 +365,42 @@ export const Cashflow = ({ currentTime }: { currentTime: Date }) => {
                   <div className="text-center text-gray-500 p-10 font-bold text-lg">Tidak ada data pengeluaran pada rentang waktu ini.</div>
                 ) : (
                   <table className="w-full text-left border-collapse whitespace-nowrap">
-                    <thead className="bg-[#ece9d8] sticky top-0 border-b-2 border-gray-400 font-bold text-red-800 shadow-sm z-10 text-sm">
+                    <thead className="bg-[#ece9d8] sticky top-0 border-b-2 border-gray-400 font-bold text-red-800 shadow-sm z-10 text-sm select-none">
                       <tr>
-                        <th className="p-3 border-r border-gray-300 w-1/4">Waktu / ID</th>
-                        <th className="p-3 border-r border-gray-300 w-1/3">Keterangan Pengeluaran</th>
-                        <th className="p-3 border-r border-gray-300 text-center">Sumber Dana</th>
-                        <th className="p-3 border-r border-gray-300 text-center">User (Kasir)</th>
-                        <th className="p-3 text-right">Nominal Pengeluaran</th>
+                        <th className="p-3 border-r border-gray-300 w-1/4 cursor-pointer hover:bg-gray-200" onClick={() => handleExpSort('date')} title="Urutkan Waktu/ID">
+                          <div className="flex items-center gap-1.5 justify-start bg-white/40 px-1 py-0.5 rounded">
+                            <span>Waktu / ID</span>
+                            <span className="font-mono text-[9px] text-red-750">{expSortKey === 'date' ? (expSortDirection === 'asc' ? '▲' : '▼') : '↕'}</span>
+                          </div>
+                        </th>
+                        <th className="p-3 border-r border-gray-300 w-1/3 cursor-pointer hover:bg-gray-200" onClick={() => handleExpSort('name')} title="Urutkan Keterangan">
+                          <div className="flex items-center gap-1.5 justify-between bg-white/40 px-1 py-0.5 rounded">
+                            <span>Keterangan Pengeluaran</span>
+                            <span className="font-mono text-[9px] text-red-750">{expSortKey === 'name' ? (expSortDirection === 'asc' ? '▲' : '▼') : '↕'}</span>
+                          </div>
+                        </th>
+                        <th className="p-3 border-r border-gray-300 text-center cursor-pointer hover:bg-gray-200" onClick={() => handleExpSort('wallet')} title="Urutkan Sumber Dana">
+                          <div className="flex items-center justify-center gap-1.5 bg-white/40 px-1 py-0.5 rounded">
+                            <span>Sumber Dana</span>
+                            <span className="font-mono text-[9px] text-red-750">{expSortKey === 'wallet' ? (expSortDirection === 'asc' ? '▲' : '▼') : '↕'}</span>
+                          </div>
+                        </th>
+                        <th className="p-3 border-r border-gray-300 text-center cursor-pointer hover:bg-gray-200" onClick={() => handleExpSort('cashier')} title="Urutkan Kasir">
+                          <div className="flex items-center justify-center gap-1.5 bg-white/40 px-1 py-0.5 rounded">
+                            <span>User (Kasir)</span>
+                            <span className="font-mono text-[9px] text-red-750">{expSortKey === 'cashier' ? (expSortDirection === 'asc' ? '▲' : '▼') : '↕'}</span>
+                          </div>
+                        </th>
+                        <th className="p-3 text-right cursor-pointer hover:bg-gray-200" onClick={() => handleExpSort('amount')} title="Urutkan Nominal">
+                          <div className="flex items-center justify-end gap-1.5 bg-white/40 px-1 py-0.5 rounded">
+                            <span>Nominal Pengeluaran</span>
+                            <span className="font-mono text-[9px] text-red-750">{expSortKey === 'amount' ? (expSortDirection === 'asc' ? '▲' : '▼') : '↕'}</span>
+                          </div>
+                        </th>
                       </tr>
                     </thead>
                     <tbody className="text-sm">
-                      {filteredExpenses.map((exp: any) => (
+                      {sortedExpenses.map((exp: any) => (
                          <tr key={exp.id} className="border-b border-gray-200 hover:bg-red-50 text-black">
                             <td className="p-3 border-r border-gray-300">{exp.date} <span className="text-gray-400 font-mono">({exp.id})</span></td>
                             <td className="p-3 border-r border-gray-300 font-bold">{exp.name}</td>
@@ -294,20 +418,35 @@ export const Cashflow = ({ currentTime }: { currentTime: Date }) => {
             )}
             {cashflowHarianSubTab === 'return' && (
               <div className="flex flex-col h-full">
-                {filteredTransactions.filter((t: any) => t.returTotal > 0 || (t.items && t.items.some((i: any) => i.isReturn))).length === 0 ? (
+                {returnTransactions.length === 0 ? (
                   <div className="text-center text-gray-500 p-10 font-bold text-lg">Tidak ada data retur pada rentang waktu ini.</div>
                 ) : (
                   <table className="w-full text-left border-collapse whitespace-nowrap">
-                    <thead className="bg-[#ece9d8] sticky top-0 border-b-2 border-gray-400 font-bold text-blue-900 shadow-sm z-10 text-sm">
+                    <thead className="bg-[#ece9d8] sticky top-0 border-b-2 border-gray-400 font-bold text-blue-900 shadow-sm z-10 text-sm select-none">
                       <tr>
-                        <th className="p-3 border-r border-gray-300 w-1/4">ID Transaksi / Waktu</th>
-                        <th className="p-3 border-r border-gray-300">Customer</th>
-                        <th className="p-3 border-r border-gray-300 w-1/2">Item Retur</th>
-                        <th className="p-3 text-right">Nilai Retur</th>
+                        <th className="p-3 border-r border-gray-300 w-1/4 cursor-pointer hover:bg-gray-200" onClick={() => handleRetSort('id')} title="Urutkan ID/Waktu">
+                          <div className="flex items-center gap-1.5 justify-start bg-white/40 px-1 py-0.5 rounded">
+                            <span>ID Transaksi / Waktu</span>
+                            <span className="font-mono text-[9px] text-[#000080]">{retSortKey === 'id' ? (retSortDirection === 'asc' ? '▲' : '▼') : '↕'}</span>
+                          </div>
+                        </th>
+                        <th className="p-3 border-r border-gray-300 cursor-pointer hover:bg-gray-200" onClick={() => handleRetSort('customer')} title="Urutkan Customer">
+                          <div className="flex items-center gap-1.5 justify-between bg-white/40 px-1 py-0.5 rounded">
+                            <span>Customer</span>
+                            <span className="font-mono text-[9px] text-[#000080]">{retSortKey === 'customer' ? (retSortDirection === 'asc' ? '▲' : '▼') : '↕'}</span>
+                          </div>
+                        </th>
+                        <th className="p-3 border-r border-gray-300 w-1/2 font-bold text-gray-550 select-none">Item Retur</th>
+                        <th className="p-3 text-right cursor-pointer hover:bg-gray-200" onClick={() => handleRetSort('returTotal')} title="Urutkan Nilai Retur">
+                          <div className="flex items-center justify-end gap-1.5 bg-white/40 px-1 py-0.5 rounded font-bold text-red-650">
+                            <span>Nilai Retur</span>
+                            <span className="font-mono text-[9px] text-red-650">{retSortKey === 'returTotal' ? (retSortDirection === 'asc' ? '▲' : '▼') : '↕'}</span>
+                          </div>
+                        </th>
                       </tr>
                     </thead>
                     <tbody className="text-sm">
-                      {filteredTransactions.filter((t: any) => t.returTotal > 0 || (t.items && t.items.some((i: any) => i.isReturn))).map((trx: any) => (
+                      {sortedReturnTransactions.map((trx: any) => (
                          <tr key={`return-${trx.id}`} className="border-b border-gray-200 hover:bg-yellow-50 text-black">
                             <td className="p-3 border-r border-gray-300">{trx.date} <span className="text-gray-400 font-mono">({trx.id})</span></td>
                             <td className="p-3 border-r border-gray-300 font-bold">{trx.customer}</td>

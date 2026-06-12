@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Landmark, ArrowRight, UserCheck, ShieldAlert, CheckCircle2, CircleDollarSign, ArrowDownToLine, ReceiptText, Edit } from 'lucide-react';
 import { useAppContext } from '../context/AppContext';
+import { smartSort } from '../utils';
 
 export const DanaBebas = ({ currentTime, headless = false }: { currentTime?: Date; headless?: boolean }) => {
   const {
@@ -107,6 +108,41 @@ export const DanaBebas = ({ currentTime, headless = false }: { currentTime?: Dat
   // Image preview modal state
   const [previewImage, setPreviewImage] = useState<string | null>(null);
 
+  // Sorting States
+  const [tarikSortKey, setTarikSortKey] = useState('date');
+  const [tarikSortDirection, setTarikSortDirection] = useState<'asc' | 'desc'>('desc');
+  const [pelunasanSortKey, setPelunasanSortKey] = useState('date');
+  const [pelunasanSortDirection, setPelunasanSortDirection] = useState<'asc' | 'desc'>('desc');
+  const [gajiSortKey, setGajiSortKey] = useState('name');
+  const [gajiSortDirection, setGajiSortDirection] = useState<'asc' | 'desc'>('asc');
+
+  const handleTarikSort = (key: string) => {
+    if (tarikSortKey === key) {
+      setTarikSortDirection(prev => (prev === 'asc' ? 'desc' : 'asc'));
+    } else {
+      setTarikSortKey(key);
+      setTarikSortDirection('asc');
+    }
+  };
+
+  const handlePelunasanSort = (key: string) => {
+    if (pelunasanSortKey === key) {
+      setPelunasanSortDirection(prev => (prev === 'asc' ? 'desc' : 'asc'));
+    } else {
+      setPelunasanSortKey(key);
+      setPelunasanSortDirection('asc');
+    }
+  };
+
+  const handleGajiSort = (key: string) => {
+    if (gajiSortKey === key) {
+      setGajiSortDirection(prev => (prev === 'asc' ? 'desc' : 'asc'));
+    } else {
+      setGajiSortKey(key);
+      setGajiSortDirection('asc');
+    }
+  };
+
   // Helper date formatter: dd/mm/yyyy
   const formatSDate = (dateStr: string) => {
     try {
@@ -129,17 +165,11 @@ export const DanaBebas = ({ currentTime, headless = false }: { currentTime?: Dat
 
   const [doneDeleteState, setDoneDeleteState] = useState<{ [id: string]: boolean }>({});
 
-  const handleCancelAndRecreateSalary = (item: any) => {
-    const totalRefund = item.approvedTotal || (item.salary + (item.approvedBonus || 0));
-    const confirmDelete = window.confirm(
-      `PERINGATAN: Apakah Anda yakin ingin menghapus pembayaran gaji atas nama ${item.name}?\n\n` +
-      `- Saldo Dana Bebas sebesar Rp ${totalRefund.toLocaleString('id-ID')} akan dikembalikan.\n` +
-      `- Laporan pengeluaran gaji ini akan dihapus.\n` +
-      `- Data daftar tunggu item ini akan dihapus, sehingga Anda dapat membuat ulang pengajuan gaji dari menu Absensi jika diperlukan.\n\n` +
-      `Lanjutkan menghapus?`
-    );
+  const [confirmDeleteSalaryItem, setConfirmDeleteSalaryItem] = useState<any | null>(null);
+  const [confirmPelunasanData, setConfirmPelunasanData] = useState<any | null>(null);
 
-    if (!confirmDelete) return;
+  const executeCancelAndRecreateSalary = (item: any) => {
+    const totalRefund = item.approvedTotal || (item.salary + (item.approvedBonus || 0));
 
     // 1. Return the balance to Dana Bebas wallet
     setWallets((prev: any) => ({
@@ -173,6 +203,8 @@ export const DanaBebas = ({ currentTime, headless = false }: { currentTime?: Dat
       `Membatalkan & Menghapus Pembayaran Gaji ${item.name} sebesar Rp ${totalRefund.toLocaleString('id-ID')} (Dana Bebas dikembalikan)`
     );
 
+    setConfirmDeleteSalaryItem(null);
+    setDoneDeleteState(prev => ({ ...prev, [item.id]: false }));
     showToast('success', `Berhasil membatalkan pembayaran gaji ${item.name}. Dana Bebas dikembalikan sebesar Rp ${totalRefund.toLocaleString('id-ID')}.`);
   };
 
@@ -316,9 +348,19 @@ export const DanaBebas = ({ currentTime, headless = false }: { currentTime?: Dat
       return;
     }
 
-    if (!window.confirm(`Apakah Anda yakin ingin melakukan pembayaran hutang ke ${targetHutang.supplier_name} sebesar ${formatRp(amt)}?`)) {
-      return;
-    }
+    // Set confirmation item instead of window.confirm
+    setConfirmPelunasanData({
+      targetHutang,
+      amt,
+      pelunasanType,
+      pelunasanCabang,
+      pelunasanBukti
+    });
+  };
+
+  const executePelunasanSupplier = () => {
+    if (!confirmPelunasanData) return;
+    const { targetHutang, amt, pelunasanType, pelunasanCabang, pelunasanBukti } = confirmPelunasanData;
 
     const tDate = transactionDate || new Date().toISOString().split('T')[0];
     const typeLabel = pelunasanType === 'full' ? 'Lunas' : 
@@ -340,8 +382,9 @@ export const DanaBebas = ({ currentTime, headless = false }: { currentTime?: Dat
 
     // Update Hutang Supplier state
     setHutangSupplier((prevArr: any[]) => {
-      return prevArr.map((h: any) => {
-        if (h.id === selectedHutangId) {
+      const nextArr = prevArr || [];
+      return nextArr.map((h: any) => {
+        if (h.id === targetHutang.id) {
           const newSisa = h.sisa_hutang - amt;
           return {
             ...h,
@@ -369,6 +412,7 @@ export const DanaBebas = ({ currentTime, headless = false }: { currentTime?: Dat
     setPelunasanAmount('');
     setPelunasanType('full');
     setPelunasanBukti(null);
+    setConfirmPelunasanData(null);
     showToast('success', `Berhasil membayar supplier ${targetHutang.supplier_name} sebesar ${formatRp(amt)}!`);
   };
 
@@ -486,6 +530,14 @@ export const DanaBebas = ({ currentTime, headless = false }: { currentTime?: Dat
   const arsipTarikDana = expenses.filter((e: any) => e.wallet === 'Dana Bebas' && (e.category === 'Tarik Dana Bebas' || e.category === 'Modal Masuk'));
   const arsipPelunasan = expenses.filter((e: any) => e.wallet === 'Dana Bebas' && e.category === 'Pelunasan Supplier');
   const arsipPrive = expenses.filter((e: any) => e.wallet === 'Dana Bebas' && e.category === 'Prive Owner');
+
+  const sortedArsipTarikDana = React.useMemo(() => {
+    return smartSort(arsipTarikDana, tarikSortKey, tarikSortDirection);
+  }, [arsipTarikDana, tarikSortKey, tarikSortDirection]);
+
+  const sortedArsipPelunasan = React.useMemo(() => {
+    return smartSort(arsipPelunasan, pelunasanSortKey, pelunasanSortDirection);
+  }, [arsipPelunasan, pelunasanSortKey, pelunasanSortDirection]);
 
   const selectedHutangItem = listHutangAktif.find((h: any) => h.id === selectedHutangId);
 
@@ -657,17 +709,42 @@ export const DanaBebas = ({ currentTime, headless = false }: { currentTime?: Dat
                ) : (
                   <div className="overflow-x-auto border border-gray-300 rounded max-h-[300px]">
                     <table className="w-full text-left border-collapse whitespace-nowrap text-xs">
-                      <thead className="bg-gray-100 border-b border-gray-300 text-gray-700 font-bold">
+                      <thead className="bg-[#1e2b6b] text-white border-b-2 border-gray-400 font-bold text-xs select-none">
                         <tr>
-                          <th className="p-2 border-r border-gray-300">Waktu</th>
-                          <th className="p-2 border-r border-gray-300">Pelaku</th>
-                          <th className="p-2 border-r border-gray-300">Deskripsi / Catatan</th>
-                          <th className="p-2 border-r border-gray-300 text-center">Kategori</th>
-                          <th className="p-2 text-right">Nominal (Rp)</th>
+                          <th className="p-2 border-r border-[#660066] cursor-pointer hover:bg-blue-800" onClick={() => handleTarikSort('date')} title="Urutkan Waktu">
+                            <div className="flex items-center gap-1 justify-start bg-white/10 px-1 py-0.5 rounded">
+                              <span>Waktu</span>
+                              <span className="font-mono text-[9px] text-[#00ffcc]">{tarikSortKey === 'date' ? (tarikSortDirection === 'asc' ? '▲' : '▼') : '↕'}</span>
+                            </div>
+                          </th>
+                          <th className="p-2 border-r border-[#660066] cursor-pointer hover:bg-blue-800" onClick={() => handleTarikSort('cashier')} title="Urutkan Pelaku">
+                            <div className="flex items-center gap-1 justify-between bg-white/10 px-1 py-0.5 rounded">
+                              <span>Pelaku</span>
+                              <span className="font-mono text-[9px] text-[#00ffcc]">{tarikSortKey === 'cashier' ? (tarikSortDirection === 'asc' ? '▲' : '▼') : '↕'}</span>
+                            </div>
+                          </th>
+                          <th className="p-2 border-r border-[#660066] cursor-pointer hover:bg-blue-800" onClick={() => handleTarikSort('name')} title="Urutkan Deskripsi">
+                            <div className="flex items-center gap-1 justify-between bg-white/10 px-1 py-0.5 rounded">
+                              <span>Deskripsi / Catatan</span>
+                              <span className="font-mono text-[9px] text-[#00ffcc]">{tarikSortKey === 'name' ? (tarikSortDirection === 'asc' ? '▲' : '▼') : '↕'}</span>
+                            </div>
+                          </th>
+                          <th className="p-2 border-r border-[#660066] text-center cursor-pointer hover:bg-blue-800" onClick={() => handleTarikSort('category')} title="Urutkan Kategori">
+                            <div className="flex items-center gap-1 justify-center bg-white/10 px-1 py-0.5 rounded">
+                              <span>Kategori</span>
+                              <span className="font-mono text-[9px] text-[#00ffcc]">{tarikSortKey === 'category' ? (tarikSortDirection === 'asc' ? '▲' : '▼') : '↕'}</span>
+                            </div>
+                          </th>
+                          <th className="p-2 cursor-pointer hover:bg-blue-800 text-right" onClick={() => handleTarikSort('amount')} title="Urutkan Nominal">
+                            <div className="flex items-center gap-1 justify-end bg-white/10 px-1 py-0.5 rounded">
+                              <span>Nominal (Rp)</span>
+                              <span className="font-mono text-[9px] text-[#00ffcc]">{tarikSortKey === 'amount' ? (tarikSortDirection === 'asc' ? '▲' : '▼') : '↕'}</span>
+                            </div>
+                          </th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-gray-200">
-                        {arsipTarikDana.slice(0, 50).map((item: any, idx: number) => (
+                        {sortedArsipTarikDana.slice(0, 50).map((item: any, idx: number) => (
                            <tr key={item.id || idx} className="hover:bg-gray-50 text-black">
                              <td className="p-2 border-r border-gray-300">{formatSDate(item.date)}</td>
                              <td className="p-2 border-r border-gray-300 font-medium">{item.cashier || 'Admin'}</td>
@@ -845,18 +922,43 @@ export const DanaBebas = ({ currentTime, headless = false }: { currentTime?: Dat
                ) : (
                   <div className="overflow-x-auto border border-gray-300 rounded max-h-[300px]">
                     <table className="w-full text-left border-collapse whitespace-nowrap text-xs">
-                      <thead className="bg-amber-50 border-b border-gray-300 text-amber-900 font-bold">
+                      <thead className="bg-amber-100 text-amber-900 border-b-2 border-amber-300 font-bold text-xs select-none">
                         <tr>
-                          <th className="p-2 border-r border-gray-300">Waktu</th>
-                          <th className="p-2 border-r border-gray-300">Cabang</th>
-                          <th className="p-2 border-r border-gray-300">Pelaku</th>
-                          <th className="p-2 border-r border-gray-300">Deskripsi / Catatan</th>
-                          <th className="p-2 border-r border-gray-300 text-center">Struk Bukti</th>
-                          <th className="p-2 text-right">Nominal Dibayar (Rp)</th>
+                          <th className="p-2 border-r border-amber-200 cursor-pointer hover:bg-amber-200" onClick={() => handlePelunasanSort('date')} title="Urutkan Waktu">
+                            <div className="flex items-center gap-1 justify-start bg-white/40 px-1 py-0.5 rounded">
+                              <span>Waktu</span>
+                              <span className="font-mono text-[9px] text-amber-800">{pelunasanSortKey === 'date' ? (pelunasanSortDirection === 'asc' ? '▲' : '▼') : '↕'}</span>
+                            </div>
+                          </th>
+                          <th className="p-2 border-r border-amber-200 cursor-pointer hover:bg-amber-200" onClick={() => handlePelunasanSort('branch')} title="Urutkan Cabang">
+                            <div className="flex items-center gap-1 justify-between bg-white/40 px-1 py-0.5 rounded">
+                              <span>Cabang</span>
+                              <span className="font-mono text-[9px] text-amber-800">{pelunasanSortKey === 'branch' ? (pelunasanSortDirection === 'asc' ? '▲' : '▼') : '↕'}</span>
+                            </div>
+                          </th>
+                          <th className="p-2 border-r border-amber-200 cursor-pointer hover:bg-amber-200" onClick={() => handlePelunasanSort('cashier')} title="Urutkan Pelaku">
+                            <div className="flex items-center gap-1 justify-between bg-white/40 px-1 py-0.5 rounded">
+                              <span>Pelaku</span>
+                              <span className="font-mono text-[9px] text-amber-800">{pelunasanSortKey === 'cashier' ? (pelunasanSortDirection === 'asc' ? '▲' : '▼') : '↕'}</span>
+                            </div>
+                          </th>
+                          <th className="p-2 border-r border-amber-200 cursor-pointer hover:bg-amber-200" onClick={() => handlePelunasanSort('name')} title="Urutkan Catatan">
+                            <div className="flex items-center gap-1 justify-between bg-white/40 px-1 py-0.5 rounded">
+                              <span>Deskripsi / Catatan</span>
+                              <span className="font-mono text-[9px] text-amber-800">{pelunasanSortKey === 'name' ? (pelunasanSortDirection === 'asc' ? '▲' : '▼') : '↕'}</span>
+                            </div>
+                          </th>
+                          <th className="p-2 border-r border-amber-200 text-center font-bold text-gray-550 select-none">Struk Bukti</th>
+                          <th className="p-2 cursor-pointer hover:bg-amber-200 text-right" onClick={() => handlePelunasanSort('amount')} title="Urutkan Nominal">
+                            <div className="flex items-center gap-1 justify-end bg-white/40 px-1 py-0.5 rounded">
+                              <span>Nominal Dibayar (Rp)</span>
+                              <span className="font-mono text-[9px] text-amber-800">{pelunasanSortKey === 'amount' ? (pelunasanSortDirection === 'asc' ? '▲' : '▼') : '↕'}</span>
+                            </div>
+                          </th>
                         </tr>
                       </thead>
-                      <tbody className="divide-y divide-gray-200">
-                        {arsipPelunasan.slice(0, 50).map((item: any, idx: number) => (
+                      <tbody className="divide-y divide-gray-200 bg-amber-50/15">
+                        {sortedArsipPelunasan.slice(0, 50).map((item: any, idx: number) => (
                            <tr key={item.id || idx} className="hover:bg-amber-50 text-black">
                              <td className="p-2 border-r border-gray-300">{formatSDate(item.date)}</td>
                              <td className="p-2 border-r border-gray-300">{item.branch || '-'}</td>
@@ -896,6 +998,8 @@ export const DanaBebas = ({ currentTime, headless = false }: { currentTime?: Dat
                const dateB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
                return dateB - dateA;
             });
+
+            const sortedGaji = smartSort(filteredGaji, gajiSortKey, gajiSortDirection);
 
             return (
               <div className="flex flex-col gap-3">
@@ -937,19 +1041,34 @@ export const DanaBebas = ({ currentTime, headless = false }: { currentTime?: Dat
                 ) : (
                   <div className="overflow-x-auto border border-gray-300 rounded">
                   <table className="w-full text-left border-collapse whitespace-nowrap text-xs">
-                    <thead className="bg-gray-100 border-b border-gray-300 text-gray-700 font-bold">
+                    <thead className="bg-[#1e2b6b] text-white border-b-2 border-gray-400 font-bold text-xs select-none">
                       <tr>
-                        <th className="p-2 border-r border-gray-300">Nama Karyawan</th>
-                        <th className="p-2 border-r border-gray-300 text-center w-36">Tanggal Bayar</th>
-                        <th className="p-2 border-r border-gray-300 text-center w-24">Metode</th>
-                        <th className="p-2 border-r border-gray-300 text-right w-36">Gaji Pokok</th>
-                        <th className="p-2 border-r border-gray-300 text-center w-28">Bonus (Rp)</th>
-                        <th className="p-2 border-r border-gray-300 text-right">Take Home Pay (THP)</th>
-                        <th className="p-2 text-center w-28">Status / Aksi</th>
+                        <th className="p-2 border-r border-[#660066] cursor-pointer hover:bg-blue-800" onClick={() => handleGajiSort('name')} title="Urutkan Nama">
+                          <div className="flex items-center gap-1.5 justify-start bg-white/10 px-1 py-0.5 rounded">
+                            <span>Nama Karyawan</span>
+                            <span className="font-mono text-[9px] text-[#00ffcc]">{gajiSortKey === 'name' ? (gajiSortDirection === 'asc' ? '▲' : '▼') : '↕'}</span>
+                          </div>
+                        </th>
+                        <th className="p-2 border-r border-[#660066] text-center w-36 font-bold text-gray-255 select-none">Tanggal Bayar</th>
+                        <th className="p-2 border-r border-[#660066] text-center w-24 font-bold text-gray-255 select-none">Metode</th>
+                        <th className="p-2 border-r border-[#660066] text-right w-36 cursor-pointer hover:bg-blue-800" onClick={() => handleGajiSort('salary')} title="Urutkan Gaji Pokok">
+                          <div className="flex items-center gap-1.5 justify-end bg-white/10 px-1 py-0.5 rounded">
+                             <span>Gaji Pokok</span>
+                             <span className="font-mono text-[9px] text-[#00ffcc]">{gajiSortKey === 'salary' ? (gajiSortDirection === 'asc' ? '▲' : '▼') : '↕'}</span>
+                          </div>
+                        </th>
+                        <th className="p-2 border-r border-[#660066] text-center w-28 font-bold text-gray-255 select-none">Bonus (Rp)</th>
+                        <th className="p-2 border-r border-[#660066] text-right cursor-pointer hover:bg-blue-800" onClick={() => handleGajiSort('approvedTotal')} title="Urutkan THP">
+                          <div className="flex items-center gap-1.5 justify-end bg-white/10 px-1 py-0.5 rounded">
+                             <span>Take Home Pay (THP)</span>
+                             <span className="font-mono text-[9px] text-[#00ffcc]">{gajiSortKey === 'approvedTotal' ? (gajiSortDirection === 'asc' ? '▲' : '▼') : '↕'}</span>
+                          </div>
+                        </th>
+                        <th className="p-2 text-center w-28 font-bold text-gray-255 select-none">Status / Aksi</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-200">
-                      {filteredGaji.map((item: any) => {
+                      {sortedGaji.map((item: any) => {
                         const isApproved = !!item.approved;
                         const displayDate = isApproved 
                           ? (item.approvedDate || (item.createdAt ? item.createdAt.substring(0, 10) : new Date().toISOString().substring(0, 10))) 
@@ -1028,7 +1147,7 @@ export const DanaBebas = ({ currentTime, headless = false }: { currentTime?: Dat
                                 doneDeleteState[item.id] ? (
                                   <div className="flex items-center justify-center gap-1">
                                     <button
-                                      onClick={() => handleCancelAndRecreateSalary(item)}
+                                      onClick={() => setConfirmDeleteSalaryItem(item)}
                                       className="px-2 py-1 bg-red-600 hover:bg-red-700 text-white font-bold text-[10px] rounded shadow-sm uppercase transition-all"
                                     >
                                       HAPUS
@@ -1086,6 +1205,149 @@ export const DanaBebas = ({ currentTime, headless = false }: { currentTime?: Dat
           </div>
         </div>
       )}
+
+      {/* Custom Confirmation Modal for Gaji Deletion */}
+      {confirmDeleteSalaryItem && (() => {
+        const item = confirmDeleteSalaryItem;
+        const totalRefund = item.approvedTotal || (item.salary + (item.approvedBonus || 0));
+        return (
+          <div className="fixed inset-0 z-[110] flex items-center justify-center bg-black/60 p-4">
+            <div className="relative bg-white border border-gray-400 rounded-sm shadow-xl max-w-md w-full overflow-hidden flex flex-col font-sans">
+              {/* Header */}
+              <div className="bg-red-800 text-white px-4 py-2 flex justify-between items-center">
+                <span className="font-bold text-xs uppercase tracking-wider flex items-center gap-1.5">
+                  ⚠️ Konfirmasi Hapus Pembayaran Gaji
+                </span>
+                <button 
+                  onClick={() => setConfirmDeleteSalaryItem(null)} 
+                  className="text-white font-bold hover:text-red-200 text-lg leading-none"
+                >
+                  &times;
+                </button>
+              </div>
+              
+              {/* Content */}
+              <div className="p-4 flex flex-col gap-3">
+                <p className="text-xs text-gray-800 font-medium">
+                  Apakah Anda yakin ingin menghapus pembayaran gaji atas nama <strong className="text-blue-950">{item.name}</strong>?
+                </p>
+                
+                <div className="bg-red-50 border border-red-200 p-3 rounded-xs text-[11px] text-red-905 flex flex-col gap-2 text-left">
+                  <div className="font-bold uppercase tracking-wider text-red-950">Efek Tindakan Ini:</div>
+                  <ul className="list-disc pl-4 space-y-1">
+                    <li>
+                      Saldo Dana Bebas sebesar <strong>Rp {totalRefund.toLocaleString('id-ID')}</strong> akan dikembalikan.
+                    </li>
+                    <li>
+                      Laporan pengeluaran gaji ini akan dihapus dari data cashflow.
+                    </li>
+                    <li>
+                      Data daftar tunggu gaji akan dihapus, sehingga Anda dapat membuat ulang pengajuan gaji dari menu Absensi.
+                    </li>
+                  </ul>
+                </div>
+
+                <p className="text-[10px] text-gray-500 italic text-center">
+                  Tindakan ini tidak dapat dibatalkan setelah disetujui.
+                </p>
+              </div>
+
+              {/* Actions */}
+              <div className="bg-gray-100 px-4 py-3 border-t border-gray-300 flex items-center justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => setConfirmDeleteSalaryItem(null)}
+                  className="px-3 py-1.5 bg-gray-200 hover:bg-gray-300 border border-gray-400 text-gray-700 font-bold text-xs rounded-sm transition-all uppercase"
+                >
+                  Batal
+                </button>
+                <button
+                  type="button"
+                  onClick={() => executeCancelAndRecreateSalary(item)}
+                  className="px-4 py-1.5 bg-red-600 hover:bg-red-700 text-white font-bold text-xs rounded-sm transition-all uppercase shadow-md"
+                >
+                  Ya, Hapus Pembayaran
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* Custom Confirmation Modal for Pelunasan Supplier */}
+      {confirmPelunasanData && (() => {
+        const { targetHutang, amt, pelunasanType } = confirmPelunasanData;
+        const typeLabel = pelunasanType === 'full' ? 'Lunas / Penuh' : 
+                          pelunasanType === 'cicil_1' ? 'Cicil Tahap 1' :
+                          pelunasanType === 'cicil_2' ? 'Cicil Tahap 2' : 'Cicil Tahap 3';
+        return (
+          <div className="fixed inset-0 z-[110] flex items-center justify-center bg-black/60 p-4">
+            <div className="relative bg-white border border-gray-400 rounded-sm shadow-xl max-w-sm w-full overflow-hidden flex flex-col font-sans text-black">
+              {/* Header */}
+              <div className="bg-amber-800 text-white px-4 py-2 flex justify-between items-center">
+                <span className="font-bold text-[11px] uppercase tracking-wider flex items-center gap-1.5">
+                  🤝 Konfirmasi Pelunasan Supplier
+                </span>
+                <button 
+                  onClick={() => setConfirmPelunasanData(null)} 
+                  className="text-white font-bold hover:text-amber-200 text-lg leading-none"
+                >
+                  &times;
+                </button>
+              </div>
+              
+              {/* Content */}
+              <div className="p-4 flex flex-col gap-3">
+                <p className="text-xs text-gray-800 font-medium">
+                  Apakah Anda yakin ingin melakukan pembayaran hutang ke <strong className="text-blue-950">{targetHutang.supplier_name}</strong>?
+                </p>
+                
+                <div className="border border-amber-300 bg-amber-50/50 p-3 rounded-xs text-xs flex flex-col gap-1.5 text-left">
+                  <div className="flex justify-between border-b border-amber-200 pb-1 text-[11px]">
+                    <span className="text-gray-500 font-medium font-sans">Nama Supplier :</span>
+                    <span className="font-bold text-gray-900">{targetHutang.supplier_name}</span>
+                  </div>
+                  <div className="flex justify-between border-b border-amber-200 pb-1 text-[11px]">
+                    <span className="text-gray-500 font-medium font-sans">Sisa Tagihan :</span>
+                    <span className="font-bold text-amber-900">{formatRp(targetHutang.sisa_hutang)}</span>
+                  </div>
+                  <div className="flex justify-between border-b border-amber-200 pb-1 text-[11px]">
+                    <span className="text-gray-500 font-medium font-sans">Metode :</span>
+                    <span className="font-bold text-gray-900 uppercase">{typeLabel}</span>
+                  </div>
+                  <div className="flex justify-between pt-1 text-[11px]">
+                    <span className="text-gray-500 font-bold font-sans">NOMINAL DIBAYAR :</span>
+                    <span className="font-black text-rose-700 font-mono text-xs">{formatRp(amt)}</span>
+                  </div>
+                </div>
+
+                <div className="bg-gray-100 border border-gray-300 p-2.5 rounded-xs text-[10px] text-gray-600 text-left">
+                  <span className="font-bold text-orange-950 uppercase block mb-0.5">⚠️ Efek Tindakan:</span>
+                  Saldo Dana Bebas akan berkurang sebesar <strong className="text-red-700">{formatRp(amt)}</strong> dan pelunasan supplier dicatat dalam riwayat cashflow.
+                </div>
+              </div>
+
+              {/* Actions */}
+              <div className="bg-gray-100 px-4 py-3 border-t border-gray-300 flex items-center justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => setConfirmPelunasanData(null)}
+                  className="px-3 py-1.5 bg-gray-200 hover:bg-gray-300 border border-gray-400 text-gray-700 font-bold text-xs rounded-sm transition-all uppercase"
+                >
+                  Batal
+                </button>
+                <button
+                  type="button"
+                  onClick={executePelunasanSupplier}
+                  className="px-4 py-1.5 bg-amber-700 hover:bg-amber-800 text-white font-bold text-xs rounded-sm transition-all uppercase shadow-md"
+                >
+                  Ya, Bayar
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 };

@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { smartSort, formatRp } from '../utils';
 import { Printer, MonitorSmartphone, Server, Lock, DownloadCloud, UploadCloud, Database, History, Trash2, AlertTriangle, Check, Eye, EyeOff } from 'lucide-react';
 import { LegacyWindowHeader } from './LegacyWindowHeader';
 import { useAppContext } from '../context/AppContext';
@@ -32,6 +33,39 @@ export const SettingsPanel = ({ currentTime }: { currentTime: Date }) => {
   const [showSyncMarginModal, setShowSyncMarginModal] = useState<{cat: string, lv1: number, lv2: number, lv3: number} | null>(null);
   const [isSyncingMargin, setIsSyncingMargin] = useState(false);
 
+  // Sorting states
+  const [empSortKey, setEmpSortKey] = useState('id');
+  const [empSortDirection, setEmpSortDirection] = useState<'asc' | 'desc'>('asc');
+  const [custSortKey, setCustSortKey] = useState('id');
+  const [custSortDirection, setCustSortDirection] = useState<'asc' | 'desc'>('asc');
+  const [supSortKey, setSupSortKey] = useState('id');
+  const [supSortDirection, setSupSortDirection] = useState<'asc' | 'desc'>('asc');
+  const [promoSortKey, setPromoSortKey] = useState('id');
+  const [promoSortDirection, setPromoSortDirection] = useState<'asc' | 'desc'>('asc');
+  const [snapSortKey, setSnapSortKey] = useState('timestamp');
+  const [snapSortDirection, setSnapSortDirection] = useState<'asc' | 'desc'>('desc');
+
+  const handleEmpSort = (key: string) => {
+    if (empSortKey === key) setEmpSortDirection(prev => (prev === 'asc' ? 'desc' : 'asc'));
+    else { setEmpSortKey(key); setEmpSortDirection('asc'); }
+  };
+  const handleCustSort = (key: string) => {
+    if (custSortKey === key) setCustSortDirection(prev => (prev === 'asc' ? 'desc' : 'asc'));
+    else { setCustSortKey(key); setCustSortDirection('asc'); }
+  };
+  const handleSupSort = (key: string) => {
+    if (supSortKey === key) setSupSortDirection(prev => (prev === 'asc' ? 'desc' : 'asc'));
+    else { setSupSortKey(key); setSupSortDirection('asc'); }
+  };
+  const handlePromoSort = (key: string) => {
+    if (promoSortKey === key) setPromoSortDirection(prev => (prev === 'asc' ? 'desc' : 'asc'));
+    else { setPromoSortKey(key); setPromoSortDirection('asc'); }
+  };
+  const handleSnapSort = (key: string) => {
+    if (snapSortKey === key) setSnapSortDirection(prev => (prev === 'asc' ? 'desc' : 'asc'));
+    else { setSnapSortKey(key); setSnapSortDirection('desc'); }
+  };
+
   const handleBackupData = () => {
       const allData = { 
           inventory, customers, suppliers, orderData, supplierReturns,
@@ -64,8 +98,7 @@ export const SettingsPanel = ({ currentTime }: { currentTime: Date }) => {
          )}
       </div>
 
-      <div className="p-2 flex flex-col h-full gap-2 overflow-y-auto w-full max-w-4xl">
-        <div className="flex-1 bg-white border border-gray-400 shadow-inner p-6">
+      <div className="flex-1 p-4 md:p-6 flex flex-col h-full gap-2 overflow-y-auto w-full max-w-5xl bg-white border border-gray-400 shadow-inner mx-2 my-2">
            
            {settingTab === 'margins' && (
               <div className="flex flex-col gap-4">
@@ -347,16 +380,26 @@ export const SettingsPanel = ({ currentTime }: { currentTime: Date }) => {
                     ) : (
                       <div className="min-w-[550px]">
                         <table className="w-full text-left text-xs border-collapse">
-                          <thead>
+                          <thead className="select-none text-black">
                             <tr className="bg-slate-100 border-b-2 border-gray-400">
-                              <th className="p-2 font-bold text-gray-700 whitespace-nowrap">Nama Checkpoint</th>
-                              <th className="p-2 font-bold text-gray-700 whitespace-nowrap">Waktu Simpan</th>
-                              <th className="p-2 font-bold text-gray-700 whitespace-nowrap">Rincian Data</th>
-                              <th className="p-2 font-bold text-gray-700 text-center whitespace-nowrap">Aksi</th>
+                              <th className="p-2 font-bold text-gray-700 whitespace-nowrap cursor-pointer hover:bg-slate-200" onClick={() => handleSnapSort('label')} title="Urutkan Nama">
+                                  <div className="flex items-center gap-1 justify-between">
+                                      <span>Nama Checkpoint</span>
+                                      <span className="font-mono text-[9px] text-[#000080]">{snapSortKey === 'label' ? (snapSortDirection === 'asc' ? '▲' : '▼') : '↕'}</span>
+                                  </div>
+                              </th>
+                              <th className="p-2 font-bold text-gray-700 whitespace-nowrap cursor-pointer hover:bg-slate-200" onClick={() => handleSnapSort('timestamp')} title="Urutkan Waktu">
+                                  <div className="flex items-center gap-1 justify-between">
+                                      <span>Waktu Simpan</span>
+                                      <span className="font-mono text-[9px] text-[#000080]">{snapSortKey === 'timestamp' ? (snapSortDirection === 'asc' ? '▲' : '▼') : '↕'}</span>
+                                  </div>
+                              </th>
+                              <th className="p-2 font-bold text-gray-700 whitespace-nowrap text-gray-400 select-none">Rincian Data</th>
+                              <th className="p-2 font-bold text-gray-700 text-center whitespace-nowrap text-gray-400 select-none">Aksi</th>
                             </tr>
                           </thead>
                           <tbody>
-                          {snapshots.map((snap) => (
+                          {smartSort(snapshots, snapSortKey, snapSortDirection).map((snap: any) => (
                             <tr key={snap.id} className="border-b border-gray-200 hover:bg-slate-50">
                               <td className="p-2 font-bold text-blue-900">{snap.label}</td>
                               <td className="p-2 text-gray-600 font-mono text-[10px]">
@@ -751,9 +794,6 @@ export const SettingsPanel = ({ currentTime }: { currentTime: Date }) => {
               </div>
            )}
 
-        </div>
-      </div>
-
       {editUser && (
         <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
           <div className="bg-[#460101] text-white w-[500px] shadow-2xl border border-gray-600 rounded-sm overflow-hidden flex flex-col font-sans">
@@ -940,19 +980,49 @@ export const SettingsPanel = ({ currentTime }: { currentTime: Date }) => {
       {settingTab === 'karyawan' && (
           <div className="flex flex-col gap-2">
             <button onClick={() => setShowAddEmpModal(true)} className="bg-blue-600 text-white font-bold py-2 w-48 mb-2 shadow rounded hover:bg-blue-700">+ Tambah Karyawan Baru</button>
-            <table className="w-full text-left border-collapse whitespace-nowrap border border-gray-400">
-              <thead className="bg-gray-100 border-b border-gray-400">
+            <table className="w-full text-left border-collapse whitespace-nowrap border border-gray-400 select-none text-black">
+              <thead className="bg-[#ece9d8] border-b border-gray-400 text-xs font-bold">
                 <tr>
-                  <th className="p-2 border-r w-16">ID</th>
-                  <th className="p-2 border-r">Nama</th>
-                  <th className="p-2 border-r">Posisi/Jabatan</th>
-                  <th className="p-2 border-r">Cabang</th>
-                  <th className="p-2 border-r">No WA</th>
-                  <th className="p-2">Gaji Perhari</th>
+                  <th className="p-2 border-r w-16 cursor-pointer hover:bg-gray-300" onClick={() => handleEmpSort('id')} title="Urutkan ID">
+                      <div className="flex items-center gap-1 justify-between">
+                          <span>ID</span>
+                          <span className="font-mono text-[9px] text-[#000080]">{empSortKey === 'id' ? (empSortDirection === 'asc' ? '▲' : '▼') : '↕'}</span>
+                      </div>
+                  </th>
+                  <th className="p-2 border-r cursor-pointer hover:bg-gray-300" onClick={() => handleEmpSort('name')} title="Urutkan Nama">
+                      <div className="flex items-center gap-1 justify-between">
+                          <span>Nama</span>
+                          <span className="font-mono text-[9px] text-[#000080]">{empSortKey === 'name' ? (empSortDirection === 'asc' ? '▲' : '▼') : '↕'}</span>
+                      </div>
+                  </th>
+                  <th className="p-2 border-r cursor-pointer hover:bg-gray-300" onClick={() => handleEmpSort('position')} title="Urutkan Posisi">
+                      <div className="flex items-center gap-1 justify-between">
+                          <span>Posisi/Jabatan</span>
+                          <span className="font-mono text-[9px] text-[#000080]">{empSortKey === 'position' ? (empSortDirection === 'asc' ? '▲' : '▼') : '↕'}</span>
+                      </div>
+                  </th>
+                  <th className="p-2 border-r cursor-pointer hover:bg-gray-300" onClick={() => handleEmpSort('branch')} title="Urutkan Cabang">
+                      <div className="flex items-center gap-1 justify-between">
+                          <span>Cabang</span>
+                          <span className="font-mono text-[9px] text-[#000080]">{empSortKey === 'branch' ? (empSortDirection === 'asc' ? '▲' : '▼') : '↕'}</span>
+                      </div>
+                  </th>
+                  <th className="p-2 border-r cursor-pointer hover:bg-gray-300" onClick={() => handleEmpSort('phone')} title="Urutkan No WA">
+                      <div className="flex items-center gap-1 justify-between">
+                          <span>No WA</span>
+                          <span className="font-mono text-[9px] text-[#000080]">{empSortKey === 'phone' ? (empSortDirection === 'asc' ? '▲' : '▼') : '↕'}</span>
+                      </div>
+                  </th>
+                  <th className="p-2 cursor-pointer hover:bg-gray-300" onClick={() => handleEmpSort('dailySalary')} title="Urutkan Gaji">
+                      <div className="flex items-center gap-1 justify-start">
+                          <span>Gaji Perhari</span>
+                          <span className="font-mono text-[9px] text-[#000080]">{empSortKey === 'dailySalary' ? (empSortDirection === 'asc' ? '▲' : '▼') : '↕'}</span>
+                      </div>
+                  </th>
                 </tr>
               </thead>
               <tbody>
-                {employees.map((emp: any) => (
+                {smartSort(employees, empSortKey, empSortDirection).map((emp: any) => (
                     <tr key={emp.id} className="border-b hover:bg-gray-50">
                       <td className="p-2 border-r text-gray-500 font-mono">#{emp.id}</td>
                       <td className="p-2 border-r font-bold">{emp.name}</td>
@@ -973,12 +1043,38 @@ export const SettingsPanel = ({ currentTime }: { currentTime: Date }) => {
               <span className="font-bold">Daftar Pelanggan Terdaftar</span>
               <button onClick={() => setShowAddCustomerModal(true)} className="bg-gray-200 border border-gray-500 px-3 py-1 font-bold shadow hover:bg-gray-300">+ Tambah Pelanggan</button>
             </div>
-            <table className="w-full text-left border-collapse whitespace-nowrap">
-              <thead className="bg-slate-50 border-b-2 border-gray-400 font-normal">
-                <tr><th className="p-2 border-r border-gray-300 w-16 text-center">ID</th><th className="p-2 border-r border-gray-300">Nama Pelanggan</th><th className="p-2 border-r border-gray-300">No. Telp / WA</th><th className="p-2 border-r border-gray-300 text-center">Level Harga</th><th className="p-2 text-center">Aksi</th></tr>
+            <table className="w-full text-left border-collapse whitespace-nowrap select-none text-black">
+              <thead className="bg-[#ece9d8] border-b-2 border-gray-400 font-bold text-xs">
+                <tr>
+                  <th className="p-2 border-r border-gray-300 w-16 text-center cursor-pointer hover:bg-gray-300" onClick={() => handleCustSort('id')} title="Urutkan ID">
+                      <div className="flex items-center gap-1 justify-center">
+                          <span>ID</span>
+                          <span className="font-mono text-[9px] text-[#000080]">{custSortKey === 'id' ? (custSortDirection === 'asc' ? '▲' : '▼') : '↕'}</span>
+                      </div>
+                  </th>
+                  <th className="p-2 border-r border-gray-300 cursor-pointer hover:bg-gray-300" onClick={() => handleCustSort('name')} title="Urutkan Nama">
+                      <div className="flex items-center gap-1 justify-between">
+                          <span>Nama Pelanggan</span>
+                          <span className="font-mono text-[9px] text-[#000080]">{custSortKey === 'name' ? (custSortDirection === 'asc' ? '▲' : '▼') : '↕'}</span>
+                      </div>
+                  </th>
+                  <th className="p-2 border-r border-gray-300 cursor-pointer hover:bg-gray-300" onClick={() => handleCustSort('phone')} title="Urutkan No Telp">
+                      <div className="flex items-center gap-1 justify-between">
+                          <span>No. Telp / WA</span>
+                          <span className="font-mono text-[9px] text-[#000080]">{custSortKey === 'phone' ? (custSortDirection === 'asc' ? '▲' : '▼') : '↕'}</span>
+                      </div>
+                  </th>
+                  <th className="p-2 border-r border-gray-300 text-center cursor-pointer hover:bg-gray-300" onClick={() => handleCustSort('level')} title="Urutkan Level">
+                      <div className="flex items-center gap-1 justify-center">
+                          <span>Level Harga</span>
+                          <span className="font-mono text-[9px] text-[#000080]">{custSortKey === 'level' ? (custSortDirection === 'asc' ? '▲' : '▼') : '↕'}</span>
+                      </div>
+                  </th>
+                  <th className="p-2 text-center text-gray-500 font-bold select-none">Aksi</th>
+                </tr>
               </thead>
               <tbody>
-                {customers.map((c: any) => (
+                {smartSort(customers, custSortKey, custSortDirection).map((c: any) => (
                   <tr key={c.id} className="border-b border-gray-200 hover:bg-blue-50">
                     <td className="p-2 border-r border-gray-300 text-center font-mono text-gray-500">#{c.id}</td><td className="p-2 border-r border-gray-300 font-bold">{c.name}</td><td className="p-2 border-r border-gray-300">{c.phone || '-'}</td><td className="p-2 border-r border-gray-300 text-center">Level {c.level} {c.level == 1 ? '(NON member)' : ''}</td><td className="p-2 text-center"><button className="px-2 text-blue-700 font-bold hover:underline">Edit</button></td>
                   </tr>
@@ -1017,12 +1113,37 @@ export const SettingsPanel = ({ currentTime }: { currentTime: Date }) => {
                     <button onClick={() => setShowAddSupplierModal(false)} className="bg-gray-400 text-white font-bold py-1 px-4 shadow hover:bg-gray-500">Batal</button>
                  </div>
             )}
-            <table className="w-full text-left border-collapse whitespace-nowrap mt-2">
-               <thead className="bg-slate-50 border-b-2 border-gray-400 font-normal">
-                  <tr><th className="p-2 border-r border-gray-300 text-center w-16">ID Sup</th><th className="p-2 border-r border-gray-300">Nama Lengkap Supliyer</th><th className="p-2 border-r border-gray-300">Kontak Person</th><th className="p-2 border-r border-gray-300">Alamat Lengkap</th></tr>
+            <table className="w-full text-left border-collapse whitespace-nowrap mt-2 select-none text-black">
+               <thead className="bg-[#ece9d8] border-b-2 border-gray-400 font-bold text-xs">
+                  <tr>
+                    <th className="p-2 border-r border-gray-300 text-center w-16 cursor-pointer hover:bg-gray-300" onClick={() => handleSupSort('id')} title="Urutkan ID">
+                        <div className="flex items-center gap-1 justify-center">
+                            <span>ID Sup</span>
+                            <span className="font-mono text-[9px] text-[#000080]">{supSortKey === 'id' ? (supSortDirection === 'asc' ? '▲' : '▼') : '↕'}</span>
+                        </div>
+                    </th>
+                    <th className="p-2 border-r border-gray-300 cursor-pointer hover:bg-gray-300" onClick={() => handleSupSort('name')} title="Urutkan Nama">
+                        <div className="flex items-center gap-1 justify-between">
+                            <span>Nama Lengkap Supliyer</span>
+                            <span className="font-mono text-[9px] text-[#000080]">{supSortKey === 'name' ? (supSortDirection === 'asc' ? '▲' : '▼') : '↕'}</span>
+                        </div>
+                    </th>
+                    <th className="p-2 border-r border-gray-300 cursor-pointer hover:bg-gray-300" onClick={() => handleSupSort('contact')} title="Urutkan Kontak">
+                        <div className="flex items-center gap-1 justify-between">
+                            <span>Kontak Person</span>
+                            <span className="font-mono text-[9px] text-[#000080]">{supSortKey === 'contact' ? (supSortDirection === 'asc' ? '▲' : '▼') : '↕'}</span>
+                        </div>
+                    </th>
+                    <th className="p-2 border-r border-gray-300 cursor-pointer hover:bg-gray-300" onClick={() => handleSupSort('address')} title="Urutkan Alamat">
+                        <div className="flex items-center gap-1 justify-between">
+                            <span>Alamat Lengkap</span>
+                            <span className="font-mono text-[9px] text-[#000080]">{supSortKey === 'address' ? (supSortDirection === 'asc' ? '▲' : '▼') : '↕'}</span>
+                        </div>
+                    </th>
+                  </tr>
                </thead>
                <tbody>
-                 {suppliers.map((s: any) => (
+                 {smartSort(suppliers, supSortKey, supSortDirection).map((s: any) => (
                     <tr key={s.id} className="border-b border-gray-200 hover:bg-blue-50">
                        <td className="p-2 border-r border-gray-300 text-center font-mono text-gray-500">#{s.id}</td>
                        <td className="p-2 border-r border-gray-300 font-bold">{s.name}</td>
@@ -1076,6 +1197,8 @@ export const SettingsPanel = ({ currentTime }: { currentTime: Date }) => {
              </table>
           </div>
       )}
+      
+      </div>
 
     </div>
   );

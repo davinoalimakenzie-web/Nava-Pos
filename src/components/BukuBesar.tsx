@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { CustomDatePicker } from './CustomDatePicker';
 import { Download, MessageSquare, ExternalLink, FileSpreadsheet } from 'lucide-react';
 import * as XLSX from 'xlsx';
+import { smartSort } from '../utils';
 
 export interface RecordData {
   id: string;
@@ -317,30 +318,8 @@ export const BukuBesar = () => {
   });
 
   const sortedFilteredRecords = React.useMemo(() => {
-    let sortableItems = [...filteredRecords];
-    if (sortConfig !== null) {
-      sortableItems.sort((a, b) => {
-        let aValue = a[sortConfig.key];
-        let bValue = b[sortConfig.key];
-        
-        if (sortConfig.key === 'biaya' || sortConfig.key === 'part') {
-           aValue = parseNum(aValue as string);
-           bValue = parseNum(bValue as string);
-        }
-
-        if (aValue === null) aValue = '';
-        if (bValue === null) bValue = '';
-        
-        if (aValue < bValue) {
-          return sortConfig.direction === 'asc' ? -1 : 1;
-        }
-        if (aValue > bValue) {
-          return sortConfig.direction === 'asc' ? 1 : -1;
-        }
-        return 0;
-      });
-    }
-    return sortableItems;
+    if (!sortConfig) return filteredRecords;
+    return smartSort(filteredRecords, sortConfig.key, sortConfig.direction);
   }, [filteredRecords, sortConfig]);
 
   const [logModalOpen, setLogModalOpen] = useState(false);
@@ -913,22 +892,92 @@ export const BukuBesar = () => {
       {/* Table Area */}
       <div className="flex-1 bg-white overflow-auto border border-gray-400 mt-1">
         <table className="w-full table-fixed text-black text-[11px]">
-          <thead className="bg-[#8f1994] text-white sticky top-0 z-10 shadow">
+          <thead className="bg-[#8f1994] text-white sticky top-0 z-10 shadow text-[10px] uppercase font-bold">
             <tr>
-              <th className="px-1 py-0.5 border-r border-[#a930b0] font-normal text-center whitespace-nowrap cursor-pointer select-none w-[45px]" onClick={() => handleSort('nota')}>NOTA {sortConfig?.key === 'nota' && (sortConfig.direction === 'asc' ? '▲' : '▼')}</th>
-              <th className="px-1 py-0.5 border-r border-[#a930b0] font-normal text-left whitespace-nowrap cursor-pointer select-none w-[85px]" onClick={() => handleSort('status')}>STATUS {sortConfig?.key === 'status' && (sortConfig.direction === 'asc' ? '▲' : '▼')}</th>
-              <th className="px-1 py-0.5 border-r border-[#a930b0] font-normal text-center whitespace-nowrap cursor-pointer select-none w-[45px]" onClick={() => handleSort('teknisi')}>TEKNISI {sortConfig?.key === 'teknisi' && (sortConfig.direction === 'asc' ? '▲' : '▼')}</th>
-              <th className="px-1 py-0.5 border-r border-[#a930b0] font-normal text-left whitespace-nowrap cursor-pointer select-none w-[70px]" onClick={() => handleSort('namaUser')}>USER {sortConfig?.key === 'namaUser' && (sortConfig.direction === 'asc' ? '▲' : '▼')}</th>
-              <th className="px-1 py-0.5 border-r border-[#a930b0] font-normal text-left whitespace-nowrap cursor-pointer select-none w-[80px]" onClick={() => handleSort('noWaUser')}>WAUSER {sortConfig?.key === 'noWaUser' && (sortConfig.direction === 'asc' ? '▲' : '▼')}</th>
-              <th className="px-1 py-0.5 border-r border-[#a930b0] font-normal text-left whitespace-nowrap cursor-pointer select-none w-[75px]" onClick={() => handleSort('device')}>DEVICE {sortConfig?.key === 'device' && (sortConfig.direction === 'asc' ? '▲' : '▼')}</th>
-              <th className="px-1 py-0.5 border-r border-[#a930b0] font-normal text-left whitespace-nowrap cursor-pointer select-none w-[100px]" onClick={() => handleSort('keluhan')}>KELUHAN {sortConfig?.key === 'keluhan' && (sortConfig.direction === 'asc' ? '▲' : '▼')}</th>
-              <th className="px-1 py-0.5 border-r border-[#a930b0] font-normal text-center whitespace-nowrap cursor-pointer select-none w-[65px]" onClick={() => handleSort('tglMasuk')}>TGLMASUK {sortConfig?.key === 'tglMasuk' && (sortConfig.direction === 'asc' ? '▲' : '▼')}</th>
-              <th className="px-1 py-0.5 border-r border-[#a930b0] font-normal text-right whitespace-nowrap cursor-pointer select-none w-[75px]" onClick={() => handleSort('biaya')}>BIAYA {sortConfig?.key === 'biaya' && (sortConfig.direction === 'asc' ? '▲' : '▼')}</th>
-              <th className="px-1 py-0.5 border-r border-[#a930b0] font-normal text-right whitespace-nowrap cursor-pointer select-none w-[75px]" onClick={() => handleSort('part')}>MODAL {sortConfig?.key === 'part' && (sortConfig.direction === 'asc' ? '▲' : '▼')}</th>
-              <th className="px-1 py-0.5 border-r border-[#a930b0] font-normal text-right whitespace-nowrap cursor-pointer select-none w-[75px]" onClick={() => handleSort('jasa')}>JASA {sortConfig?.key === 'jasa' && (sortConfig.direction === 'asc' ? '▲' : '▼')}</th>
-              <th className="px-1 py-0.5 border-r border-[#a930b0] font-normal text-left whitespace-nowrap cursor-pointer select-none w-[65px]" onClick={() => handleSort('tglAmbil')}>TGLAMBIL {sortConfig?.key === 'tglAmbil' && (sortConfig.direction === 'asc' ? '▲' : '▼')}</th>
-              <th className="px-1 py-0.5 border-r border-[#a930b0] font-normal text-left whitespace-nowrap cursor-pointer select-none w-[65px]" onClick={() => handleSort('garansi')}>GARANSI {sortConfig?.key === 'garansi' && (sortConfig.direction === 'asc' ? '▲' : '▼')}</th>
-              <th className="px-1 py-0.5 font-normal text-left whitespace-nowrap cursor-pointer select-none w-[45px]" onClick={() => handleSort('cashTf')}>BAYAR {sortConfig?.key === 'cashTf' && (sortConfig.direction === 'asc' ? '▲' : '▼')}</th>
+              <th className="px-1 py-1 border-r border-[#a930b0] cursor-pointer select-none w-[55px] hover:bg-[#a52fa9] transition-colors" onClick={() => handleSort('nota')} title="Sortir Nota">
+                <div className="flex items-center justify-between px-0.5">
+                  <span>NOTA</span>
+                  <span className="font-mono text-[9px] text-[#e0a6e3]">{sortConfig?.key === 'nota' ? (sortConfig.direction === 'asc' ? '▲' : '▼') : '↕'}</span>
+                </div>
+              </th>
+              <th className="px-1 py-1 border-r border-[#a930b0] cursor-pointer select-none w-[90px] hover:bg-[#a52fa9] transition-colors" onClick={() => handleSort('status')} title="Sortir Status">
+                <div className="flex items-center justify-between px-0.5">
+                  <span>STATUS</span>
+                  <span className="font-mono text-[9px] text-[#e0a6e3]">{sortConfig?.key === 'status' ? (sortConfig.direction === 'asc' ? '▲' : '▼') : '↕'}</span>
+                </div>
+              </th>
+              <th className="px-1 py-1 border-r border-[#a930b0] cursor-pointer select-none w-[55px] hover:bg-[#a52fa9] transition-colors" onClick={() => handleSort('teknisi')} title="Sortir Teknisi">
+                <div className="flex items-center justify-between px-0.5">
+                  <span>TEK</span>
+                  <span className="font-mono text-[9px] text-[#e0a6e3]">{sortConfig?.key === 'teknisi' ? (sortConfig.direction === 'asc' ? '▲' : '▼') : '↕'}</span>
+                </div>
+              </th>
+              <th className="px-1 py-1 border-r border-[#a930b0] cursor-pointer select-none w-[75px] hover:bg-[#a52fa9] transition-colors" onClick={() => handleSort('namaUser')} title="Sortir Nama User">
+                <div className="flex items-center justify-between px-0.5">
+                  <span>USER</span>
+                  <span className="font-mono text-[9px] text-[#e0a6e3]">{sortConfig?.key === 'namaUser' ? (sortConfig.direction === 'asc' ? '▲' : '▼') : '↕'}</span>
+                </div>
+              </th>
+              <th className="px-1 py-1 border-r border-[#a930b0] cursor-pointer select-none w-[80px] hover:bg-[#a52fa9] transition-colors" onClick={() => handleSort('noWaUser')} title="Sortir No WA">
+                <div className="flex items-center justify-between px-0.5">
+                  <span>WAUSER</span>
+                  <span className="font-mono text-[9px] text-[#e0a6e3]">{sortConfig?.key === 'noWaUser' ? (sortConfig.direction === 'asc' ? '▲' : '▼') : '↕'}</span>
+                </div>
+              </th>
+              <th className="px-1 py-1 border-r border-[#a930b0] cursor-pointer select-none w-[80px] hover:bg-[#a52fa9] transition-colors" onClick={() => handleSort('device')} title="Sortir Device">
+                <div className="flex items-center justify-between px-0.5">
+                  <span>DEVICE</span>
+                  <span className="font-mono text-[9px] text-[#e0a6e3]">{sortConfig?.key === 'device' ? (sortConfig.direction === 'asc' ? '▲' : '▼') : '↕'}</span>
+                </div>
+              </th>
+              <th className="px-1 py-1 border-r border-[#a930b0] cursor-pointer select-none w-[100px] hover:bg-[#a52fa9] transition-colors" onClick={() => handleSort('keluhan')} title="Sortir Keluhan">
+                <div className="flex items-center justify-between px-0.5">
+                  <span>KELUHAN</span>
+                  <span className="font-mono text-[9px] text-[#e0a6e3]">{sortConfig?.key === 'keluhan' ? (sortConfig.direction === 'asc' ? '▲' : '▼') : '↕'}</span>
+                </div>
+              </th>
+              <th className="px-1 py-1 border-r border-[#a930b0] cursor-pointer select-none w-[70px] hover:bg-[#a52fa9] transition-colors" onClick={() => handleSort('tglMasuk')} title="Sortir Tanggal Masuk">
+                <div className="flex items-center justify-between px-0.5">
+                  <span>TGLMASUK</span>
+                  <span className="font-mono text-[9px] text-[#e0a6e3]">{sortConfig?.key === 'tglMasuk' ? (sortConfig.direction === 'asc' ? '▲' : '▼') : '↕'}</span>
+                </div>
+              </th>
+              <th className="px-1 py-1 border-r border-[#a930b0] cursor-pointer select-none w-[75px] hover:bg-[#a52fa9] transition-colors" onClick={() => handleSort('biaya')} title="Sortir Biaya">
+                <div className="flex items-center justify-between px-0.5">
+                  <span>BIAYA</span>
+                  <span className="font-mono text-[9px] text-[#e0a6e3]">{sortConfig?.key === 'biaya' ? (sortConfig.direction === 'asc' ? '▲' : '▼') : '↕'}</span>
+                </div>
+              </th>
+              <th className="px-1 py-1 border-r border-[#a930b0] cursor-pointer select-none w-[75px] hover:bg-[#a52fa9] transition-colors" onClick={() => handleSort('part')} title="Sortir Modal Part">
+                <div className="flex items-center justify-between px-0.5">
+                  <span>MODAL</span>
+                  <span className="font-mono text-[9px] text-[#e0a6e3]">{sortConfig?.key === 'part' ? (sortConfig.direction === 'asc' ? '▲' : '▼') : '↕'}</span>
+                </div>
+              </th>
+              <th className="px-1 py-1 border-r border-[#a930b0] cursor-pointer select-none w-[75px] hover:bg-[#a52fa9] transition-colors" onClick={() => handleSort('jasa')} title="Sortir Jasa">
+                <div className="flex items-center justify-between px-0.5">
+                  <span>JASA</span>
+                  <span className="font-mono text-[9px] text-[#e0a6e3]">{sortConfig?.key === 'jasa' ? (sortConfig.direction === 'asc' ? '▲' : '▼') : '↕'}</span>
+                </div>
+              </th>
+              <th className="px-1 py-1 border-r border-[#a930b0] cursor-pointer select-none w-[70px] hover:bg-[#a52fa9] transition-colors" onClick={() => handleSort('tglAmbil')} title="Sortir Tanggal Ambil">
+                <div className="flex items-center justify-between px-0.5">
+                  <span>TGLAMBIL</span>
+                  <span className="font-mono text-[9px] text-[#e0a6e3]">{sortConfig?.key === 'tglAmbil' ? (sortConfig.direction === 'asc' ? '▲' : '▼') : '↕'}</span>
+                </div>
+              </th>
+              <th className="px-1 py-1 border-r border-[#a930b0] cursor-pointer select-none w-[70px] hover:bg-[#a52fa9] transition-colors" onClick={() => handleSort('garansi')} title="Sortir Garansi">
+                <div className="flex items-center justify-between px-0.5">
+                  <span>GARANSI</span>
+                  <span className="font-mono text-[9px] text-[#e0a6e3]">{sortConfig?.key === 'garansi' ? (sortConfig.direction === 'asc' ? '▲' : '▼') : '↕'}</span>
+                </div>
+              </th>
+              <th className="px-1 py-1 cursor-pointer select-none w-[55px] hover:bg-[#a52fa9] transition-colors" onClick={() => handleSort('cashTf')} title="Sortir Metode Bayar">
+                <div className="flex items-center justify-between px-0.5">
+                  <span>BAYAR</span>
+                  <span className="font-mono text-[9px] text-[#e0a6e3]">{sortConfig?.key === 'cashTf' ? (sortConfig.direction === 'asc' ? '▲' : '▼') : '↕'}</span>
+                </div>
+              </th>
             </tr>
           </thead>
           <tbody>

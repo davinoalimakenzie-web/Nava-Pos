@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { Calendar, Sparkles, Loader2, ShoppingCart } from 'lucide-react';
 import { useAppContext } from '../context/AppContext';
 import { defaultDate } from '../data';
-import { formatRp, formatDateDisplay } from '../utils';
+import { formatRp, formatDateDisplay, smartSort } from '../utils';
 import { LegacyWindowHeader } from './LegacyWindowHeader';
 
 export const POS = ({ currentTime }: { currentTime: Date }) => {
@@ -40,6 +40,17 @@ export const POS = ({ currentTime }: { currentTime: Date }) => {
   const [showInputMenu, setShowInputMenu] = useState(false);
   const [showHistoryModal, setShowHistoryModal] = useState(false);
   const [searchNotaRetur, setSearchNotaRetur] = useState('');
+  const [returSortKey, setReturSortKey] = useState('date');
+  const [returSortDirection, setReturSortDirection] = useState<'asc' | 'desc'>('desc');
+
+  const handleReturSort = (key: string) => {
+    if (returSortKey === key) {
+      setReturSortDirection(prev => (prev === 'asc' ? 'desc' : 'asc'));
+    } else {
+      setReturSortKey(key);
+      setReturSortDirection('asc');
+    }
+  };
   const [showBonModal, setShowBonModal] = useState(false);
   const [bonEmployee, setBonEmployee] = useState('');
   const [bonBranch, setBonBranch] = useState(storeSettings.activeBranch || 'Pusat');
@@ -1143,45 +1154,69 @@ export const POS = ({ currentTime }: { currentTime: Date }) => {
                       <table className="w-full text-left text-xs border-collapse">
                           <thead className="bg-[#ece9d8] sticky top-0 shadow-sm z-10 border-b border-gray-400">
                               <tr>
-                                  <th className="p-2 border border-gray-400">FAKTUR</th>
-                                  <th className="p-2 border border-gray-400">TANGGAL</th>
-                                  <th className="p-2 border border-gray-400">PELANGGAN</th>
-                                  <th className="p-2 border border-gray-400 w-24 text-right">TOTAL</th>
-                                  <th className="p-2 border border-gray-400 text-center w-16">AKSI</th>
+                                  <th className="p-2 border border-gray-400 cursor-pointer hover:bg-gray-300" onClick={() => handleReturSort('id')} title="Urutkan Faktur">
+                                      <div className="flex items-center gap-1 justify-between bg-white/20 px-1 py-0.5 rounded font-bold">
+                                          <span>FAKTUR</span>
+                                          <span className="font-mono text-[9px] text-[#000040]">{returSortKey === 'id' ? (returSortDirection === 'asc' ? '▲' : '▼') : '↕'}</span>
+                                      </div>
+                                  </th>
+                                  <th className="p-2 border border-gray-400 cursor-pointer hover:bg-gray-300" onClick={() => handleReturSort('date')} title="Urutkan Tanggal">
+                                      <div className="flex items-center gap-1 justify-between bg-white/20 px-1 py-0.5 rounded font-bold">
+                                          <span>TANGGAL</span>
+                                          <span className="font-mono text-[9px] text-[#000040]">{returSortKey === 'date' ? (returSortDirection === 'asc' ? '▲' : '▼') : '↕'}</span>
+                                      </div>
+                                  </th>
+                                  <th className="p-2 border border-gray-400 cursor-pointer hover:bg-gray-300" onClick={() => handleReturSort('customer')} title="Urutkan Pelanggan">
+                                      <div className="flex items-center gap-1 justify-between bg-white/20 px-1 py-0.5 rounded font-bold">
+                                          <span>PELANGGAN</span>
+                                          <span className="font-mono text-[9px] text-[#000040]">{returSortKey === 'customer' ? (returSortDirection === 'asc' ? '▲' : '▼') : '↕'}</span>
+                                      </div>
+                                  </th>
+                                  <th className="p-2 border border-gray-400 w-24 text-right cursor-pointer hover:bg-gray-300" onClick={() => handleReturSort('total')} title="Urutkan Total">
+                                      <div className="flex items-center gap-1 justify-end bg-white/20 px-1 py-0.5 rounded font-bold">
+                                          <span>TOTAL</span>
+                                          <span className="font-mono text-[9px] text-[#000040]">{returSortKey === 'total' ? (returSortDirection === 'asc' ? '▲' : '▼') : '↕'}</span>
+                                      </div>
+                                  </th>
+                                  <th className="p-2 border border-gray-400 text-center w-16 text-gray-500 font-bold select-none">AKSI</th>
                               </tr>
                           </thead>
                           <tbody>
-                              {transactions.slice().reverse().filter((t: any) => !searchNotaRetur || t.id.toLowerCase().includes(searchNotaRetur.toLowerCase())).slice(0, searchNotaRetur ? 200 : 50).map((t: any) => (
-                                  <tr key={t.id} className="hover:bg-blue-50 border-b border-gray-300">
-                                      <td className="p-2 border-r border-gray-400 font-bold">{t.id}</td>
-                                      <td className="p-2 border-r border-gray-400">{t.date}</td>
-                                      <td className="p-2 border-r border-gray-400 truncate max-w-[120px]">{t.customer}</td>
-                                      <td className="p-2 border-r border-gray-400 font-medium text-right text-blue-900">{formatRp(t.total)}</td>
-                                      <td className="p-2 text-center p-1">
-                                          <button onClick={() => {
-                                              const matchCust = customers.find((c: any) => c.name === t.customer);
-                                              if (matchCust) setSelectedCustomerId(String(matchCust.id));
-                                              
-                                              const returnItems = t.items.filter((i: any) => i.qty > 0).map((item: any) => ({
-                                                  ...item,
-                                                  cartUniqueId: 'RET-' + item.id + '-' + Date.now() + Math.random(),
-                                                  code: 'RETUR',
-                                                  name: `(Retur) ${item.name}`,
-                                                  price: Math.abs(item.price),
-                                                  qty: item.qty,
-                                                  originalQty: item.qty,
-                                                  isReturn: true,
-                                                  originalTrxId: t.id,
-                                                  originalItemId: item.id
-                                              }));
-                                              // we just clear activeReturTrx since we don't need the banner anymore, and put items to cart
-                                              setActiveReturTrx(null);
-                                              setCart([...cart, ...returnItems]);
-                                              setShowHistoryModal(false);
-                                          }} className="bg-red-600 text-white px-2 py-1 font-bold text-xs hover:bg-red-700 shadow border border-red-800">Retur</button>
-                                      </td>
-                                  </tr>
-                              ))}
+                              {(() => {
+                                  const filteredTx = transactions.filter((t: any) => !searchNotaRetur || t.id.toLowerCase().includes(searchNotaRetur.toLowerCase()));
+                                  const sortedTx = smartSort(filteredTx, returSortKey, returSortDirection).slice(0, searchNotaRetur ? 200 : 50);
+                                  return sortedTx.map((t: any) => (
+                                      <tr key={t.id} className="hover:bg-blue-50 border-b border-gray-300">
+                                          <td className="p-2 border-r border-gray-400 font-bold">{t.id}</td>
+                                          <td className="p-2 border-r border-gray-400">{t.date}</td>
+                                          <td className="p-2 border-r border-gray-400 truncate max-w-[120px]">{t.customer}</td>
+                                          <td className="p-2 border-r border-gray-400 font-medium text-right text-blue-900">{formatRp(t.total)}</td>
+                                          <td className="p-2 text-center p-1">
+                                              <button onClick={() => {
+                                                  const matchCust = customers.find((c: any) => c.name === t.customer);
+                                                  if (matchCust) setSelectedCustomerId(String(matchCust.id));
+                                                  
+                                                  const returnItems = t.items.filter((i: any) => i.qty > 0).map((item: any) => ({
+                                                      ...item,
+                                                      cartUniqueId: 'RET-' + item.id + '-' + Date.now() + Math.random(),
+                                                      code: 'RETUR',
+                                                      name: `(Retur) ${item.name}`,
+                                                      price: Math.abs(item.price),
+                                                      qty: item.qty,
+                                                      originalQty: item.qty,
+                                                      isReturn: true,
+                                                      originalTrxId: t.id,
+                                                      originalItemId: item.id
+                                                  }));
+                                                  // we just clear activeReturTrx since we don't need the banner anymore, and put items to cart
+                                                  setActiveReturTrx(null);
+                                                  setCart([...cart, ...returnItems]);
+                                                  setShowHistoryModal(false);
+                                              }} className="bg-red-600 text-white px-2 py-1 font-bold text-xs hover:bg-red-700 shadow border border-red-800">Retur</button>
+                                          </td>
+                                      </tr>
+                                  ));
+                              })()}
                               {transactions.length === 0 && (
                                   <tr><td colSpan={5} className="p-4 text-center text-gray-500 font-bold">Tidak ada riwayat transaksi</td></tr>
                               )}

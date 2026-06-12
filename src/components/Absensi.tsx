@@ -3,6 +3,7 @@ import { Clock, Pencil } from 'lucide-react';
 import { useAppContext } from '../context/AppContext';
 import { LegacyWindowHeader } from './LegacyWindowHeader';
 import { currentMonthStr, defaultDate } from '../data';
+import { smartSort } from '../utils';
 
 export const Absensi = ({ currentTime }: { currentTime: Date }) => {
   const { 
@@ -19,6 +20,37 @@ export const Absensi = ({ currentTime }: { currentTime: Date }) => {
   const [filterEndDate, setFilterEndDate] = useState(defaultDate);
   const [filterBranch, setFilterBranch] = useState('Semua');
   const [absenAction, setAbsenAction] = useState('');
+
+  const [sortKey, setSortKey] = useState('user');
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
+
+  const handleSort = (key: string) => {
+    if (sortKey === key) {
+      setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortKey(key);
+      setSortDirection('asc');
+    }
+  };
+
+  const filteredAttendances = React.useMemo(() => {
+    return attendances.filter((a: any) => {
+      let pass = true;
+      if (filterStartDate) pass = pass && a.date >= filterStartDate;
+      if (filterEndDate) pass = pass && a.date <= filterEndDate;
+      if (filterBranch !== 'Semua') {
+         const empInfo = employees.find((e: any) => e.name === a.user);
+         if (empInfo) pass = pass && empInfo.branch === filterBranch;
+         else pass = false;
+      }
+      if (selectedEmployeeAbsensi) pass = pass && a.user === selectedEmployeeAbsensi;
+      return pass;
+    });
+  }, [attendances, filterStartDate, filterEndDate, filterBranch, selectedEmployeeAbsensi, employees]);
+
+  const sortedFilteredAttendances = React.useMemo(() => {
+    return smartSort(filteredAttendances, sortKey, sortDirection);
+  }, [filteredAttendances, sortKey, sortDirection]);
 
   // Cuti Form State
   const [viewCutiDate, setViewCutiDate] = useState(new Date());
@@ -314,30 +346,59 @@ export const Absensi = ({ currentTime }: { currentTime: Date }) => {
                       </tr>
                     );
                   })()}
-                  <tr>
-                    <th className="p-2 border-r">Nama Karyawan</th>
-                    <th className="p-2 border-r text-center">Tanggal</th>
-                    <th className="p-2 border-r text-center">Jam Masuk</th>
-                    <th className="p-2 border-r text-center">Jam Keluar</th>
-                    <th className="p-2 border-r text-center">Status</th>
-                    <th className="p-2 border-r text-center"><Clock className="w-4 h-4 inline-block"/> Keterlambatan</th>
-                    <th className="p-2 border-r text-center text-red-600">Denda Telat</th>
-                    <th className="p-2 text-center text-red-600 font-bold">Kasbon</th>
+                  <tr className="bg-[#ece9d8] text-blue-900 border-b border-gray-400 select-none text-xs">
+                    <th className="p-2 border-r border-gray-300 cursor-pointer hover:bg-gray-200" onClick={() => handleSort('user')} title="Urutkan Nama Karyawan">
+                      <div className="flex items-center gap-1.5 justify-between">
+                        <span>Nama Karyawan</span>
+                        <span className="font-mono text-[9px] text-[#000080]">{sortKey === 'user' ? (sortDirection === 'asc' ? '▲' : '▼') : '↕'}</span>
+                      </div>
+                    </th>
+                    <th className="p-2 border-r border-gray-300 cursor-pointer hover:bg-gray-200 text-center" onClick={() => handleSort('date')} title="Urutkan Tanggal">
+                      <div className="flex items-center gap-1.5 justify-center">
+                        <span>Tanggal</span>
+                        <span className="font-mono text-[9px] text-[#000080]">{sortKey === 'date' ? (sortDirection === 'asc' ? '▲' : '▼') : '↕'}</span>
+                      </div>
+                    </th>
+                    <th className="p-2 border-r border-gray-300 cursor-pointer hover:bg-gray-200 text-center" onClick={() => handleSort('timeIn')} title="Urutkan Jam Masuk">
+                      <div className="flex items-center gap-1.5 justify-center">
+                        <span>Jam Masuk</span>
+                        <span className="font-mono text-[9px] text-[#000080]">{sortKey === 'timeIn' ? (sortDirection === 'asc' ? '▲' : '▼') : '↕'}</span>
+                      </div>
+                    </th>
+                    <th className="p-2 border-r border-gray-300 cursor-pointer hover:bg-gray-200 text-center" onClick={() => handleSort('timeOut')} title="Urutkan Jam Keluar">
+                      <div className="flex items-center gap-1.5 justify-center">
+                        <span>Jam Keluar</span>
+                        <span className="font-mono text-[9px] text-[#000080]">{sortKey === 'timeOut' ? (sortDirection === 'asc' ? '▲' : '▼') : '↕'}</span>
+                      </div>
+                    </th>
+                    <th className="p-2 border-r border-gray-300 cursor-pointer hover:bg-gray-200 text-center" onClick={() => handleSort('status')} title="Urutkan Status">
+                      <div className="flex items-center gap-1.5 justify-center">
+                        <span>Status</span>
+                        <span className="font-mono text-[9px] text-[#000080]">{sortKey === 'status' ? (sortDirection === 'asc' ? '▲' : '▼') : '↕'}</span>
+                      </div>
+                    </th>
+                    <th className="p-2 border-r border-gray-300 cursor-pointer hover:bg-gray-200 text-center" onClick={() => handleSort('lateMins')} title="Urutkan Keterlambatan">
+                      <div className="flex items-center gap-1.5 justify-center">
+                        <span><Clock className="w-3.5 h-3.5 inline-block mr-1"/>Keterlambatan</span>
+                        <span className="font-mono text-[9px] text-[#000080]">{sortKey === 'lateMins' ? (sortDirection === 'asc' ? '▲' : '▼') : '↕'}</span>
+                      </div>
+                    </th>
+                    <th className="p-2 border-r border-gray-300 text-center text-red-600 cursor-pointer hover:bg-gray-200" onClick={() => handleSort('lateMins')} title="Urutkan Denda">
+                      <div className="flex items-center gap-1.5 justify-center">
+                        <span>Denda Telat</span>
+                        <span className="font-mono text-[9px] text-red-650">{sortKey === 'lateMins' ? (sortDirection === 'asc' ? '▲' : '▼') : '↕'}</span>
+                      </div>
+                    </th>
+                    <th className="p-2 text-center text-red-600 font-bold cursor-pointer hover:bg-gray-200" onClick={() => handleSort('user')} title="Urutkan Kasbon">
+                      <div className="flex items-center gap-1.5 justify-center">
+                        <span>Kasbon</span>
+                        <span className="font-mono text-[9px] text-red-650">{sortKey === 'user' ? (sortDirection === 'asc' ? '▲' : '▼') : '↕'}</span>
+                      </div>
+                    </th>
                   </tr>
                 </thead>
                 <tbody>
-                  {attendances.filter((a: any) => {
-                      let pass = true;
-                      if (filterStartDate) pass = pass && a.date >= filterStartDate;
-                      if (filterEndDate) pass = pass && a.date <= filterEndDate;
-                      if (filterBranch !== 'Semua') {
-                         const empInfo = employees.find((e: any) => e.name === a.user);
-                         if (empInfo) pass = pass && empInfo.branch === filterBranch;
-                         else pass = false;
-                      }
-                      if (selectedEmployeeAbsensi) pass = pass && a.user === selectedEmployeeAbsensi;
-                      return pass;
-                  }).map((a: any) => (
+                  {sortedFilteredAttendances.map((a: any) => (
                       <tr key={a.id} className="border-b">
                         <td className="p-2 border-r font-bold">{a.user}</td>
                         <td className="p-2 border-r font-mono text-center text-sm">{a.date.split('-').reverse().join('/')}</td>

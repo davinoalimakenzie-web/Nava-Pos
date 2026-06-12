@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useAppContext } from '../context/AppContext';
-import { formatRp } from '../utils';
+import { formatRp, smartSort } from '../utils';
 import { DownloadCloud } from 'lucide-react';
 import { initialInventory, initialCustomers, initialTransactions, initialPiutang, initialExpenses, initialOrderData } from '../data';
 
@@ -40,6 +40,30 @@ export const GlobalModals = () => {
     const [pendingSearch, setPendingSearch] = useState('');
     const [selectedPendingId, setSelectedPendingId] = useState<string | null>(null);
     const [showAllPending, setShowAllPending] = useState(false);
+
+    // Sorting states
+    const [pendingSortKey, setPendingSortKey] = useState('dateString');
+    const [pendingSortDirection, setPendingSortDirection] = useState<'asc' | 'desc'>('desc');
+    const [piutangSortKey, setPiutangSortKey] = useState('id');
+    const [piutangSortDirection, setPiutangSortDirection] = useState<'asc' | 'desc'>('asc');
+
+    const handlePendingSort = (key: string) => {
+        if (pendingSortKey === key) {
+            setPendingSortDirection(prev => (prev === 'asc' ? 'desc' : 'asc'));
+        } else {
+            setPendingSortKey(key);
+            setPendingSortDirection('asc');
+        }
+    };
+
+    const handlePiutangSort = (key: string) => {
+        if (piutangSortKey === key) {
+            setPiutangSortDirection(prev => (prev === 'asc' ? 'desc' : 'asc'));
+        } else {
+            setPiutangSortKey(key);
+            setPiutangSortDirection('asc');
+        }
+    };
 
     const loadPendingTransaction = (pendingItem: any) => {
         setCart(pendingItem.items);
@@ -230,14 +254,34 @@ export const GlobalModals = () => {
                              <table className="w-full text-left border-collapse text-xs">
                              <thead className="sticky top-0 bg-white shadow-sm z-10">
                                  <tr className="border-b border-gray-400">
-                                 <th className="p-1 px-2 border-r border-gray-300 font-normal">KODE PENDING</th>
-                                 <th className="p-1 px-2 border-r border-gray-300 font-normal">TANGGAL</th>
-                                 <th className="p-1 px-2 border-r border-gray-300 font-normal w-1/3">PELANGGAN</th>
-                                 <th className="p-1 px-2 border-gray-300 font-normal">SALES</th>
+                                 <th className="p-1 px-2 border-r border-gray-300 font-normal cursor-pointer hover:bg-gray-200 select-none" onClick={() => handlePendingSort('id')} title="Urutkan Kode">
+                                     <div className="flex items-center gap-1 justify-between">
+                                         <span>KODE PENDING</span>
+                                         <span className="font-mono text-[9px] text-[#000080]">{pendingSortKey === 'id' ? (pendingSortDirection === 'asc' ? '▲' : '▼') : '↕'}</span>
+                                     </div>
+                                 </th>
+                                 <th className="p-1 px-2 border-r border-gray-300 font-normal cursor-pointer hover:bg-gray-200 select-none" onClick={() => handlePendingSort('dateString')} title="Urutkan Tanggal">
+                                     <div className="flex items-center gap-1 justify-between">
+                                         <span>TANGGAL</span>
+                                         <span className="font-mono text-[9px] text-[#000080]">{pendingSortKey === 'dateString' ? (pendingSortDirection === 'asc' ? '▲' : '▼') : '↕'}</span>
+                                     </div>
+                                 </th>
+                                 <th className="p-1 px-2 border-r border-gray-300 font-normal w-1/3 cursor-pointer hover:bg-gray-200 select-none" onClick={() => handlePendingSort('customerName')} title="Urutkan Pelanggan">
+                                     <div className="flex items-center gap-1 justify-between">
+                                         <span>PELANGGAN</span>
+                                         <span className="font-mono text-[9px] text-[#000080]">{pendingSortKey === 'customerName' ? (pendingSortDirection === 'asc' ? '▲' : '▼') : '↕'}</span>
+                                     </div>
+                                 </th>
+                                 <th className="p-1 px-2 border-gray-300 font-normal cursor-pointer hover:bg-gray-200 select-none" onClick={() => handlePendingSort('sales')} title="Urutkan Sales">
+                                     <div className="flex items-center gap-1 justify-between">
+                                         <span>SALES</span>
+                                         <span className="font-mono text-[9px] text-[#000080]">{pendingSortKey === 'sales' ? (pendingSortDirection === 'asc' ? '▲' : '▼') : '↕'}</span>
+                                     </div>
+                                 </th>
                                  </tr>
                              </thead>
                              <tbody>
-                                 {filteredPendingTransactions.map((p: any) => (
+                                 {smartSort(filteredPendingTransactions, pendingSortKey, pendingSortDirection).map((p: any) => (
                                  <tr 
                                    key={p.id} 
                                    onClick={() => setSelectedPendingId(p.id)}
@@ -297,15 +341,35 @@ export const GlobalModals = () => {
                         <table className="w-full text-left bg-white border border-gray-400 border-collapse">
                         <thead>
                             <tr className="border-b-2 border-gray-400 bg-gray-100">
-                            <th className="p-2 border-r border-gray-300 font-bold">ID / Waktu</th>
-                            <th className="p-2 border-r border-gray-300 font-bold">Pelanggan</th>
-                            <th className="p-2 border-r border-gray-300 font-bold text-right">Total Transaksi</th>
-                            <th className="p-2 border-r border-gray-300 font-bold text-right">Sisa Tagihan</th>
-                            <th className="p-2 font-bold text-center">Aksi</th>
+                            <th className="p-2 border-r border-gray-300 font-bold cursor-pointer hover:bg-gray-200 select-none text-[#000080]" onClick={() => handlePiutangSort('id')} title="Urutkan ID">
+                                <div className="flex items-center gap-1 justify-between bg-white/40 px-1 py-0.5 rounded">
+                                    <span>ID / Waktu</span>
+                                    <span className="font-mono text-[9px] text-[#000080]">{piutangSortKey === 'id' ? (piutangSortDirection === 'asc' ? '▲' : '▼') : '↕'}</span>
+                                </div>
+                            </th>
+                            <th className="p-2 border-r border-gray-300 font-bold cursor-pointer hover:bg-gray-200 select-none text-[#000080]" onClick={() => handlePiutangSort('customer')} title="Urutkan Pelanggan">
+                                <div className="flex items-center gap-1 justify-between bg-white/40 px-1 py-0.5 rounded">
+                                    <span>Pelanggan</span>
+                                    <span className="font-mono text-[9px] text-[#000080]">{piutangSortKey === 'customer' ? (piutangSortDirection === 'asc' ? '▲' : '▼') : '↕'}</span>
+                                </div>
+                            </th>
+                            <th className="p-2 border-r border-gray-300 font-bold text-right cursor-pointer hover:bg-gray-200 select-none text-[#000080]" onClick={() => handlePiutangSort('total')} title="Urutkan Total">
+                                <div className="flex items-center gap-1 justify-end bg-white/40 px-1 py-0.5 rounded">
+                                    <span>Total Transaksi</span>
+                                    <span className="font-mono text-[9px] text-[#000080]">{piutangSortKey === 'total' ? (piutangSortDirection === 'asc' ? '▲' : '▼') : '↕'}</span>
+                                </div>
+                            </th>
+                            <th className="p-2 border-r border-gray-300 font-bold text-right cursor-pointer hover:bg-gray-200 select-none text-[#000080]" onClick={() => handlePiutangSort('sisa')} title="Urutkan Sisa">
+                                <div className="flex items-center gap-1 justify-end bg-white/40 px-1 py-0.5 rounded">
+                                    <span>Sisa Tagihan</span>
+                                    <span className="font-mono text-[9px] text-[#000080]">{piutangSortKey === 'sisa' ? (piutangSortDirection === 'asc' ? '▲' : '▼') : '↕'}</span>
+                                </div>
+                            </th>
+                            <th className="p-2 font-bold text-center select-none text-gray-500">Aksi</th>
                             </tr>
                         </thead>
                         <tbody>
-                            {piutangData.map((p: any) => (
+                            {smartSort(piutangData, piutangSortKey, piutangSortDirection).map((p: any) => (
                             <tr key={p.id} className="border-b hover:bg-blue-50">
                                 <td className="p-2 border-r border-gray-300">{p.id} / {p.date.split(' ')[1]}</td>
                                 <td className="p-2 border-r border-gray-300 font-bold">{p.customer}</td>

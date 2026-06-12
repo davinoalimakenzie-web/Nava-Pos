@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { ArrowLeftRight, Truck, Clock, Database, DownloadCloud, UploadCloud, History, Trash2, AlertTriangle, FileJson, RotateCcw, Check } from 'lucide-react';
 import { useAppContext } from '../context/AppContext';
 import { LegacyWindowHeader } from './LegacyWindowHeader';
-import { formatRp, formatDateDisplay } from '../utils';
+import { formatRp, formatDateDisplay, smartSort } from '../utils';
 import { currentMonthStr, defaultDate } from '../data';
 
 export const MasterData = ({ currentTime }: { currentTime: Date }) => {
@@ -41,6 +41,74 @@ export const MasterData = ({ currentTime }: { currentTime: Date }) => {
   const [uploadedFileData, setUploadedFileData] = useState<any | null>(null);
   const [resetInput, setResetInput] = useState('');
   const [showResetConfirm, setShowResetConfirm] = useState(false);
+
+  // Sorting state for Master Stock / Opname
+  const [sortKey, setSortKey] = useState<string>('');
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
+
+  const handleSort = (key: string) => {
+    if (sortKey === key) {
+      setSortDirection(prev => (prev === 'asc' ? 'desc' : 'asc'));
+    } else {
+      setSortKey(key);
+      setSortDirection('asc');
+    }
+  };
+
+  const sortedInventory = React.useMemo(() => {
+    return smartSort(inventory, sortKey, sortDirection);
+  }, [inventory, sortKey, sortDirection]);
+
+  // Sorting state for Order Stock (PO)
+  const [orderSortKey, setOrderSortKey] = useState<string>('');
+  const [orderSortDirection, setOrderSortDirection] = useState<'asc' | 'desc'>('asc');
+
+  const handleOrderSort = (key: string) => {
+    if (orderSortKey === key) {
+      setOrderSortDirection(prev => (prev === 'asc' ? 'desc' : 'asc'));
+    } else {
+      setOrderSortKey(key);
+      setOrderSortDirection('asc');
+    }
+  };
+
+  const sortedOrderData = React.useMemo(() => {
+    return smartSort(orderData || [], orderSortKey, orderSortDirection);
+  }, [orderData, orderSortKey, orderSortDirection]);
+
+  // Sorting state for Stock Return
+  const [returnSortKey, setReturnSortKey] = useState<string>('');
+  const [returnSortDirection, setReturnSortDirection] = useState<'asc' | 'desc'>('asc');
+
+  const handleReturnSort = (key: string) => {
+    if (returnSortKey === key) {
+      setReturnSortDirection(prev => (prev === 'asc' ? 'desc' : 'asc'));
+    } else {
+      setReturnSortKey(key);
+      setReturnSortDirection('asc');
+    }
+  };
+
+  const sortedSupplierReturns = React.useMemo(() => {
+    return smartSort(supplierReturns || [], returnSortKey, returnSortDirection);
+  }, [supplierReturns, returnSortKey, returnSortDirection]);
+
+  // Sorting state for Hutang Supplier
+  const [hutangSortKey, setHutangSortKey] = useState<string>('');
+  const [hutangSortDirection, setHutangSortDirection] = useState<'asc' | 'desc'>('asc');
+
+  const handleHutangSort = (key: string) => {
+    if (hutangSortKey === key) {
+      setHutangSortDirection(prev => (prev === 'asc' ? 'desc' : 'asc'));
+    } else {
+      setHutangSortKey(key);
+      setHutangSortDirection('asc');
+    }
+  };
+
+  const sortedHutangSupplier = React.useMemo(() => {
+    return smartSort(hutangSupplier || [], hutangSortKey, hutangSortDirection);
+  }, [hutangSupplier, hutangSortKey, hutangSortDirection]);
 
   return (
     <div className="flex-1 flex flex-col bg-[#8fb4d9] border border-[#8fb4d9] overflow-hidden">
@@ -109,13 +177,91 @@ export const MasterData = ({ currentTime }: { currentTime: Date }) => {
                  </div>
               )}
               <table className="w-full text-left border-collapse whitespace-nowrap">
-                <thead className="bg-slate-50 border-b-2 border-gray-400 font-normal">
-                  <tr><th className="p-2 border-r border-gray-300">Kode</th><th className="p-2 border-r border-gray-300">Nama Barang</th><th className="p-2 border-r border-gray-300">Kategori</th><th className="p-2 border-r border-gray-300 text-right">Harga Lvl 1</th><th className="p-2 border-r border-gray-300 text-right">Harga Lvl 2</th><th className="p-2 border-r border-gray-300 text-center">Stok</th></tr>
+                <thead className="bg-[#ece9d8] border-b border-gray-400 text-xs font-bold select-none text-blue-950">
+                  <tr>
+                    <th 
+                      onClick={() => handleSort('code')} 
+                      className="p-2 border-r border-gray-300 cursor-pointer hover:bg-gray-200 transition-colors min-w-[70px]"
+                      title="Klik untuk mengurutkan berdasarkan Kode"
+                    >
+                      <div className="flex items-center justify-between gap-1 px-1">
+                        <span>Kode</span>
+                        <span className="text-[9px] text-gray-500 font-mono">
+                          {sortKey === 'code' ? (sortDirection === 'asc' ? '▲' : '▼') : '↕'}
+                        </span>
+                      </div>
+                    </th>
+                    <th 
+                      onClick={() => handleSort('name')} 
+                      className="p-2 border-r border-gray-300 cursor-pointer hover:bg-gray-200 transition-colors"
+                      title="Klik untuk mengurutkan berdasarkan Nama Barang"
+                    >
+                      <div className="flex items-center justify-between gap-1 px-1">
+                        <span>Nama Barang</span>
+                        <span className="text-[9px] text-gray-500 font-mono">
+                          {sortKey === 'name' ? (sortDirection === 'asc' ? '▲' : '▼') : '↕'}
+                        </span>
+                      </div>
+                    </th>
+                    <th 
+                      onClick={() => handleSort('category')} 
+                      className="p-2 border-r border-gray-300 cursor-pointer hover:bg-gray-200 transition-colors min-w-[95px]"
+                      title="Klik untuk mengurutkan berdasarkan Kategori"
+                    >
+                      <div className="flex items-center justify-between gap-1 px-1">
+                        <span>Kategori</span>
+                        <span className="text-[9px] text-gray-500 font-mono">
+                          {sortKey === 'category' ? (sortDirection === 'asc' ? '▲' : '▼') : '↕'}
+                        </span>
+                      </div>
+                    </th>
+                    <th 
+                      onClick={() => handleSort('price1')} 
+                      className="p-2 border-r border-gray-300 text-right cursor-pointer hover:bg-gray-200 transition-colors min-w-[100px]"
+                      title="Klik untuk mengurutkan berdasarkan Harga Lvl 1"
+                    >
+                      <div className="flex items-center justify-end gap-1 px-1">
+                        <span>Harga Lvl 1</span>
+                        <span className="text-[9px] text-gray-500 font-mono">
+                          {sortKey === 'price1' ? (sortDirection === 'asc' ? '▲' : '▼') : '↕'}
+                        </span>
+                      </div>
+                    </th>
+                    <th 
+                      onClick={() => handleSort('price2')} 
+                      className="p-2 border-r border-gray-300 text-right cursor-pointer hover:bg-gray-200 transition-colors min-w-[100px]"
+                      title="Klik untuk mengurutkan berdasarkan Harga Lvl 2"
+                    >
+                      <div className="flex items-center justify-end gap-1 px-1">
+                        <span>Harga Lvl 2</span>
+                        <span className="text-[9px] text-gray-500 font-mono">
+                          {sortKey === 'price2' ? (sortDirection === 'asc' ? '▲' : '▼') : '↕'}
+                        </span>
+                      </div>
+                    </th>
+                    <th 
+                      onClick={() => handleSort('stock')} 
+                      className="p-2 border-r border-gray-300 text-center cursor-pointer hover:bg-gray-200 transition-colors min-w-[70px]"
+                      title="Klik untuk mengurutkan berdasarkan Stok"
+                    >
+                      <div className="flex items-center justify-center gap-1.5 px-1">
+                        <span>Stok</span>
+                        <span className="text-[9px] text-gray-500 font-mono">
+                          {sortKey === 'stock' ? (sortDirection === 'asc' ? '▲' : '▼') : '↕'}
+                        </span>
+                      </div>
+                    </th>
+                  </tr>
                 </thead>
                 <tbody>
-                  {inventory.map((item: any) => (
-                    <tr key={item.id} className="border-b border-gray-200 hover:bg-blue-50">
-                      <td className="p-2 border-r border-gray-300">{item.code}</td><td className="p-2 border-r border-gray-300 font-bold">{item.name}</td><td className="p-2 border-r border-gray-300">{item.category || '-'}</td><td className="p-2 border-r border-gray-300 text-right">{formatRp(item.price1)}</td><td className="p-2 border-r border-gray-300 text-right">{formatRp(item.price2)}</td><td className={`p-2 border-r border-gray-300 text-center font-bold text-sm ${item.stock <= 2 ? 'text-red-600' : 'text-black'}`}>{item.stock}</td>
+                  {sortedInventory.map((item: any) => (
+                    <tr key={item.id} className="border-b border-gray-200 hover:bg-blue-50 text-xs text-black">
+                      <td className="p-2 border-r border-gray-300 font-mono font-bold text-gray-700">{item.code}</td>
+                      <td className="p-2 border-r border-gray-300 font-bold">{item.name}</td>
+                      <td className="p-2 border-r border-gray-300 font-medium text-gray-600">{item.category || '-'}</td>
+                      <td className="p-2 border-r border-gray-300 text-right font-mono text-gray-800">{formatRp(item.price1)}</td>
+                      <td className="p-2 border-r border-gray-300 text-right font-mono text-gray-800">{formatRp(item.price2)}</td>
+                      <td className={`p-2 border-r border-gray-300 text-center font-mono font-bold text-sm ${item.stock <= 2 ? 'text-red-600' : 'text-emerald-700'}`}>{item.stock}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -128,24 +274,49 @@ export const MasterData = ({ currentTime }: { currentTime: Date }) => {
             <div className="flex flex-col h-full">
               <div className="bg-[#ece9d8] border-b border-gray-400 p-2 font-bold sticky top-0 z-20">Sesuaikan Fisik Gudang & Sistem</div>
               <table className="w-full text-left border-collapse whitespace-nowrap">
-                <thead className="bg-slate-50 border-b-2 border-gray-400 font-normal">
-                  <tr><th className="p-2 border-r border-gray-300">Kode</th><th className="p-2 border-r border-gray-300">Nama Barang</th><th className="p-2 border-r border-gray-300 text-center">Stok Sistem</th><th className="p-2 border-r border-gray-300 text-center">Fisik Aktual</th><th className="p-2 text-center">Aksi</th></tr>
+                <thead className="bg-[#ece9d8] border-b-2 border-gray-400 font-bold text-blue-900 text-xs">
+                  <tr>
+                    <th className="p-2 border-r border-gray-300 cursor-pointer hover:bg-gray-200 select-none" onClick={() => handleSort('code')} title="Urutkan berdasarkan Kode">
+                      <div className="flex items-center gap-1.5 justify-between">
+                        <span>Kode</span>
+                        <span className="text-[10px] text-gray-500 font-mono">{sortKey === 'code' ? (sortDirection === 'asc' ? '▲' : '▼') : '↕'}</span>
+                      </div>
+                    </th>
+                    <th className="p-2 border-r border-gray-300 cursor-pointer hover:bg-gray-200 select-none" onClick={() => handleSort('name')} title="Urutkan berdasarkan Nama Barang">
+                      <div className="flex items-center gap-1.5 justify-between">
+                        <span>Nama Barang</span>
+                        <span className="text-[10px] text-gray-500 font-mono">{sortKey === 'name' ? (sortDirection === 'asc' ? '▲' : '▼') : '↕'}</span>
+                      </div>
+                    </th>
+                    <th className="p-2 border-r border-gray-300 cursor-pointer hover:bg-gray-200 select-none text-center w-36" onClick={() => handleSort('stock')} title="Urutkan berdasarkan Stok Sistem">
+                      <div className="flex items-center gap-1.5 justify-center">
+                        <span>Stok Sistem</span>
+                        <span className="text-[10px] text-gray-500 font-mono">{sortKey === 'stock' ? (sortDirection === 'asc' ? '▲' : '▼') : '↕'}</span>
+                      </div>
+                    </th>
+                    <th className="p-2 border-r border-gray-300 text-center w-40">Fisik Aktual</th>
+                    <th className="p-2 text-center w-28">Aksi</th>
+                  </tr>
                 </thead>
                 <tbody>
-                  {inventory.map((item: any) => (
-                    <tr key={item.id} className="border-b border-gray-200 hover:bg-blue-50">
-                      <td className="p-2 border-r border-gray-300">{item.code}</td><td className="p-2 border-r border-gray-300 font-bold">{item.name}</td><td className="p-2 border-r border-gray-300 text-center font-bold text-sm">{item.stock}</td>
+                  {sortedInventory.map((item: any) => (
+                    <tr key={item.id} className="border-b border-gray-200 hover:bg-blue-50 text-xs text-black">
+                      <td className="p-2 border-r border-gray-300 font-mono font-bold text-gray-700">{item.code}</td>
+                      <td className="p-2 border-r border-gray-300 font-bold">{item.name}</td>
+                      <td className="p-2 border-r border-gray-300 text-center font-bold text-sm text-[#000080]">{item.stock}</td>
                       <td className="p-2 border-r border-gray-300 text-center">
-                        <input type="number" value={opnameInputs[item.id] !== undefined ? opnameInputs[item.id] : ''} onChange={e => setOpnameInputs({...opnameInputs, [item.id]: parseInt(e.target.value) || 0})} className="w-24 border border-gray-400 p-1 text-center font-bold outline-none focus:border-blue-500" placeholder={item.stock} />
+                        <input type="number" value={opnameInputs[item.id] !== undefined ? opnameInputs[item.id] : ''} onChange={e => setOpnameInputs({...opnameInputs, [item.id]: parseInt(e.target.value) || 0})} className="w-24 border border-gray-400 p-1 text-center font-bold outline-none focus:border-blue-500 text-black bg-white" placeholder={String(item.stock)} />
                       </td>
-                      <td className="p-2 text-center"><button onClick={() => {
+                      <td className="p-2 text-center">
+                        <button onClick={() => {
                           if (opnameInputs[item.id] !== undefined) {
                               setInventory(inventory.map((i:any) => i.id === item.id ? { ...i, stock: opnameInputs[item.id] } : i));
                               const newInputs = {...opnameInputs};
                               delete newInputs[item.id];
                               setOpnameInputs(newInputs);
                           }
-                      }} className={`px-3 py-1 font-bold shadow border ${opnameInputs[item.id] !== undefined && opnameInputs[item.id] !== item.stock ? 'bg-green-600 text-white border-green-800 hover:bg-green-700' : 'bg-gray-200 border-gray-500 hover:bg-gray-300'}`}>Update</button></td>
+                        }} className={`px-3 py-1 font-bold shadow border text-xs ${opnameInputs[item.id] !== undefined && opnameInputs[item.id] !== item.stock ? 'bg-green-600 text-white border-green-800 hover:bg-green-700' : 'bg-gray-200 text-black border-gray-500 hover:bg-gray-300'}`}>Update</button>
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -170,11 +341,49 @@ export const MasterData = ({ currentTime }: { currentTime: Date }) => {
                    <p className="text-gray-500 italic mt-2">Tidak ada barang yang perlu diorder saat ini (Stok Aman).</p>
                ) : (
                    <table className="w-full text-left border-collapse whitespace-nowrap mt-2 border border-gray-400 shadow-sm">
-                      <thead className="bg-[#ece9d8] border-b-2 border-gray-400 font-normal">
-                        <tr><th className="p-2 border-r border-gray-300">No PO / Tgl</th><th className="p-2 border-r border-gray-300">Supliyer</th><th className="p-2 border-r border-gray-300">Item</th><th className="p-2 border-r border-gray-300 text-center">Sisa Stok</th><th className="p-2 border-r border-gray-300 text-center">Target Order</th><th className="p-2 border-r border-gray-300 text-center">Status</th><th className="p-2 text-center">Aksi</th></tr>
+                      <thead className="bg-[#ece9d8] border-b-2 border-gray-400 font-bold text-blue-900 select-none text-xs">
+                        <tr>
+                          <th className="p-2 border-r border-gray-300 cursor-pointer hover:bg-gray-200" onClick={() => handleOrderSort('id')} title="Urutkan No PO / Tgl">
+                            <div className="flex items-center gap-1.5 justify-between">
+                              <span>No PO / Tgl</span>
+                              <span className="font-mono text-[9px] text-[#000080]">{orderSortKey === 'id' ? (orderSortDirection === 'asc' ? '▲' : '▼') : '↕'}</span>
+                            </div>
+                          </th>
+                          <th className="p-2 border-r border-gray-300 cursor-pointer hover:bg-gray-200" onClick={() => handleOrderSort('supplier')} title="Urutkan Supliyer">
+                            <div className="flex items-center gap-1.5 justify-between">
+                              <span>Supliyer</span>
+                              <span className="font-mono text-[9px] text-[#000080]">{orderSortKey === 'supplier' ? (orderSortDirection === 'asc' ? '▲' : '▼') : '↕'}</span>
+                            </div>
+                          </th>
+                          <th className="p-2 border-r border-gray-300 cursor-pointer hover:bg-gray-200" onClick={() => handleOrderSort('item')} title="Urutkan Item">
+                            <div className="flex items-center gap-1.5 justify-between">
+                              <span>Item</span>
+                              <span className="font-mono text-[9px] text-[#000080]">{orderSortKey === 'item' ? (orderSortDirection === 'asc' ? '▲' : '▼') : '↕'}</span>
+                            </div>
+                          </th>
+                          <th className="p-2 border-r border-gray-300 text-center cursor-pointer hover:bg-gray-200 font-bold" onClick={() => handleOrderSort('sisaStock')} title="Urutkan Sisa Stok">
+                            <div className="flex items-center gap-1.5 justify-center">
+                              <span>Sisa Stok</span>
+                              <span className="font-mono text-[9px] text-[#000080]">{orderSortKey === 'sisaStock' ? (orderSortDirection === 'asc' ? '▲' : '▼') : '↕'}</span>
+                            </div>
+                          </th>
+                          <th className="p-2 border-r border-gray-300 text-center cursor-pointer hover:bg-gray-200 font-bold" onClick={() => handleOrderSort('targetOrder')} title="Urutkan Target Order">
+                            <div className="flex items-center gap-1.5 justify-center">
+                              <span>Target Order</span>
+                              <span className="font-mono text-[9px] text-[#000080]">{orderSortKey === 'targetOrder' ? (orderSortDirection === 'asc' ? '▲' : '▼') : '↕'}</span>
+                            </div>
+                          </th>
+                          <th className="p-2 border-r border-gray-300 text-center cursor-pointer hover:bg-gray-200 font-bold" onClick={() => handleOrderSort('status')} title="Urutkan Status">
+                            <div className="flex items-center gap-1.5 justify-center">
+                              <span>Status</span>
+                              <span className="font-mono text-[9px] text-[#000080]">{orderSortKey === 'status' ? (orderSortDirection === 'asc' ? '▲' : '▼') : '↕'}</span>
+                            </div>
+                          </th>
+                          <th className="p-2 text-center w-24">Aksi</th>
+                        </tr>
                       </thead>
                       <tbody>
-                        {orderData.filter((o: any) => o.sisaStock <= 2).map((o: any) => (
+                        {sortedOrderData.filter((o: any) => o.sisaStock <= 2).map((o: any) => (
                            <tr key={o.id} className="border-b border-gray-200 hover:bg-blue-50">
                               <td className="p-2 border-r border-gray-300 font-bold">{o.id}<br/><span className="text-[10px] text-gray-500 font-normal">{o.date}</span></td>
                               <td className="p-2 border-r border-gray-300 font-bold text-blue-800">{o.supplier}</td>
@@ -252,13 +461,56 @@ export const MasterData = ({ currentTime }: { currentTime: Date }) => {
               <h3 className="font-bold border-b pb-1">Riwayat Retur ke Supliyer</h3>
               <table className="w-full text-left border-collapse whitespace-nowrap border border-gray-400 mt-2">
                  <thead className="bg-[#ece9d8] border-b-2 border-gray-400 font-bold text-sm">
-                    <tr><th className="p-2 border-r border-gray-300">ID Retur</th><th className="p-2 border-r border-gray-300">Tanggal</th><th className="p-2 border-r border-gray-300">Supliyer</th><th className="p-2 border-r border-gray-300">Barang Rusak</th><th className="p-2 border-r border-gray-300">Kendala</th><th className="p-2 border-r border-gray-300 text-center">Qty</th><th className="p-2 border-gray-300 text-center">Status</th></tr>
+                    <tr>
+                      <th className="p-2 border-r border-gray-300 cursor-pointer hover:bg-gray-200" onClick={() => handleReturnSort('id')} title="Urutkan ID Retur">
+                        <div className="flex items-center gap-1.5 justify-between">
+                          <span>ID Retur</span>
+                          <span className="font-mono text-[9px] text-gray-500">{returnSortKey === 'id' ? (returnSortDirection === 'asc' ? '▲' : '▼') : '↕'}</span>
+                        </div>
+                      </th>
+                      <th className="p-2 border-r border-gray-300 cursor-pointer hover:bg-gray-200" onClick={() => handleReturnSort('date')} title="Urutkan Tanggal">
+                        <div className="flex items-center gap-1.5 justify-between">
+                          <span>Tanggal</span>
+                          <span className="font-mono text-[9px] text-gray-500">{returnSortKey === 'date' ? (returnSortDirection === 'asc' ? '▲' : '▼') : '↕'}</span>
+                        </div>
+                      </th>
+                      <th className="p-2 border-r border-gray-300 cursor-pointer hover:bg-gray-200" onClick={() => handleReturnSort('supplierName')} title="Urutkan Supliyer">
+                        <div className="flex items-center gap-1.5 justify-between">
+                          <span>Supliyer</span>
+                          <span className="font-mono text-[9px] text-gray-500">{returnSortKey === 'supplierName' ? (returnSortDirection === 'asc' ? '▲' : '▼') : '↕'}</span>
+                        </div>
+                      </th>
+                      <th className="p-2 border-r border-gray-300 cursor-pointer hover:bg-gray-200" onClick={() => handleReturnSort('itemName')} title="Urutkan Barang Rusak">
+                        <div className="flex items-center gap-1.5 justify-between">
+                          <span>Barang Rusak</span>
+                          <span className="font-mono text-[9px] text-gray-500">{returnSortKey === 'itemName' ? (returnSortDirection === 'asc' ? '▲' : '▼') : '↕'}</span>
+                        </div>
+                      </th>
+                      <th className="p-2 border-r border-gray-300 cursor-pointer hover:bg-gray-200" onClick={() => handleReturnSort('kendala')} title="Urutkan Kendala">
+                        <div className="flex items-center gap-1.5 justify-between">
+                          <span>Kendala</span>
+                          <span className="font-mono text-[9px] text-gray-500">{returnSortKey === 'kendala' ? (returnSortDirection === 'asc' ? '▲' : '▼') : '↕'}</span>
+                        </div>
+                      </th>
+                      <th className="p-2 border-r border-gray-300 text-center cursor-pointer hover:bg-gray-200 font-bold" onClick={() => handleReturnSort('qty')} title="Urutkan Qty">
+                        <div className="flex items-center gap-1.5 justify-center">
+                          <span>Qty</span>
+                          <span className="font-mono text-[9px] text-gray-500">{returnSortKey === 'qty' ? (returnSortDirection === 'asc' ? '▲' : '▼') : '↕'}</span>
+                        </div>
+                      </th>
+                      <th className="p-2 text-center cursor-pointer hover:bg-gray-200 font-bold" onClick={() => handleReturnSort('status')} title="Urutkan Status">
+                        <div className="flex items-center gap-1.5 justify-center">
+                          <span>Status</span>
+                          <span className="font-mono text-[9px] text-gray-500">{returnSortKey === 'status' ? (returnSortDirection === 'asc' ? '▲' : '▼') : '↕'}</span>
+                        </div>
+                      </th>
+                    </tr>
                  </thead>
                  <tbody className="text-sm">
                     {supplierReturns.length === 0 ? (
                        <tr><td colSpan={7} className="text-center p-4 italic text-gray-500">Belum ada data retur.</td></tr>
                     ) : (
-                       supplierReturns.map((r: any) => (
+                       sortedSupplierReturns.map((r: any) => (
                           <tr key={r.id} className="border-b border-gray-300 hover:bg-gray-100">
                              <td className="p-2 border-r border-gray-300 font-mono font-bold text-red-700">{r.id}</td>
                              <td className="p-2 border-r border-gray-300">{r.date}</td>
@@ -404,17 +656,47 @@ export const MasterData = ({ currentTime }: { currentTime: Date }) => {
               <table className="w-full text-left border-collapse whitespace-nowrap">
                 <thead className="bg-slate-50 border-b-2 border-gray-400 font-normal">
                   <tr>
-                    <th className="p-2 border-r border-gray-300 text-center">Nota</th>
-                    <th className="p-2 border-r border-gray-300">Supplier</th>
-                    <th className="p-2 border-r border-gray-300">Tgl Beli</th>
-                    <th className="p-2 border-r border-gray-300">Jatuh Tempo</th>
-                    <th className="p-2 border-r border-gray-300 text-right">Nilai Hutang</th>
-                    <th className="p-2 border-r border-gray-300 text-right">Sisa Hutang</th>
-                    <th className="p-2 text-center">Aksi</th>
+                    <th className="p-2 border-r border-gray-300 text-center cursor-pointer hover:bg-gray-200 text-xs font-bold text-blue-900 select-none" onClick={() => handleHutangSort('nomor_nota')} title="Urutkan Nota">
+                      <div className="flex items-center gap-1.5 justify-center">
+                        <span>Nota</span>
+                        <span className="font-mono text-[9px] text-[#000080]">{hutangSortKey === 'nomor_nota' ? (hutangSortDirection === 'asc' ? '▲' : '▼') : '↕'}</span>
+                      </div>
+                    </th>
+                    <th className="p-2 border-r border-gray-300 cursor-pointer hover:bg-gray-200 text-xs font-bold text-blue-900 select-none" onClick={() => handleHutangSort('supplier_nama')} title="Urutkan Supplier">
+                      <div className="flex items-center gap-1.5 justify-between">
+                        <span>Supplier</span>
+                        <span className="font-mono text-[9px] text-[#000080]">{hutangSortKey === 'supplier_nama' ? (hutangSortDirection === 'asc' ? '▲' : '▼') : '↕'}</span>
+                      </div>
+                    </th>
+                    <th className="p-2 border-r border-gray-300 cursor-pointer hover:bg-gray-200 text-xs font-bold text-blue-900 select-none" onClick={() => handleHutangSort('tanggal_beli')} title="Urutkan Tgl Beli">
+                      <div className="flex items-center gap-1.5 justify-between">
+                        <span>Tgl Beli</span>
+                        <span className="font-mono text-[9px] text-[#000080]">{hutangSortKey === 'tanggal_beli' ? (hutangSortDirection === 'asc' ? '▲' : '▼') : '↕'}</span>
+                      </div>
+                    </th>
+                    <th className="p-2 border-r border-gray-300 cursor-pointer hover:bg-gray-200 text-xs font-bold text-blue-900 select-none" onClick={() => handleHutangSort('tanggal_jatuh_tempo')} title="Urutkan Jatuh Tempo">
+                      <div className="flex items-center gap-1.5 justify-between">
+                        <span>Jatuh Tempo</span>
+                        <span className="font-mono text-[9px] text-[#000080]">{hutangSortKey === 'tanggal_jatuh_tempo' ? (hutangSortDirection === 'asc' ? '▲' : '▼') : '↕'}</span>
+                      </div>
+                    </th>
+                    <th className="p-2 border-r border-gray-300 text-right cursor-pointer hover:bg-gray-200 text-xs font-bold text-blue-900 select-none" onClick={() => handleHutangSort('nilai_hutang')} title="Urutkan Nilai Hutang">
+                      <div className="flex items-center gap-1.5 justify-end">
+                        <span>Nilai Hutang</span>
+                        <span className="font-mono text-[9px] text-[#000080]">{hutangSortKey === 'nilai_hutang' ? (hutangSortDirection === 'asc' ? '▲' : '▼') : '↕'}</span>
+                      </div>
+                    </th>
+                    <th className="p-2 border-r border-gray-300 text-right cursor-pointer hover:bg-gray-200 text-xs font-bold text-blue-900 select-none" onClick={() => handleHutangSort('sisa_hutang')} title="Urutkan Sisa Hutang">
+                      <div className="flex items-center gap-1.5 justify-end">
+                        <span>Sisa Hutang</span>
+                        <span className="font-mono text-[9px] text-[#000080]">{hutangSortKey === 'sisa_hutang' ? (hutangSortDirection === 'asc' ? '▲' : '▼') : '↕'}</span>
+                      </div>
+                    </th>
+                    <th className="p-2 text-center w-24 text-xs font-bold text-blue-900 select-none">Aksi</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {(hutangSupplier||[]).filter((h: any) => h.sisa_hutang > 0).map((h: any) => {
+                  {sortedHutangSupplier.filter((h: any) => h.sisa_hutang > 0).map((h: any) => {
                     const diffDays = Math.ceil((new Date(h.tanggal_jatuh_tempo).getTime() - new Date().setHours(0,0,0,0)) / (1000 * 60 * 60 * 24));
                     return (
                         <tr key={h.id} className="border-b border-gray-200 hover:bg-blue-50">

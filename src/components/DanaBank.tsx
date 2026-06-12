@@ -1,7 +1,60 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { CustomDatePicker } from './CustomDatePicker';
+import { smartSort } from '../utils';
 
 export const DanaBank = () => {
+  const [leftData, setLeftData] = useState([
+    { tgl: '07 Feb 2026', jenis: 'SP DANA BANK', nota: '7981', tek: 'AND', part: 'GANTI LCD', harga: 91000, ket: '', nominal: 91000, status: 'DONE BELUM DIAMBIL' },
+    { tgl: '24 Feb 2026', jenis: 'SP DANA BANK', nota: '11842', tek: 'AND', part: 'MATI TOTAL', harga: 58000, ket: '', nominal: 58000, status: 'PROGRESS' },
+    { tgl: '18 Apr 2026', jenis: 'SP DANA BANK', nota: '12471', tek: 'UDN', part: 'GANTI LCD', harga: 848000, ket: '', nominal: 871000, status: 'PROGRESS' },
+    { tgl: '13 May 2026', jenis: 'SP DANA BANK', nota: '12945', tek: 'SMD', part: 'GANTI LCD', harga: 130000, ket: '', nominal: 130000, status: 'DONE BELUM DIAMBIL' },
+    { tgl: '07 Jun 2026', jenis: 'SPTB-RTTN', nota: '13093', tek: 'UDN', part: 'TIDAK BISA DICAS, MATI', harga: 2000, ket: 'BATT OPP BLP673 - UDN', nominal: 95000, status: 'SP TAMBAHAN' }
+  ]);
+
+  const [rightData, setRightData] = useState([
+    { tgl: '02 May 2026', jenis: 'BON URGENT', nota: '', tek: 'ALI', ket: 'BUAT CEKELAN', nominal: 50000 },
+    { tgl: '10 May 2026', jenis: 'BON URGENT', nota: '', tek: 'ALI', ket: 'BUAT CEKELAN', nominal: 100000 },
+    { tgl: '10 May 2026', jenis: 'BON URGENT', nota: '', tek: 'ALI', ket: 'BUAT BELI LIQUID+CAT...', nominal: 218000 },
+    { tgl: '12 May 2026', jenis: 'BON URGENT', nota: '', tek: 'ALI', ket: 'BUAT CEKELAN', nominal: 250000 },
+    { tgl: '12 May 2026', jenis: 'BON URGENT', nota: '', tek: 'IRF', ket: 'BUAT CEKELAN', nominal: 500000 },
+    { tgl: '13 May 2026', jenis: 'BON URGENT', nota: '', tek: 'ALI', ket: 'BAYAR PAKET PAMPES+...', nominal: 300000 },
+    { tgl: '07 Jun 2026', jenis: 'SPTB-RTTN', nota: '13093', tek: 'UDN', ket: 'BATT OPP BLP673 - UDN', nominal: 95000 }
+  ]);
+
+  // Left sorting state
+  const [leftSortKey, setLeftSortKey] = useState('tgl');
+  const [leftSortDirection, setLeftSortDirection] = useState<'asc' | 'desc'>('asc');
+
+  // Right sorting state
+  const [rightSortKey, setRightSortKey] = useState('tgl');
+  const [rightSortDirection, setRightSortDirection] = useState<'asc' | 'desc'>('asc');
+
+  const handleLeftSort = (key: string) => {
+    if (leftSortKey === key) {
+      setLeftSortDirection(prev => (prev === 'asc' ? 'desc' : 'asc'));
+    } else {
+      setLeftSortKey(key);
+      setLeftSortDirection('asc');
+    }
+  };
+
+  const handleRightSort = (key: string) => {
+    if (rightSortKey === key) {
+      setRightSortDirection(prev => (prev === 'asc' ? 'desc' : 'asc'));
+    } else {
+      setRightSortKey(key);
+      setRightSortDirection('asc');
+    }
+  };
+
+  const sortedLeftData = React.useMemo(() => {
+    return smartSort(leftData, leftSortKey, leftSortDirection);
+  }, [leftData, leftSortKey, leftSortDirection]);
+
+  const sortedRightData = React.useMemo(() => {
+    return smartSort(rightData, rightSortKey, rightSortDirection);
+  }, [rightData, rightSortKey, rightSortDirection]);
+
   return (
     <div className="flex-1 flex flex-row overflow-hidden bg-[#3b003b] text-white">
       {/* Left side: Form */}
@@ -96,75 +149,78 @@ export const DanaBank = () => {
         {/* Left Table */}
         <div className="flex-1 bg-[#a3b1c6] mt-1 overflow-auto border border-gray-400 relative">
           <table className="w-full text-black text-[11px]">
-            <thead className="bg-[#f0f0f0] sticky top-0 z-10 border-b-2 border-gray-400">
+            <thead className="bg-[#f0f0f0] sticky top-0 z-10 border-b-2 border-gray-400 select-none">
               <tr>
-                <th className="px-1.5 py-1 text-left font-normal border-r border-gray-300 w-[70px] leading-tight">TGL<br/>INPUT</th>
-                <th className="px-1.5 py-1 text-left font-normal border-r border-gray-300">JENIS</th>
-                <th className="px-1.5 py-1 text-left font-normal border-r border-gray-300 w-12">NOTA</th>
-                <th className="px-1.5 py-1 text-left font-normal border-r border-gray-300 w-10">TEK</th>
-                <th className="px-1.5 py-1 text-left font-normal border-r border-gray-300">PART AWAL</th>
-                <th className="px-1.5 py-1 text-left font-normal border-r border-gray-300 w-24">HARGA</th>
-                <th className="px-1.5 py-1 text-left font-normal border-r border-gray-300">KETERANGAN</th>
-                <th className="px-1.5 py-1 text-left font-normal border-r border-gray-300 w-24">NOMINAL</th>
-                <th className="px-1.5 py-1 text-left font-normal border-r border-gray-300">STATUS</th>
+                <th className="px-1.5 py-1 text-left font-bold border-r border-gray-300 w-[70px] cursor-pointer hover:bg-gray-300" onClick={() => handleLeftSort('tgl')} title="Urutkan Tanggal">
+                  <div className="flex items-center gap-1">
+                    <span>TGL INPUT</span>
+                    <span className="font-mono text-[9px] text-[#000080]">{leftSortKey === 'tgl' ? (leftSortDirection === 'asc' ? '▲' : '▼') : '↕'}</span>
+                  </div>
+                </th>
+                <th className="px-1.5 py-1 text-left font-bold border-r border-gray-300 cursor-pointer hover:bg-gray-300" onClick={() => handleLeftSort('jenis')} title="Urutkan Jenis">
+                  <div className="flex items-center gap-1 justify-between">
+                    <span>JENIS</span>
+                    <span className="font-mono text-[9px] text-[#000080]">{leftSortKey === 'jenis' ? (leftSortDirection === 'asc' ? '▲' : '▼') : '↕'}</span>
+                  </div>
+                </th>
+                <th className="px-1.5 py-1 text-left font-bold border-r border-gray-300 w-12 cursor-pointer hover:bg-gray-300" onClick={() => handleLeftSort('nota')} title="Urutkan Nota">
+                  <div className="flex items-center gap-1">
+                    <span>NOTA</span>
+                    <span className="font-mono text-[9px] text-[#000080]">{leftSortKey === 'nota' ? (leftSortDirection === 'asc' ? '▲' : '▼') : '↕'}</span>
+                  </div>
+                </th>
+                <th className="px-1.5 py-1 text-left font-bold border-r border-gray-300 w-10 cursor-pointer hover:bg-gray-300" onClick={() => handleLeftSort('tek')} title="Urutkan Teknisi">
+                  <div className="flex items-center gap-1">
+                    <span>TEK</span>
+                    <span className="font-mono text-[9px] text-[#000080]">{leftSortKey === 'tek' ? (leftSortDirection === 'asc' ? '▲' : '▼') : '↕'}</span>
+                  </div>
+                </th>
+                <th className="px-1.5 py-1 text-left font-bold border-r border-gray-300 cursor-pointer hover:bg-gray-300" onClick={() => handleLeftSort('part')} title="Urutkan Part">
+                  <div className="flex items-center gap-1 justify-between">
+                    <span>PART AWAL</span>
+                    <span className="font-mono text-[9px] text-[#000080]">{leftSortKey === 'part' ? (leftSortDirection === 'asc' ? '▲' : '▼') : '↕'}</span>
+                  </div>
+                </th>
+                <th className="px-1.5 py-1 text-right font-bold border-r border-gray-300 w-24 cursor-pointer hover:bg-gray-300" onClick={() => handleLeftSort('harga')} title="Urutkan Harga">
+                  <div className="flex items-center justify-end gap-1">
+                    <span>HARGA</span>
+                    <span className="font-mono text-[9px] text-[#000080]">{leftSortKey === 'harga' ? (leftSortDirection === 'asc' ? '▲' : '▼') : '↕'}</span>
+                  </div>
+                </th>
+                <th className="px-1.5 py-1 text-left font-bold border-r border-gray-300 cursor-pointer hover:bg-gray-300" onClick={() => handleLeftSort('ket')} title="Urutkan Keterangan">
+                  <div className="flex items-center gap-1 justify-between">
+                    <span>KETERANGAN</span>
+                    <span className="font-mono text-[9px] text-[#000080]">{leftSortKey === 'ket' ? (leftSortDirection === 'asc' ? '▲' : '▼') : '↕'}</span>
+                  </div>
+                </th>
+                <th className="px-1.5 py-1 text-right font-bold border-r border-gray-300 w-24 cursor-pointer hover:bg-gray-300" onClick={() => handleLeftSort('nominal')} title="Urutkan Nominal">
+                  <div className="flex items-center justify-end gap-1">
+                    <span>NOMINAL</span>
+                    <span className="font-mono text-[9px] text-[#000080]">{leftSortKey === 'nominal' ? (leftSortDirection === 'asc' ? '▲' : '▼') : '↕'}</span>
+                  </div>
+                </th>
+                <th className="px-1.5 py-1 text-left font-bold border-r border-gray-300 cursor-pointer hover:bg-gray-300" onClick={() => handleLeftSort('status')} title="Urutkan Status">
+                  <div className="flex items-center gap-1 justify-between">
+                    <span>STATUS</span>
+                    <span className="font-mono text-[9px] text-[#000080]">{leftSortKey === 'status' ? (leftSortDirection === 'asc' ? '▲' : '▼') : '↕'}</span>
+                  </div>
+                </th>
               </tr>
             </thead>
             <tbody className="bg-white">
-              <tr className="border-b border-gray-200">
-                <td className="px-1.5 py-1 text-center border-r border-gray-200">07 Feb 2026</td>
-                <td className="px-1.5 py-1 border-r border-gray-200">SP DANA BANK</td>
-                <td className="px-1.5 py-1 text-center border-r border-gray-200">7981</td>
-                <td className="px-1.5 py-1 text-center border-r border-gray-200">AND</td>
-                <td className="px-1.5 py-1 border-r border-gray-200">GANTI LCD</td>
-                <td className="px-1.5 py-1 text-right border-r border-gray-200">Rp 91.000</td>
-                <td className="px-1.5 py-1 border-r border-gray-200"></td>
-                <td className="px-1.5 py-1 text-right border-r border-gray-200">Rp 91.000</td>
-                <td className="px-1.5 py-1 border-r border-gray-200">DONE BELUM DIAMBIL</td>
-              </tr>
-              <tr className="border-b border-gray-200">
-                <td className="px-1.5 py-1 text-center border-r border-gray-200">24 Feb 2026</td>
-                <td className="px-1.5 py-1 border-r border-gray-200">SP DANA BANK</td>
-                <td className="px-1.5 py-1 text-center border-r border-gray-200">11842</td>
-                <td className="px-1.5 py-1 text-center border-r border-gray-200">AND</td>
-                <td className="px-1.5 py-1 border-r border-gray-200">MATI TOTAL</td>
-                <td className="px-1.5 py-1 text-right border-r border-gray-200">Rp 58.000</td>
-                <td className="px-1.5 py-1 border-r border-gray-200"></td>
-                <td className="px-1.5 py-1 text-right border-r border-gray-200">Rp 58.000</td>
-                <td className="px-1.5 py-1 border-r border-gray-200">PROGRESS</td>
-              </tr>
-              <tr className="border-b border-gray-200">
-                <td className="px-1.5 py-1 text-center border-r border-gray-200">18 Apr 2026</td>
-                <td className="px-1.5 py-1 border-r border-gray-200">SP DANA BANK</td>
-                <td className="px-1.5 py-1 text-center border-r border-gray-200">12471</td>
-                <td className="px-1.5 py-1 text-center border-r border-gray-200">UDN</td>
-                <td className="px-1.5 py-1 border-r border-gray-200">GANTI LCD</td>
-                <td className="px-1.5 py-1 text-right border-r border-gray-200">Rp 848.000</td>
-                <td className="px-1.5 py-1 border-r border-gray-200"></td>
-                <td className="px-1.5 py-1 text-right border-r border-gray-200">Rp 871.000</td>
-                <td className="px-1.5 py-1 border-r border-gray-200">PROGRESS</td>
-              </tr>
-              <tr className="border-b border-gray-200">
-                <td className="px-1.5 py-1 text-center border-r border-gray-200">13 May 2026</td>
-                <td className="px-1.5 py-1 border-r border-gray-200">SP DANA BANK</td>
-                <td className="px-1.5 py-1 text-center border-r border-gray-200">12945</td>
-                <td className="px-1.5 py-1 text-center border-r border-gray-200">SMD</td>
-                <td className="px-1.5 py-1 border-r border-gray-200">GANTI LCD</td>
-                <td className="px-1.5 py-1 text-right border-r border-gray-200">Rp 130.000</td>
-                <td className="px-1.5 py-1 border-r border-gray-200"></td>
-                <td className="px-1.5 py-1 text-right border-r border-gray-200">Rp 130.000</td>
-                <td className="px-1.5 py-1 border-r border-gray-200">DONE BELUM DIAMBIL</td>
-              </tr>
-              <tr className="border-b border-gray-200 bg-[#3399ff] text-white">
-                <td className="px-1.5 py-1 text-center border-r border-[#66b2ff]">07 Jun 2026</td>
-                <td className="px-1.5 py-1 border-r border-[#66b2ff]">SPTB-RTTN</td>
-                <td className="px-1.5 py-1 text-center border-r border-[#66b2ff]">13093</td>
-                <td className="px-1.5 py-1 text-center border-r border-[#66b2ff]">UDN</td>
-                <td className="px-1.5 py-1 border-r border-[#66b2ff]">TIDAK BISA DICAS, MATI</td>
-                <td className="px-1.5 py-1 text-right border-r border-[#66b2ff]">Rp 2.000</td>
-                <td className="px-1.5 py-1 border-r border-[#66b2ff]">BATT OPP BLP673 - UDN</td>
-                <td className="px-1.5 py-1 text-right border-r border-[#66b2ff]">Rp 95.000</td>
-                <td className="px-1.5 py-1 border-r border-[#66b2ff]">SP TAMBAHAN</td>
-              </tr>
+              {sortedLeftData.map((row, i) => (
+                <tr key={i} className={`border-b border-gray-200 hover:bg-blue-50 ${row.tgl === '07 Jun 2026' ? 'bg-[#3399ff] text-white hover:bg-[#3399ff]' : ''}`}>
+                  <td className="px-1.5 py-1 text-center border-r border-gray-200">{row.tgl}</td>
+                  <td className="px-1.5 py-1 border-r border-gray-200">{row.jenis}</td>
+                  <td className="px-1.5 py-1 text-center border-r border-gray-200">{row.nota}</td>
+                  <td className="px-1.5 py-1 text-center border-r border-gray-200">{row.tek}</td>
+                  <td className="px-1.5 py-1 border-r border-gray-200">{row.part}</td>
+                  <td className="px-1.5 py-1 text-right border-r border-gray-200">Rp {row.harga.toLocaleString('id-ID')}</td>
+                  <td className="px-1.5 py-1 border-r border-gray-200">{row.ket}</td>
+                  <td className="px-1.5 py-1 text-right border-r border-gray-200">Rp {row.nominal.toLocaleString('id-ID')}</td>
+                  <td className="px-1.5 py-1 border-r border-gray-200">{row.status}</td>
+                </tr>
+              ))}
             </tbody>
           </table>
         </div>
@@ -199,74 +255,57 @@ export const DanaBank = () => {
         {/* Right Table */}
         <div className="flex-1 bg-[#a3b1c6] mt-0.5 overflow-auto border border-gray-400 relative">
           <table className="w-full text-black text-[11px]">
-            <thead className="bg-[#f0f0f0] sticky top-0 z-10 border-b border-gray-300">
+            <thead className="bg-[#f0f0f0] sticky top-0 z-10 border-b border-gray-300 select-none">
               <tr>
-                <th className="px-1.5 py-1 text-left font-normal border-r border-gray-300 w-[60px] leading-tight">TGL<br/>INPUT</th>
-                <th className="px-1.5 py-1 text-left font-normal border-r border-gray-300 w-24">JENIS</th>
-                <th className="px-1.5 py-1 text-left font-normal border-r border-gray-300 w-12">NOTA</th>
-                <th className="px-1.5 py-1 text-left font-normal border-r border-gray-300 w-10">TEK</th>
-                <th className="px-1.5 py-1 text-left font-normal border-r border-gray-300">KETERANGAN</th>
-                <th className="px-1.5 py-1 text-left font-normal border-r border-gray-300 w-20">NOMINAL</th>
+                <th className="px-1.5 py-1 text-left font-bold border-r border-gray-300 w-[60px] cursor-pointer hover:bg-gray-300" onClick={() => handleRightSort('tgl')} title="Urutkan Tanggal">
+                  <div className="flex items-center gap-1">
+                    <span>TGL INPUT</span>
+                    <span className="font-mono text-[9px] text-[#000080]">{rightSortKey === 'tgl' ? (rightSortDirection === 'asc' ? '▲' : '▼') : '↕'}</span>
+                  </div>
+                </th>
+                <th className="px-1.5 py-1 text-left font-bold border-r border-gray-300 w-24 cursor-pointer hover:bg-gray-300" onClick={() => handleRightSort('jenis')} title="Urutkan Jenis">
+                  <div className="flex items-center gap-1 justify-between">
+                    <span>JENIS</span>
+                    <span className="font-mono text-[9px] text-[#000080]">{rightSortKey === 'jenis' ? (rightSortDirection === 'asc' ? '▲' : '▼') : '↕'}</span>
+                  </div>
+                </th>
+                <th className="px-1.5 py-1 text-left font-bold border-r border-gray-300 w-12 cursor-pointer hover:bg-gray-300" onClick={() => handleRightSort('nota')} title="Urutkan Nota">
+                  <div className="flex items-center gap-1">
+                    <span>NOTA</span>
+                    <span className="font-mono text-[9px] text-[#000080]">{rightSortKey === 'nota' ? (rightSortDirection === 'asc' ? '▲' : '▼') : '↕'}</span>
+                  </div>
+                </th>
+                <th className="px-1.5 py-1 text-left font-bold border-r border-gray-300 w-10 cursor-pointer hover:bg-gray-300" onClick={() => handleRightSort('tek')} title="Urutkan Teknisi">
+                  <div className="flex items-center gap-1">
+                    <span>TEK</span>
+                    <span className="font-mono text-[9px] text-[#000080]">{rightSortKey === 'tek' ? (rightSortDirection === 'asc' ? '▲' : '▼') : '↕'}</span>
+                  </div>
+                </th>
+                <th className="px-1.5 py-1 text-left font-bold border-r border-gray-300 cursor-pointer hover:bg-gray-300" onClick={() => handleRightSort('ket')} title="Urutkan Keterangan">
+                  <div className="flex items-center gap-1 justify-between">
+                    <span>KETERANGAN</span>
+                    <span className="font-mono text-[9px] text-[#000080]">{rightSortKey === 'ket' ? (rightSortDirection === 'asc' ? '▲' : '▼') : '↕'}</span>
+                  </div>
+                </th>
+                <th className="px-1.5 py-1 text-right font-bold border-r border-gray-300 w-20 cursor-pointer hover:bg-gray-300" onClick={() => handleRightSort('nominal')} title="Urutkan Nominal">
+                  <div className="flex items-center justify-end gap-1 font-bold">
+                    <span>NOMINAL</span>
+                    <span className="font-mono text-[9px] text-[#000080]">{rightSortKey === 'nominal' ? (rightSortDirection === 'asc' ? '▲' : '▼') : '↕'}</span>
+                  </div>
+                </th>
               </tr>
             </thead>
             <tbody className="bg-white">
-              <tr className="border-b border-gray-200">
-                <td className="px-1.5 py-1 text-center border-r border-gray-200">02 May 2026</td>
-                <td className="px-1.5 py-1 border-r border-gray-200">BON URGENT</td>
-                <td className="px-1.5 py-1 text-center border-r border-gray-200"></td>
-                <td className="px-1.5 py-1 text-center border-r border-gray-200">ALI</td>
-                <td className="px-1.5 py-1 border-r border-gray-200 truncate max-w-[120px]">BUAT CEKELAN</td>
-                <td className="px-1.5 py-1 text-right border-r border-gray-200">Rp 50.000</td>
-              </tr>
-              <tr className="border-b border-gray-200">
-                <td className="px-1.5 py-1 text-center border-r border-gray-200">10 May 2026</td>
-                <td className="px-1.5 py-1 border-r border-gray-200">BON URGENT</td>
-                <td className="px-1.5 py-1 text-center border-r border-gray-200"></td>
-                <td className="px-1.5 py-1 text-center border-r border-gray-200">ALI</td>
-                <td className="px-1.5 py-1 border-r border-gray-200 truncate max-w-[120px]">BUAT CEKELAN</td>
-                <td className="px-1.5 py-1 text-right border-r border-gray-200">Rp 100.000</td>
-              </tr>
-              <tr className="border-b border-gray-200">
-                <td className="px-1.5 py-1 text-center border-r border-gray-200">10 May 2026</td>
-                <td className="px-1.5 py-1 border-r border-gray-200">BON URGENT</td>
-                <td className="px-1.5 py-1 text-center border-r border-gray-200"></td>
-                <td className="px-1.5 py-1 text-center border-r border-gray-200">ALI</td>
-                <td className="px-1.5 py-1 border-r border-gray-200 truncate max-w-[120px]">BUAT BELI LIQUID+CAT...</td>
-                <td className="px-1.5 py-1 text-right border-r border-gray-200">Rp 218.000</td>
-              </tr>
-              <tr className="border-b border-gray-200">
-                <td className="px-1.5 py-1 text-center border-r border-gray-200">12 May 2026</td>
-                <td className="px-1.5 py-1 border-r border-gray-200">BON URGENT</td>
-                <td className="px-1.5 py-1 text-center border-r border-gray-200"></td>
-                <td className="px-1.5 py-1 text-center border-r border-gray-200">ALI</td>
-                <td className="px-1.5 py-1 border-r border-gray-200 truncate max-w-[120px]">BUAT CEKELAN</td>
-                <td className="px-1.5 py-1 text-right border-r border-gray-200">Rp 250.000</td>
-              </tr>
-              <tr className="border-b border-gray-200">
-                <td className="px-1.5 py-1 text-center border-r border-gray-200">12 May 2026</td>
-                <td className="px-1.5 py-1 border-r border-gray-200">BON URGENT</td>
-                <td className="px-1.5 py-1 text-center border-r border-gray-200"></td>
-                <td className="px-1.5 py-1 text-center border-r border-gray-200">IRF</td>
-                <td className="px-1.5 py-1 border-r border-gray-200 truncate max-w-[120px]">BUAT CEKELAN</td>
-                <td className="px-1.5 py-1 text-right border-r border-gray-200">Rp 500.000</td>
-              </tr>
-              <tr className="border-b border-gray-200">
-                <td className="px-1.5 py-1 text-center border-r border-gray-200">13 May 2026</td>
-                <td className="px-1.5 py-1 border-r border-gray-200">BON URGENT</td>
-                <td className="px-1.5 py-1 text-center border-r border-gray-200"></td>
-                <td className="px-1.5 py-1 text-center border-r border-gray-200">ALI</td>
-                <td className="px-1.5 py-1 border-r border-gray-200 truncate max-w-[120px]">BAYAR PAKET PAMPES+...</td>
-                <td className="px-1.5 py-1 text-right border-r border-gray-200">Rp 300.000</td>
-              </tr>
-              {/* Added a mock selection class to last row as present in the image */}
-              <tr className="border-b border-gray-200 bg-[#3399ff] text-white">
-                <td className="px-1.5 py-1 text-center border-r border-[#66b2ff]">07 Jun 2026</td>
-                <td className="px-1.5 py-1 border-r border-[#66b2ff]">SPTB-RTTN</td>
-                <td className="px-1.5 py-1 text-center border-r border-[#66b2ff]">13093</td>
-                <td className="px-1.5 py-1 text-center border-r border-[#66b2ff]">UDN</td>
-                <td className="px-1.5 py-1 border-r border-[#66b2ff] truncate max-w-[120px]">BATT OPP BLP673 - UDN</td>
-                <td className="px-1.5 py-1 text-right border-r border-[#66b2ff]">Rp 95.000</td>
-              </tr>
+              {sortedRightData.map((row, i) => (
+                <tr key={i} className={`border-b border-gray-200 hover:bg-yellow-50 ${row.tgl === '07 Jun 2026' ? 'bg-[#3399ff] text-white hover:bg-[#3399ff]' : ''}`}>
+                  <td className="px-1.5 py-1 text-center border-r border-gray-200">{row.tgl}</td>
+                  <td className="px-1.5 py-1 border-r border-gray-200">{row.jenis}</td>
+                  <td className="px-1.5 py-1 text-center border-r border-gray-200">{row.nota}</td>
+                  <td className="px-1.5 py-1 text-center border-r border-gray-200">{row.tek}</td>
+                  <td className="px-1.5 py-1 border-r border-gray-200 truncate max-w-[120px]">{row.ket}</td>
+                  <td className="px-1.5 py-1 text-right border-r border-gray-200">Rp {row.nominal.toLocaleString('id-ID')}</td>
+                </tr>
+              ))}
             </tbody>
           </table>
         </div>
