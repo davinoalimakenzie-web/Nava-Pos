@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { Landmark, ArrowRight, UserCheck, ShieldAlert, CheckCircle2, CircleDollarSign, ArrowDownToLine, ReceiptText } from 'lucide-react';
+import React, { useState, useRef, useEffect } from 'react';
+import { Landmark, ArrowRight, UserCheck, ShieldAlert, CheckCircle2, CircleDollarSign, ArrowDownToLine, ReceiptText, Edit } from 'lucide-react';
 import { useAppContext } from '../context/AppContext';
 
 export const DanaBebas = ({ currentTime, headless = false }: { currentTime?: Date; headless?: boolean }) => {
@@ -100,12 +100,81 @@ export const DanaBebas = ({ currentTime, headless = false }: { currentTime?: Dat
   // 2. Pelunasan Supplier Form States
   const [selectedHutangId, setSelectedHutangId] = useState('');
   const [pelunasanAmount, setPelunasanAmount] = useState('');
-  const [pelunasanType, setPelunasanType] = useState<'full' | 'partial'>('full');
+  const [pelunasanType, setPelunasanType] = useState<'full' | 'cicil_1' | 'cicil_2' | 'cicil_3'>('full');
+  const [pelunasanCabang, setPelunasanCabang] = useState(user?.branch || storeSettings?.activeBranch || 'Pusat');
+  const [pelunasanBukti, setPelunasanBukti] = useState<string | null>(null);
+  
+  // Image preview modal state
+  const [previewImage, setPreviewImage] = useState<string | null>(null);
+
+  // Helper date formatter: dd/mm/yyyy
+  const formatSDate = (dateStr: string) => {
+    try {
+      const [datePart] = dateStr.split(' ');
+      const [y, m, d] = datePart.split('-');
+      if (y && m && d) return `${d}/${m}/${y}`;
+      return dateStr;
+    } catch {
+      return dateStr;
+    }
+  };
 
   // 3. Gaji Karyawan (Waiting list bonuses)
   const [bonuses, setBonuses] = useState<{ [key: string]: string }>({});
   const [paymentDates, setPaymentDates] = useState<{ [key: string]: string }>({});
   const [paymentMethods, setPaymentMethods] = useState<{ [key: string]: 'Cash' | 'Transfer' }>({});
+  
+  const [filterGajiBulan, setFilterGajiBulan] = useState(new Date().getMonth() + 1);
+  const [filterGajiTahun, setFilterGajiTahun] = useState(new Date().getFullYear());
+
+  const [doneDeleteState, setDoneDeleteState] = useState<{ [id: string]: boolean }>({});
+
+  const handleCancelAndRecreateSalary = (item: any) => {
+    const totalRefund = item.approvedTotal || (item.salary + (item.approvedBonus || 0));
+    const confirmDelete = window.confirm(
+      `PERINGATAN: Apakah Anda yakin ingin menghapus pembayaran gaji atas nama ${item.name}?\n\n` +
+      `- Saldo Dana Bebas sebesar Rp ${totalRefund.toLocaleString('id-ID')} akan dikembalikan.\n` +
+      `- Laporan pengeluaran gaji ini akan dihapus.\n` +
+      `- Data daftar tunggu item ini akan dihapus, sehingga Anda dapat membuat ulang pengajuan gaji dari menu Absensi jika diperlukan.\n\n` +
+      `Lanjutkan menghapus?`
+    );
+
+    if (!confirmDelete) return;
+
+    // 1. Return the balance to Dana Bebas wallet
+    setWallets((prev: any) => ({
+      ...prev,
+      danaBebas: (prev?.danaBebas || 0) + totalRefund
+    }));
+
+    // 2. Remove from expenses list
+    setExpenses((prevExpenses: any[]) => {
+      const nextExpenses = prevExpenses || [];
+      return nextExpenses.filter((exp: any) => {
+        if (exp.waitingPaymentId) {
+          return exp.waitingPaymentId !== item.id;
+        }
+        const isGaji = exp.category === 'Gaji Karyawan';
+        const nameMatches = exp.name && exp.name.includes(item.name);
+        const amountMatches = exp.amount === totalRefund;
+        return !(isGaji && nameMatches && amountMatches);
+      });
+    });
+
+    // 3. Delete from waitingPayments list
+    setWaitingPayments((prevPayments: any[]) => {
+      const nextPayments = prevPayments || [];
+      return nextPayments.filter((p: any) => p.id !== item.id);
+    });
+
+    // 4. Record dynamic app log
+    addLog(
+      'PENGGAJIAN', 
+      `Membatalkan & Menghapus Pembayaran Gaji ${item.name} sebesar Rp ${totalRefund.toLocaleString('id-ID')} (Dana Bebas dikembalikan)`
+    );
+
+    showToast('success', `Berhasil membatalkan pembayaran gaji ${item.name}. Dana Bebas dikembalikan sebesar Rp ${totalRefund.toLocaleString('id-ID')}.`);
+  };
 
   // 4. Prive Owner Form States
   const [priveAmount, setPriveAmount] = useState('');
@@ -135,6 +204,24 @@ export const DanaBebas = ({ currentTime, headless = false }: { currentTime?: Dat
   // Flow 1: Tarik Dana Bebas / Suntik
   const handleTarikDanaBebas = (e: React.FormEvent) => {
     e.preventDefault();
+
+    if (!tarikNotes.trim()) {
+      showToast('error', 'Catatan / Keperluan penarikan wajib diisi!');
+      return;
+    }
+
+    if (user?.role !== 'admin' && user?.role !== 'owner') {
+      const pin = Math.floor(1000 + Math.random() * 9000);
+      const input = window.prompt(`[PERINGATAN APPROVAL OWNER]\n\nSilahkan minta Owner untuk memasukkan PIN persetujuan berikut:\nPIN: ${pin}`);
+      if (input !== pin.toString()) {
+        showToast('error', 'PIN tidak sesuai atau proses dibatalkan.');
+        return;
+      }
+    } else if (user?.role === 'owner') {
+      const pin = Math.floor(1000 + Math.random() * 9000);
+      window.alert(`[APPROVAL OWNER OTOMATIS]\n\nPIN Approval (${pin}) terisi otomatis karena Anda login sebagai Owner.`);
+    }
+
     const nominal = parseInputNumber(tarikNominal);
     if (!nominal || nominal <= 0) {
       showToast('error', 'Masukkan jumlah nominal yang valid!');
@@ -191,6 +278,11 @@ export const DanaBebas = ({ currentTime, headless = false }: { currentTime?: Dat
   // Flow 2: Pelunasan Supplier
   const handlePelunasanSupplier = (e: React.FormEvent) => {
     e.preventDefault();
+    if (user?.role !== 'admin' && user?.role !== 'owner') {
+       showToast('error', 'Pelunasan hanya dapat dilakukan oleh akun Admin atau Owner!');
+       return;
+    }
+
     if (!selectedHutangId) {
       showToast('error', 'Pilih salah satu hutang supplier yang ingin dilunasi!');
       return;
@@ -224,17 +316,26 @@ export const DanaBebas = ({ currentTime, headless = false }: { currentTime?: Dat
       return;
     }
 
+    if (!window.confirm(`Apakah Anda yakin ingin melakukan pembayaran hutang ke ${targetHutang.supplier_name} sebesar ${formatRp(amt)}?`)) {
+      return;
+    }
+
     const tDate = transactionDate || new Date().toISOString().split('T')[0];
+    const typeLabel = pelunasanType === 'full' ? 'Lunas' : 
+                      pelunasanType === 'cicil_1' ? 'Cicil Tahap 1' :
+                      pelunasanType === 'cicil_2' ? 'Cicil Tahap 2' : 'Cicil Tahap 3';
+
     const newExpense = {
       id: 'EXP-' + Date.now(),
       date: `${tDate} ${new Date().toLocaleTimeString('id-ID')}`,
       isoDate: new Date().toISOString(),
-      name: `Pelunasan Supplier: ${targetHutang.supplier_name} (${targetHutang.id})`,
+      name: `Pelunasan Supplier: ${targetHutang.supplier_name} (${targetHutang.id}) - ${typeLabel}`,
       amount: amt,
       cashier: user?.name || 'Owner',
-      branch: user?.branch || storeSettings?.activeBranch || 'Pusat',
+      branch: pelunasanCabang,
       wallet: 'Dana Bebas',
-      category: 'Pelunasan Supplier'
+      category: 'Pelunasan Supplier',
+      image: pelunasanBukti
     };
 
     // Update Hutang Supplier state
@@ -266,6 +367,8 @@ export const DanaBebas = ({ currentTime, headless = false }: { currentTime?: Dat
 
     setSelectedHutangId('');
     setPelunasanAmount('');
+    setPelunasanType('full');
+    setPelunasanBukti(null);
     showToast('success', `Berhasil membayar supplier ${targetHutang.supplier_name} sebesar ${formatRp(amt)}!`);
   };
 
@@ -298,7 +401,8 @@ export const DanaBebas = ({ currentTime, headless = false }: { currentTime?: Dat
       cashier: user?.name || 'Owner',
       branch: user?.branch || storeSettings?.activeBranch || 'Pusat',
       wallet: 'Dana Bebas',
-      category: 'Gaji Karyawan'
+      category: 'Gaji Karyawan',
+      waitingPaymentId: item.id
     };
     setExpenses([newExpense, ...expenses]);
 
@@ -477,12 +581,6 @@ export const DanaBebas = ({ currentTime, headless = false }: { currentTime?: Dat
           >
             👷 Daftar Tunggu Gaji Karyawan
           </button>
-          <button
-            onClick={() => setActiveControl('prive')}
-            className={`px-3 py-1.5 text-[11px] font-bold transition-all uppercase outline-none ${activeControl === 'prive' ? 'bg-[#1e2b6b] text-white rounded-t border-t border-x border-[#1e2b6b]' : 'bg-gray-200 border-x border-t border-gray-300 text-gray-700 hover:bg-gray-300'}`}
-          >
-            👤 Prive Owner
-          </button>
         </div>
 
         {/* TAB ACTIVE PANEL CONTENT */}
@@ -522,7 +620,7 @@ export const DanaBebas = ({ currentTime, headless = false }: { currentTime?: Dat
                     className="border border-gray-400 px-2 py-1 rounded-sm text-[11px] text-black font-bold focus:border-blue-900 outline-none bg-white h-[32px] w-full"
                   >
                     <option value="laci">DANA LACI KASIR (MASUK LACI)</option>
-                    <option value="tunai">PENGELUARAN TUNAI (OUT LACI)</option>
+                    <option value="tunai">PENGELUARAN TUNAI (OUT LACI) / PRIVE OWNER</option>
                     <option value="suntik">SUNTIK DANA BEBAS (MODAL / OWNER)</option>
                   </select>
                 </div>
@@ -562,6 +660,7 @@ export const DanaBebas = ({ currentTime, headless = false }: { currentTime?: Dat
                       <thead className="bg-gray-100 border-b border-gray-300 text-gray-700 font-bold">
                         <tr>
                           <th className="p-2 border-r border-gray-300">Waktu</th>
+                          <th className="p-2 border-r border-gray-300">Pelaku</th>
                           <th className="p-2 border-r border-gray-300">Deskripsi / Catatan</th>
                           <th className="p-2 border-r border-gray-300 text-center">Kategori</th>
                           <th className="p-2 text-right">Nominal (Rp)</th>
@@ -570,7 +669,8 @@ export const DanaBebas = ({ currentTime, headless = false }: { currentTime?: Dat
                       <tbody className="divide-y divide-gray-200">
                         {arsipTarikDana.slice(0, 50).map((item: any, idx: number) => (
                            <tr key={item.id || idx} className="hover:bg-gray-50 text-black">
-                             <td className="p-2 border-r border-gray-300">{item.date}</td>
+                             <td className="p-2 border-r border-gray-300">{formatSDate(item.date)}</td>
+                             <td className="p-2 border-r border-gray-300 font-medium">{item.cashier || 'Admin'}</td>
                              <td className="p-2 border-r border-gray-300">{item.name}</td>
                              <td className="p-2 border-r border-gray-300 text-center font-bold">
                                <span className={`px-2 py-0.5 rounded text-[10px] ${item.category === 'Modal Masuk' ? 'bg-green-100 text-green-800' : 'bg-orange-100 text-orange-800'}`}>{item.category}</span>
@@ -599,8 +699,8 @@ export const DanaBebas = ({ currentTime, headless = false }: { currentTime?: Dat
                 <span className="text-[10px] text-gray-500">Membayar tagihan hutang supplier</span>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-12 gap-3 items-end">
-                <div className="flex flex-col gap-1 md:col-span-4">
+              <div className="flex flex-col gap-3">
+                <div className="flex flex-col gap-1 w-full">
                   <label className="text-[10px] font-bold text-gray-700">PILIH HUTANG SUPPLIER AKTIF :</label>
                   {listHutangAktif.length === 0 ? (
                     <div className="text-[11px] px-2 py-1 border border-dashed rounded bg-amber-50 text-amber-800 font-bold h-[32px] flex items-center">
@@ -616,75 +716,120 @@ export const DanaBebas = ({ currentTime, headless = false }: { currentTime?: Dat
                       className="border border-gray-400 px-2 py-1 rounded-sm text-xs text-black font-bold focus:border-blue-900 outline-none bg-white h-[32px] w-full"
                     >
                       <option value="">-- PILIH TRANSAKSI HUTANG --</option>
-                      {listHutangAktif.map((h: any) => (
-                        <option key={h.id} value={h.id}>
-                          {h.id} - {h.supplier_name} [Sisa: {formatRp(h.sisa_hutang)}]
-                        </option>
-                      ))}
+                      {[...listHutangAktif].sort((a: any, b: any) => {
+                         const dateA = a.jatuh_tempo || a.tanggal_jatuh_tempo;
+                         const dateB = b.jatuh_tempo || b.tanggal_jatuh_tempo;
+                         if (!dateA) return 1;
+                         if (!dateB) return -1;
+                         return new Date(dateA).getTime() - new Date(dateB).getTime();
+                      }).map((h: any) => {
+                         const jtDateRaw = h.jatuh_tempo || h.tanggal_jatuh_tempo;
+                         let jtStr = '-';
+                         if (jtDateRaw) {
+                           const d = new Date(jtDateRaw);
+                           if (!isNaN(d.getTime())) {
+                             jtStr = `${d.getDate().toString().padStart(2, '0')}/${(d.getMonth() + 1).toString().padStart(2, '0')}/${d.getFullYear()}`;
+                           }
+                         }
+                         const noFaktur = h.nomor_nota || h.id;
+                         return (
+                           <option key={h.id} value={h.id}>
+                             {noFaktur} / {h.supplier_name} / {formatRp(h.sisa_hutang)} / {jtStr}
+                           </option>
+                         );
+                      })}
                     </select>
                   )}
                 </div>
 
                 {selectedHutangItem && (
-                  <div className="bg-amber-50 border border-amber-300 p-1.5 rounded-sm text-[10px] md:col-span-3 h-[32px] flex items-center justify-between">
-                    <span className="font-medium text-gray-600 pr-1">Sisa:</span>
-                    <span className="font-bold text-red-700 text-xs">{formatRp(selectedHutangItem.sisa_hutang)}</span>
-                  </div>
-                )}
+                  <div className="grid grid-cols-1 md:grid-cols-12 gap-2 items-end">
+                    {/* SISA */}
+                    <div className={`flex flex-col gap-1 md:col-span-${pelunasanType !== 'full' ? '2' : '2'}`}>
+                      <label className="text-[10px] font-bold text-gray-700 hidden md:block">&nbsp;</label>
+                      <div className="bg-amber-50 border border-amber-300 p-1.5 rounded-sm text-[10px] h-[32px] flex items-center justify-between">
+                        <span className="font-medium text-gray-600 pr-1">Sisa:</span>
+                        <span className="font-bold text-red-700 text-xs">{formatRp(selectedHutangItem.sisa_hutang)}</span>
+                      </div>
+                    </div>
 
-                {selectedHutangItem && (
-                  <div className="flex flex-col gap-1 md:col-span-3">
-                    <label className="text-[10px] font-bold text-gray-700">METODE PEMBAYARAN :</label>
-                    <div className="flex items-center gap-3 h-[32px]">
-                      <label className="flex items-center gap-1 text-[10px] font-bold text-black cursor-pointer">
+                    {/* METODE PEMBAYARAN */}
+                    <div className={`flex flex-col gap-1 md:col-span-${pelunasanType !== 'full' ? '2' : '3'}`}>
+                      <label className="text-[10px] font-bold text-gray-700 truncate">METODE :</label>
+                      <select
+                        value={pelunasanType}
+                        onChange={(e) => setPelunasanType(e.target.value as any)}
+                        className="border border-gray-400 px-2 py-1 rounded-sm text-[11px] text-black font-bold focus:border-blue-900 outline-none bg-white h-[32px] w-full truncate"
+                      >
+                        <option value="full">Lunas</option>
+                        <option value="cicil_1">Cicil 1</option>
+                        <option value="cicil_2">Cicil 2</option>
+                        <option value="cicil_3">Cicil 3</option>
+                      </select>
+                    </div>
+
+                    {/* NOMINAL CICILAN */}
+                    {pelunasanType !== 'full' && (
+                      <div className="flex flex-col gap-1 md:col-span-2">
+                        <label className="text-[10px] font-bold text-gray-700 truncate">NOMINAL (RP):</label>
                         <input
-                          type="radio"
-                          name="pelunasanType"
-                          checked={pelunasanType === 'full'}
-                          onChange={() => setPelunasanType('full')}
-                          className="text-blue-900 focus:ring-blue-950 w-3 h-3"
+                          type="text"
+                          required
+                          value={pelunasanAmount}
+                          onChange={(e) => {
+                            const num = parseInputNumber(e.target.value);
+                            setPelunasanAmount(num ? num.toLocaleString('id-ID') : '');
+                          }}
+                          className="border border-gray-400 px-2 py-1.5 rounded-sm text-xs text-black font-mono font-bold focus:border-blue-900 outline-none bg-white h-[32px] w-full"
+                          placeholder="Nominal.."
                         />
-                        Lunas
-                      </label>
-                      <label className="flex items-center gap-1 text-[10px] font-bold text-black cursor-pointer">
-                        <input
-                          type="radio"
-                          name="pelunasanType"
-                          checked={pelunasanType === 'partial'}
-                          onChange={() => setPelunasanType('partial')}
-                          className="text-blue-900 focus:ring-blue-950 w-3 h-3"
+                      </div>
+                    )}
+
+                    {/* CABANG */}
+                    <div className={`flex flex-col gap-1 md:col-span-2`}>
+                      <label className="text-[10px] font-bold text-gray-700 truncate">CABANG :</label>
+                      <input
+                        type="text"
+                        value={pelunasanCabang}
+                        onChange={(e) => setPelunasanCabang(e.target.value)}
+                        className="border border-gray-400 px-2 py-1.5 rounded-sm text-xs text-black font-medium focus:border-blue-900 outline-none bg-white h-[32px] w-full"
+                        placeholder="Cabang..."
+                      />
+                    </div>
+
+                    {/* BUKTI TRANSFER */}
+                    <div className={`flex flex-col gap-1 md:col-span-${pelunasanType !== 'full' ? '2' : '3'}`}>
+                      <label className="text-[10px] font-bold text-gray-700 truncate">BUKTI (JPG) :</label>
+                      <label className="cursor-pointer border border-dashed border-gray-400 px-2 py-1.5 rounded-sm text-[10px] text-gray-600 bg-gray-50 flex items-center justify-center hover:bg-gray-100 h-[32px] w-full overflow-hidden">
+                        {pelunasanBukti ? <span className="text-green-700 font-bold truncate">✓ Terlampir</span> : <span className="truncate">+ Upload</span>}
+                        <input 
+                          type="file" 
+                          accept="image/jpeg, image/jpg, image/png"
+                          className="hidden" 
+                          onChange={(e) => {
+                             const file = e.target.files?.[0];
+                             if (file) {
+                               const reader = new FileReader();
+                               reader.onload = (event) => {
+                                 setPelunasanBukti(event.target?.result as string);
+                               };
+                               reader.readAsDataURL(file);
+                             }
+                          }} 
                         />
-                        Cicil
                       </label>
                     </div>
-                  </div>
-                )}
 
-                {selectedHutangItem && pelunasanType === 'partial' && (
-                  <div className="flex flex-col gap-1 md:col-span-2">
-                    <label className="text-[10px] font-bold text-gray-700">NOMINAL (RP) :</label>
-                    <input
-                      type="text"
-                      required
-                      value={pelunasanAmount}
-                      onChange={(e) => {
-                        const num = parseInputNumber(e.target.value);
-                        setPelunasanAmount(num ? num.toLocaleString('id-ID') : '');
-                      }}
-                      className="border border-gray-400 px-2 py-1.5 rounded-sm text-xs text-black font-mono font-bold focus:border-blue-900 outline-none bg-white h-[32px] w-full"
-                      placeholder="Contoh: 500.000"
-                    />
-                  </div>
-                )}
-
-                {selectedHutangItem && (
-                  <div className={`flex justify-end ${pelunasanType === 'partial' ? 'md:col-span-12' : 'md:col-span-2'}`}>
-                    <button
-                      type="submit"
-                      className="bg-amber-700 hover:bg-amber-800 text-white font-bold h-[32px] px-3 w-full rounded-sm text-[11px] flex items-center justify-center gap-1 transition-colors shadow-sm uppercase active:translate-y-px"
-                    >
-                      BAYAR HUTANG
-                    </button>
+                    {/* SUBMIT BUTTON */}
+                    <div className={`flex justify-end md:col-span-2`}>
+                      <button
+                        type="submit"
+                        className="bg-amber-700 hover:bg-amber-800 text-white font-bold h-[32px] px-3 w-full rounded-sm text-[11px] flex items-center justify-center gap-1 transition-colors shadow-sm uppercase active:translate-y-px"
+                      >
+                        BAYAR
+                      </button>
+                    </div>
                   </div>
                 )}
               </div>
@@ -703,15 +848,32 @@ export const DanaBebas = ({ currentTime, headless = false }: { currentTime?: Dat
                       <thead className="bg-amber-50 border-b border-gray-300 text-amber-900 font-bold">
                         <tr>
                           <th className="p-2 border-r border-gray-300">Waktu</th>
+                          <th className="p-2 border-r border-gray-300">Cabang</th>
+                          <th className="p-2 border-r border-gray-300">Pelaku</th>
                           <th className="p-2 border-r border-gray-300">Deskripsi / Catatan</th>
+                          <th className="p-2 border-r border-gray-300 text-center">Struk Bukti</th>
                           <th className="p-2 text-right">Nominal Dibayar (Rp)</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-gray-200">
                         {arsipPelunasan.slice(0, 50).map((item: any, idx: number) => (
                            <tr key={item.id || idx} className="hover:bg-amber-50 text-black">
-                             <td className="p-2 border-r border-gray-300">{item.date}</td>
+                             <td className="p-2 border-r border-gray-300">{formatSDate(item.date)}</td>
+                             <td className="p-2 border-r border-gray-300">{item.branch || '-'}</td>
+                             <td className="p-2 border-r border-gray-300">{item.cashier || 'Admin'}</td>
                              <td className="p-2 border-r border-gray-300 font-bold text-amber-800">{item.name}</td>
+                             <td className="p-2 border-r border-gray-300 text-center">
+                               {item.image ? (
+                                 <button 
+                                   onClick={() => setPreviewImage(item.image)}
+                                   className="text-[10px] bg-blue-100 text-blue-700 px-2 py-0.5 rounded font-bold hover:bg-blue-200 uppercase"
+                                 >
+                                   Lihat
+                                 </button>
+                               ) : (
+                                 <span className="text-[10px] text-gray-400">-</span>
+                               )}
+                             </td>
                              <td className="p-2 text-right font-mono font-bold text-red-600">
                                 -Rp {item.amount.toLocaleString('id-ID')}
                              </td>
@@ -725,36 +887,69 @@ export const DanaBebas = ({ currentTime, headless = false }: { currentTime?: Dat
           </div>
           )}
 
-          {activeControl === 'gaji' && (
-            <div className="flex flex-col gap-3">
-              <div className="flex items-center justify-between border-b border-gray-200 pb-1.5">
-                <span className="font-bold text-xs text-emerald-800 flex items-center gap-1 font-sans">
-                   <UserCheck className="w-4 h-4" />
-                   DAFTAR TUNGGU PEMBAYARAN GAJI KARYAWAN
-                </span>
-                <span className="text-[10px] text-gray-500">Kompensasi atau gaji yang diajukan dari absensi</span>
-              </div>
+          {activeControl === 'gaji' && (() => {
+            const filteredGaji = (waitingPayments || []).filter((item: any) => {
+               const dateObj = item.createdAt ? new Date(item.createdAt) : new Date();
+               return (dateObj.getMonth() + 1) === filterGajiBulan && dateObj.getFullYear() === filterGajiTahun;
+            }).sort((a: any, b: any) => {
+               const dateA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+               const dateB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+               return dateB - dateA;
+            });
 
-              {(!waitingPayments || waitingPayments.length === 0) ? (
-                <div className="py-8 text-center text-gray-500 border border-dashed border-gray-300 bg-gray-50 rounded text-xs">
-                   Tidak ada daftar tunggu pembayaran gaji karyawan saat ini.
+            return (
+              <div className="flex flex-col gap-3">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-gray-200 pb-2.5">
+                  <div className="flex flex-col">
+                    <span className="font-bold text-xs text-emerald-800 flex items-center gap-1 font-sans">
+                       <UserCheck className="w-4 h-4" />
+                       DAFTAR TUNGGU PEMBAYARAN GAJI KARYAWAN
+                    </span>
+                    <span className="text-[10px] text-gray-500">Kompensasi atau gaji yang diajukan dari absensi</span>
+                  </div>
+                  
+                  <div className="flex items-center gap-2 mt-1">
+                    <select
+                      value={filterGajiBulan}
+                      onChange={(e) => setFilterGajiBulan(parseInt(e.target.value))}
+                      className="border border-gray-400 px-2.5 py-1 rounded-sm text-xs font-bold text-gray-700 hover:bg-gray-50 focus:border-blue-900 outline-none w-[130px] bg-white text-center cursor-pointer uppercase shadow-sm h-[30px]"
+                    >
+                      {[...Array(12)].map((_, i) => (
+                        <option key={i+1} value={i+1}>{new Date(2000, i, 1).toLocaleString('id-ID', { month: 'long' }).toUpperCase()}</option>
+                      ))}
+                    </select>
+                    <select
+                      value={filterGajiTahun}
+                      onChange={(e) => setFilterGajiTahun(parseInt(e.target.value))}
+                      className="border border-gray-400 px-2.5 py-1 rounded-sm text-xs font-bold text-gray-700 hover:bg-gray-50 focus:border-blue-900 outline-none w-[90px] bg-white text-center cursor-pointer shadow-sm h-[30px]"
+                    >
+                      {Array.from({ length: 2077 - 2024 + 1 }, (_, i) => 2024 + i).map((yr) => (
+                        <option key={yr} value={yr}>{yr}</option>
+                      ))}
+                    </select>
+                  </div>
                 </div>
-              ) : (
-                <div className="overflow-x-auto border border-gray-300 rounded">
+
+                {filteredGaji.length === 0 ? (
+                  <div className="py-8 text-center text-gray-500 border border-dashed border-gray-300 bg-gray-50 rounded text-xs">
+                     Tidak ada daftar tunggu untuk periode yang dipilih saat ini.
+                  </div>
+                ) : (
+                  <div className="overflow-x-auto border border-gray-300 rounded">
                   <table className="w-full text-left border-collapse whitespace-nowrap text-xs">
                     <thead className="bg-gray-100 border-b border-gray-300 text-gray-700 font-bold">
                       <tr>
                         <th className="p-2 border-r border-gray-300">Nama Karyawan</th>
                         <th className="p-2 border-r border-gray-300 text-center w-36">Tanggal Bayar</th>
                         <th className="p-2 border-r border-gray-300 text-center w-24">Metode</th>
-                        <th className="p-2 border-r border-gray-300 text-right">Gaji Pokok</th>
+                        <th className="p-2 border-r border-gray-300 text-right w-36">Gaji Pokok</th>
                         <th className="p-2 border-r border-gray-300 text-center w-28">Bonus (Rp)</th>
                         <th className="p-2 border-r border-gray-300 text-right">Take Home Pay (THP)</th>
                         <th className="p-2 text-center w-28">Status / Aksi</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-200">
-                      {waitingPayments.map((item: any) => {
+                      {filteredGaji.map((item: any) => {
                         const isApproved = !!item.approved;
                         const displayDate = isApproved 
                           ? (item.approvedDate || (item.createdAt ? item.createdAt.substring(0, 10) : new Date().toISOString().substring(0, 10))) 
@@ -765,6 +960,7 @@ export const DanaBebas = ({ currentTime, headless = false }: { currentTime?: Dat
                         const displayBonus = isApproved 
                           ? (item.approvedBonus || 0) 
                           : (parseInputNumber(bonuses[item.id] || ''));
+
                         const displayTHP = isApproved 
                           ? (item.approvedTotal || (item.salary + displayBonus)) 
                           : (item.salary + displayBonus);
@@ -829,10 +1025,31 @@ export const DanaBebas = ({ currentTime, headless = false }: { currentTime?: Dat
                             </td>
                             <td className="p-2 text-center">
                               {isApproved ? (
-                                <span className="inline-flex items-center gap-1 bg-green-100 text-green-700 border border-green-300 font-bold px-2.5 py-1 text-[10px] rounded shadow-xs uppercase">
-                                  <CheckCircle2 className="w-3.5 h-3.5" />
-                                  DONE
-                                </span>
+                                doneDeleteState[item.id] ? (
+                                  <div className="flex items-center justify-center gap-1">
+                                    <button
+                                      onClick={() => handleCancelAndRecreateSalary(item)}
+                                      className="px-2 py-1 bg-red-600 hover:bg-red-700 text-white font-bold text-[10px] rounded shadow-sm uppercase transition-all"
+                                    >
+                                      HAPUS
+                                    </button>
+                                    <button
+                                      onClick={() => setDoneDeleteState(prev => ({ ...prev, [item.id]: false }))}
+                                      className="px-1.5 py-1 bg-gray-200 hover:bg-gray-300 text-gray-700 font-bold text-[10px] rounded transition-all"
+                                    >
+                                      BATAL
+                                    </button>
+                                  </div>
+                                ) : (
+                                  <button
+                                    onClick={() => setDoneDeleteState(prev => ({ ...prev, [item.id]: true }))}
+                                    className="inline-flex items-center gap-1 bg-green-100 text-green-700 border border-green-300 hover:bg-green-200 hover:border-green-400 font-bold px-2.5 py-1 text-[10px] rounded shadow-xs uppercase cursor-pointer transition-all mx-auto"
+                                    title="Klik untuk membatalkan / menghapus gaji ini"
+                                  >
+                                    <CheckCircle2 className="w-3.5 h-3.5" />
+                                    DONE
+                                  </button>
+                                )
                               ) : (
                                 <button
                                   onClick={() => handleApproveSalary(item)}
@@ -847,101 +1064,28 @@ export const DanaBebas = ({ currentTime, headless = false }: { currentTime?: Dat
                       })}
                     </tbody>
                   </table>
-                </div>
+                  </div>
               )}
             </div>
-          )}
+            );
+          })()}
+        </div>
+      </div>
 
-          {activeControl === 'prive' && (
-            <div className="flex flex-col gap-4">
-              <form onSubmit={handlePriveOwner} className="flex flex-col gap-3">
-              <div className="flex items-center justify-between border-b border-gray-200 pb-1.5">
-                <span className="font-bold text-xs text-purple-800 flex items-center gap-1">
-                   <CircleDollarSign className="w-4 h-4" />
-                   MODUL PRIVE / OWNER DRAWINGS
-                </span>
-                <span className="text-[10px] text-gray-500">Mencatat penarikan kas owner</span>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-12 gap-3 items-end">
-                <div className="flex flex-col gap-1 md:col-span-4">
-                  <label className="text-[10px] font-bold text-gray-700">NOMINAL PRIVE OWNER (RP) :</label>
-                  <input
-                    type="text"
-                    required
-                    value={priveAmount}
-                    onChange={(e) => {
-                      const num = parseInputNumber(e.target.value);
-                      setPriveAmount(num ? num.toLocaleString('id-ID') : '');
-                    }}
-                    className="border border-gray-400 px-2 py-1.5 rounded-sm text-xs text-black font-mono font-bold focus:border-blue-900 outline-none bg-white h-[32px] w-full"
-                    placeholder="Contoh: 5.000.000"
-                  />
-                </div>
-
-                <div className="flex flex-col gap-1 md:col-span-6">
-                  <label className="text-[10px] font-bold text-gray-700">DISKLAMER ALASAN / CATATAN :</label>
-                  <input
-                    type="text"
-                    value={priveNotes}
-                    onChange={(e) => setPriveNotes(e.target.value)}
-                    className="border border-gray-400 px-2 py-1.5 rounded-sm text-xs text-black focus:border-blue-900 outline-none bg-white h-[32px] w-full"
-                    placeholder="Contoh: Prive Rutin Pribadi Owner"
-                  />
-                </div>
-
-                <div className="md:col-span-2">
-                  <button
-                    type="submit"
-                    className="w-full bg-purple-900 hover:bg-purple-800 text-white font-bold h-[32px] rounded-sm text-[11px] flex items-center justify-center gap-1 transition-colors shadow-sm uppercase active:translate-y-px"
-                  >
-                    PROSES PRIVE
-                  </button>
-                </div>
-              </div>
-            </form>
-
-            {/* Arsip Table for Prive Owner */}
-            <div className="flex flex-col gap-2 border-t border-gray-200 pt-4 mt-2">
-               <span className="text-[11px] font-bold text-gray-700 uppercase">Arsip Prive Owner</span>
-               {arsipPrive.length === 0 ? (
-                  <div className="py-4 text-center text-gray-500 border border-dashed border-gray-300 bg-gray-50 rounded text-xs">
-                     Belum ada arsip penarikan prive owner.
-                  </div>
-               ) : (
-                  <div className="overflow-x-auto border border-gray-300 rounded max-h-[300px]">
-                    <table className="w-full text-left border-collapse whitespace-nowrap text-xs">
-                      <thead className="bg-purple-50 border-b border-purple-200 text-purple-900 font-bold">
-                        <tr>
-                          <th className="p-2 border-r border-gray-300">Waktu</th>
-                          <th className="p-2 border-r border-gray-300">Deskripsi / Catatan</th>
-                          <th className="p-2 border-r border-gray-300 text-center">Status</th>
-                          <th className="p-2 text-right">Nominal Prive (Rp)</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-gray-200">
-                        {arsipPrive.slice(0, 50).map((item: any, idx: number) => (
-                           <tr key={item.id || idx} className="hover:bg-purple-50/50 text-black">
-                             <td className="p-2 border-r border-gray-300">{item.date}</td>
-                             <td className="p-2 border-r border-gray-300">{item.name}</td>
-                             <td className="p-2 border-r border-gray-300 text-center font-bold">
-                               <span className="px-2 py-0.5 rounded text-[10px] bg-purple-100 text-purple-800">Selesai</span>
-                             </td>
-                             <td className="p-2 text-right font-mono font-bold text-red-600">
-                                -Rp {item.amount.toLocaleString('id-ID')}
-                             </td>
-                           </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-               )}
+      {/* Image Preview Modal */}
+      {previewImage && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 p-4" onClick={() => setPreviewImage(null)}>
+          <div className="relative bg-white p-2 rounded max-w-3xl max-h-[90vh] overflow-hidden flex flex-col" onClick={e => e.stopPropagation()}>
+            <div className="flex justify-between items-center mb-2 px-2">
+              <span className="font-bold text-sm">Bukti / Struk</span>
+              <button onClick={() => setPreviewImage(null)} className="text-red-600 font-bold hover:text-red-800 text-lg">&times;</button>
+            </div>
+            <div className="overflow-auto flex-1 flex justify-center items-center">
+              <img src={previewImage} alt="Bukti" className="max-w-full max-h-full object-contain" />
             </div>
           </div>
-          )}
         </div>
-
-      </div>
+      )}
     </div>
   );
 };
