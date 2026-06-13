@@ -18,7 +18,9 @@ export const Cashflow = ({ currentTime }: { currentTime: Date }) => {
     setReprintTx,
     setInventory,
     setPiutangData,
-    addLog
+    addLog,
+    setSelectedCustomerId,
+    setActiveReturTrx
   } = useAppContext();
   
   const [cashflowTab, setCashflowTab] = useState('harian');
@@ -26,6 +28,77 @@ export const Cashflow = ({ currentTime }: { currentTime: Date }) => {
   
   const [selectedTrxPopup, setSelectedTrxPopup] = useState<any>(null);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+
+  // Dragging state for POS Mini popup
+  const [popupPos, setPopupPos] = useState({ x: 0, y: 0 });
+  const [isDraggingPopup, setIsDraggingPopup] = useState(false);
+  const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
+
+  React.useEffect(() => {
+    if (selectedTrxPopup) {
+      setPopupPos({ x: 0, y: 0 });
+    }
+  }, [selectedTrxPopup]);
+
+  const handleMouseDown = (e: React.MouseEvent) => {
+    if (e.button !== 0) return;
+    const target = e.target as HTMLElement;
+    if (target.id === 'btn-popup-top-close' || target.closest('button')) return;
+    setIsDraggingPopup(true);
+    setDragStart({ x: e.clientX - popupPos.x, y: e.clientY - popupPos.y });
+  };
+
+  const handleMouseMove = React.useCallback((e: MouseEvent) => {
+    if (!isDraggingPopup) return;
+    setPopupPos({
+      x: e.clientX - dragStart.x,
+      y: e.clientY - dragStart.y
+    });
+  }, [isDraggingPopup, dragStart]);
+
+  const handleMouseUp = React.useCallback(() => {
+    setIsDraggingPopup(false);
+  }, []);
+
+  React.useEffect(() => {
+    if (isDraggingPopup) {
+      window.addEventListener('mousemove', handleMouseMove);
+      window.addEventListener('mouseup', handleMouseUp);
+    } else {
+      window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('mouseup', handleMouseUp);
+    }
+    return () => {
+      window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('mouseup', handleMouseUp);
+    };
+  }, [isDraggingPopup, handleMouseMove, handleMouseUp]);
+
+  // Handle Return from POS Mini Popup
+  const handleReturnFromPopup = () => {
+    if (!selectedTrxPopup) return;
+    const t = selectedTrxPopup;
+    const matchCust = customers.find((c: any) => c.name === t.customer);
+    if (matchCust) {
+      setSelectedCustomerId(String(matchCust.id));
+    }
+    const returnItems = (t.items || []).filter((i: any) => i.qty > 0).map((item: any) => ({
+      ...item,
+      cartUniqueId: 'RET-' + item.id + '-' + Date.now() + Math.random(),
+      code: 'RETUR',
+      name: `(Retur) ${item.name}`,
+      price: Math.abs(item.price),
+      qty: item.qty,
+      originalQty: item.qty,
+      isReturn: true,
+      originalTrxId: t.id,
+      originalItemId: item.id
+    }));
+    setActiveReturTrx(null);
+    setCart([...cart, ...returnItems]);
+    setSelectedTrxPopup(null);
+    setActiveTab('pos');
+  };
   
   const handleDeleteTransaction = () => {
     if (!selectedTrxPopup) return;
@@ -151,6 +224,9 @@ export const Cashflow = ({ currentTime }: { currentTime: Date }) => {
 
   const mappedTransactions = React.useMemo(() => {
     return (filteredTransactions || []).map((trx: any) => {
+      const displayRetur = trx.returTotal || trx.returTotalPopupOnly || 0;
+      const totalGross = (trx.total || 0) + displayRetur;
+      
       let laciMasuk = 0;
       if (trx.method !== 'Qriss/TF') {
         if (trx.type === 'PIUTANG') {
@@ -161,8 +237,6 @@ export const Cashflow = ({ currentTime }: { currentTime: Date }) => {
           laciMasuk = paid - change;
         }
       }
-      const displayRetur = trx.returTotal || trx.returTotalPopupOnly || 0;
-      const totalGross = (trx.total || 0) + displayRetur;
       return {
         ...trx,
         laciMasuk,
@@ -478,19 +552,27 @@ export const Cashflow = ({ currentTime }: { currentTime: Date }) => {
                            }}
                          >
                            <td className="p-3 border-r border-gray-300">{trx.date.split(' ')[0]}</td>
-                           <td className="p-3 border-r border-gray-300 font-mono font-bold text-blue-800">{trx.id}</td>
+                           <td className="p-3 border-r border-gray-300 font-mono font-bold text-black">{trx.id}</td>
                            <td className="p-3 border-r border-gray-300 text-center font-bold">{(trx.items || []).reduce((sum: number, i: any) => sum + i.qty, 0)}</td>
                            <td className="p-3 border-r border-gray-300">{trx.customer}</td>
                            <td className="p-3 border-r border-gray-300 text-center">
-                             <span className={trx.method === 'TUNAI' ? 'text-green-700 font-bold' : 'text-orange-600 font-bold'}>{trx.method}</span>
+                             <span className="text-black font-bold">{trx.method}</span>
                            </td>
                            {filterPaymentMethod !== 'TUNAI' && (
-                             <td className="p-3 border-r border-gray-300 text-center text-red-600 font-medium">
+                             <td className="p-3 border-r border-gray-300 text-center text-black font-medium">
                                {calculateJatuhTempo(trx.isoDate, trx.method)}
                              </td>
                            )}
                            <td className="p-3 border-r border-gray-300 text-right font-bold text-blue-800">{formatRp(trx.totalGross)}</td>
-                           <td className="p-3 border-r border-gray-300 text-right font-bold text-red-600">{formatRp(trx.displayRetur || 0)}</td>
+                           <td className={`p-3 border-r border-gray-300 text-right font-bold ${
+                             (trx.returTotal || 0) > 0
+                               ? 'text-red-600 font-extrabold'
+                               : (trx.returTotalPopupOnly || 0) > 0
+                               ? 'text-blue-600 font-extrabold'
+                               : trx.displayRetur > 0
+                               ? 'text-blue-600 font-extrabold'
+                               : 'text-gray-400 opacity-60'
+                           }`}>{formatRp(trx.displayRetur || 0)}</td>
                            <td className={`p-3 border-r border-gray-300 text-right font-bold ${trx.laciMasuk < 0 ? 'text-red-700' : 'text-green-700'}`}>{formatRp(trx.laciMasuk || 0)}</td>
                            <td className="p-3 border-gray-300 text-center text-gray-600">{trx.cashier}</td>
                          </tr>
@@ -625,10 +707,14 @@ export const Cashflow = ({ currentTime }: { currentTime: Date }) => {
       {/* POPUP DETAIL TRANSAKSI POS MINI */}
       {selectedTrxPopup && (
          <div id="popup-mini-pos-modal" className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center z-50 p-4 transition-all">
-             <div id="popup-card-container" className="bg-[#ece9d8] border-2 border-white shadow-[4px_4px_16px_rgba(0,0,0,0.6)] w-full max-w-lg overflow-hidden flex flex-col font-sans border-b-gray-600 border-r-gray-600">
+             <div 
+                 id="popup-card-container" 
+                 style={{ transform: `translate(${popupPos.x}px, ${popupPos.y}px)` }}
+                 className="bg-[#ece9d8] border-2 border-white shadow-[4px_4px_16px_rgba(0,0,0,0.6)] w-full max-w-lg overflow-hidden flex flex-col font-sans border-b-gray-600 border-r-gray-600 relative select-none pointer-events-auto"
+             >
                  
                  {/* Standard Windows Classical Title Bar */}
-                 <div className="bg-[#000080] text-white p-2 flex items-center justify-between font-bold text-sm select-none shrink-0">
+                 <div onMouseDown={handleMouseDown} className="bg-[#000080] text-white p-2 flex items-center justify-between font-bold text-sm select-none shrink-0 cursor-move">
                      <span className="flex items-center gap-1.5 pl-1">🛍️ POS DETAIL TRANSAKSI (MINI)</span>
                      <button 
                          id="btn-popup-top-close"
@@ -779,12 +865,12 @@ export const Cashflow = ({ currentTime }: { currentTime: Date }) => {
                          🖨️ Cetak
                      </button>
                      <button 
-                         id="btn-popup-cancel"
-                         onClick={() => setSelectedTrxPopup(null)} 
-                         className="bg-gray-400 hover:bg-gray-500 text-black hover:text-white border border-gray-500 px-4 py-2 rounded flex items-center gap-1 shadow-sm transition-colors cursor-pointer"
-                         title="Tutup Jendela Detail"
+                         id="btn-popup-return"
+                         onClick={handleReturnFromPopup} 
+                         className="bg-sky-600 hover:bg-sky-700 text-white border border-sky-700 px-4 py-2 rounded flex items-center gap-1 shadow-sm transition-colors cursor-pointer"
+                         title="Return Transaksi Ini"
                      >
-                         🚫 Batal
+                         🔄 Return
                      </button>
                  </div>
 

@@ -379,7 +379,7 @@ export const POS = ({ currentTime }: { currentTime: Date }) => {
        }
 
        // Automatically create tagihan supplier sesuai nota faktur (Hutang Supplier)
-       if (totalBelanjaBaru > 0) {
+       if (finalTotalCost > 0) {
            const jtDate = (() => {
               try {
                 const parts = transactionDate.split('-'); // YYYY-MM-DD
@@ -401,8 +401,8 @@ export const POS = ({ currentTime }: { currentTime: Date }) => {
                supplier_nama: supplier?.name || 'Unknown',
                tanggal_beli: transactionDate,
                tanggal_jatuh_tempo: jtDate,
-               nilai_hutang: totalBelanjaBaru,
-               sisa_hutang: totalBelanjaBaru,
+               nilai_hutang: finalTotalCost,
+               sisa_hutang: finalTotalCost,
                status: 'belum_jatuh_tempo'
            };
 
@@ -411,7 +411,11 @@ export const POS = ({ currentTime }: { currentTime: Date }) => {
 
        setInventory([...newInvItems, ...currentInv]);
        setTransactions((prev: any) => [newTransaction, ...(prev || [])]);
-       addLog('PEMBELIAN_STOK', `No: ${purchaseFaktur} Total: Rp ${finalTotalCost.toLocaleString('id-ID')} (Hutang supplier dibuat: Rp ${totalBelanjaBaru.toLocaleString('id-ID')})`);
+       if (finalTotalCost > 0) {
+          addLog('PEMBELIAN_STOK', `No: ${purchaseFaktur} Total: Rp ${finalTotalCost.toLocaleString('id-ID')} (Hutang supplier dibuat: Rp ${finalTotalCost.toLocaleString('id-ID')})`);
+        } else {
+          addLog('PEMBELIAN_STOK', `No: ${purchaseFaktur} Total: Rp 0 (Diskon 100%)`);
+        }
        if (shouldPrint) setConfirmAction({message: `Pembelian Stok Tersimpan & Dicetak! (Faktur: ${purchaseFaktur})`, isAlert: true});
        else setConfirmAction({message: 'Pembelian Stok Tersimpan!', isAlert: true});
        setIsInputStockMode(false);
@@ -823,8 +827,9 @@ export const POS = ({ currentTime }: { currentTime: Date }) => {
             
             {(() => {
               const parsedPaid = amountPaid ? parseInt(amountPaid) : 0;
-              const outstandingAmount = !isInputStockMode ? Math.max(0, Math.abs(totalBelanja) - parsedPaid) : Math.abs(totalBelanja);
-              const isCashInLabel = !isInputStockMode ? totalBelanja >= 0 : totalBelanja < 0;
+              const finalTotalCostForBanner = totalBelanjaBaru - (totalBelanjaBaru * stockDiscount / 100);
+               const outstandingAmount = !isInputStockMode ? Math.max(0, Math.abs(totalBelanja) - parsedPaid) : finalTotalCostForBanner;
+              const isCashInLabel = !isInputStockMode ? totalBelanja >= 0 : finalTotalCostForBanner < 0;
               return (
                 <div className={`${isCashInLabel ? "text-green-600" : "text-red-600"} font-bold flex items-baseline gap-2 transition-colors`}>
                   <span className="text-lg tracking-wide uppercase">{isCashInLabel ? "Cash In" : "Cash Out"}</span>
@@ -1373,11 +1378,19 @@ export const POS = ({ currentTime }: { currentTime: Date }) => {
               <p className="text-sm font-bold text-gray-800 text-center mb-6">{confirmAction.message}</p>
               <div className="flex justify-center gap-3">
                 {confirmAction.isAlert ? (
-                   <button onClick={() => { confirmAction.onConfirm && confirmAction.onConfirm(); setConfirmAction(null); }} className="px-5 py-2 border-2 border-blue-900 bg-blue-700 text-white hover:bg-blue-800 font-bold shadow-sm text-xs">OK, MENGERTI</button>
+                   <button onClick={() => {
+                     const cb = confirmAction.onConfirm;
+                     setConfirmAction(null);
+                     if (cb) setTimeout(cb, 50);
+                   }} className="px-5 py-2 border-2 border-blue-900 bg-blue-700 text-white hover:bg-blue-800 font-bold shadow-sm text-xs">OK, MENGERTI</button>
                 ) : (
                    <>
                      <button onClick={() => setConfirmAction(null)} className="px-5 py-2 border-2 border-gray-500 bg-gray-200 hover:bg-gray-300 font-bold shadow-sm text-xs">BATAL</button>
-                     <button onClick={() => { confirmAction.onConfirm && confirmAction.onConfirm(); setConfirmAction(null); }} className="px-5 py-2 border-2 border-blue-900 bg-blue-700 text-white hover:bg-blue-800 font-bold shadow-sm text-xs">YA, LANJUTKAN</button>
+                     <button onClick={() => {
+                       const cb = confirmAction.onConfirm;
+                       setConfirmAction(null);
+                       if (cb) setTimeout(cb, 50);
+                     }} className="px-5 py-2 border-2 border-blue-900 bg-blue-700 text-white hover:bg-blue-800 font-bold shadow-sm text-xs">YA, LANJUTKAN</button>
                    </>
                 )}
               </div>
