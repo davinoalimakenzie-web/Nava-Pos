@@ -1,5 +1,12 @@
 @import "tailwindcss";
 
+input[type="text"], input:not([type]), textarea {
+  text-transform: uppercase;
+}
+input[type="text"]::placeholder, input:not([type])::placeholder, textarea::placeholder {
+  text-transform: uppercase;
+}
+
 input[type="number"]::-webkit-inner-spin-button, 
 input[type="number"]::-webkit-outer-spin-button { 
   -webkit-appearance: none; 

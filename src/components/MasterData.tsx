@@ -16,6 +16,12 @@ export const MasterData = ({ currentTime }: { currentTime: Date }) => {
   } = useAppContext();
 
   const [opnameInputs, setOpnameInputs] = useState<Record<string, number>>({});
+  const [opnameNames, setOpnameNames] = useState<Record<string, string>>({});
+  const [opnameCategories, setOpnameCategories] = useState<Record<string, string>>({});
+  const [opnameModalPrices, setOpnameModalPrices] = useState<Record<string, number>>({});
+  const [opnameLvl1Prices, setOpnameLvl1Prices] = useState<Record<string, number>>({});
+  const [opnameLvl2Prices, setOpnameLvl2Prices] = useState<Record<string, number>>({});
+  const [opnameSuppliers, setOpnameSuppliers] = useState<Record<string, string>>({});
   const [orderChecklist, setOrderChecklist] = useState<Record<string, boolean>>({});
   const [showAddStockModal, setShowAddStockModal] = useState(false);
   const [showAddSupplierModal, setShowAddSupplierModal] = useState(false);
@@ -23,7 +29,7 @@ export const MasterData = ({ currentTime }: { currentTime: Date }) => {
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [selectedHutang, setSelectedHutang] = useState<any>(null);
   
-  const [newStock, setNewStock] = useState({code: '', name: '', category: 'UMUM', supplierPrice: 0, price1: 0, price2: 0, stock: 0});
+  const [newStock, setNewStock] = useState({code: '', name: '', category: 'UMUM', supplierPrice: 0, price1: 0, price2: 0, stock: 0, supplier: ''});
   const [newSupplier, setNewSupplier] = useState({name: '', contact: '', address: ''});
   const [newHutang, setNewHutang] = useState({nota: '', supplier_id: '', supplier_nama: '', tanggal_beli: '', tanggal_jatuh_tempo: '', nilai: ''});
   const [paymentAmount, setPaymentAmount] = useState('');
@@ -159,6 +165,13 @@ export const MasterData = ({ currentTime }: { currentTime: Date }) => {
                         <label className="text-xs font-bold text-gray-700">Stok:</label>
                         <input type="number" className="border border-gray-400 p-1 w-full" value={newStock.stock || ''} onChange={e => setNewStock({...newStock, stock: parseInt(e.target.value) || 0})} />
                     </div>
+                    <div className="flex flex-col gap-1 w-32">
+                        <label className="text-xs font-bold text-gray-700">Supliyer:</label>
+                        <select className="border border-gray-400 p-1 w-full bg-white text-xs select-none" value={newStock.supplier} onChange={e => setNewStock({...newStock, supplier: e.target.value})}>
+                            <option value="">-- Supliyer --</option>
+                            {suppliers?.map((s: any) => <option key={s.id} value={s.name}>{s.name}</option>)}
+                        </select>
+                    </div>
                     <button onClick={() => {
                         if (!newStock.name) return alert('Nama barang wajib diisi!');
                         
@@ -169,14 +182,14 @@ export const MasterData = ({ currentTime }: { currentTime: Date }) => {
                         const p1 = Math.round(val * (1 + margin1/100));
                         const p2 = Math.round(val * (1 + margin2/100));
 
-                        setInventory([...inventory, { id: Date.now().toString(), name: newStock.name, code: newStock.code, category: newStock.category, price1: p1, price2: p2, stock: newStock.stock }]);
-                        setNewStock({code: '', name: '', category: 'UMUM', supplierPrice: 0, price1: 0, price2: 0, stock: 0});
+                        setInventory([...inventory, { id: Date.now().toString(), name: newStock.name, code: newStock.code, category: newStock.category, price1: p1, price2: p2, stock: newStock.stock, supplierPrice: val, supplier: newStock.supplier }]);
+                        setNewStock({code: '', name: '', category: 'UMUM', supplierPrice: 0, price1: 0, price2: 0, stock: 0, supplier: ''});
                         setShowAddStockModal(false);
                     }} className="bg-green-600 text-white font-bold py-1.5 px-4 shadow hover:bg-green-700">Simpan</button>
                     <button onClick={() => setShowAddStockModal(false)} className="bg-gray-400 text-white font-bold py-1.5 px-4 shadow hover:bg-gray-500">Batal</button>
                  </div>
               )}
-              <table className="w-full text-left border-collapse whitespace-nowrap">
+               <table className="w-full text-left border-collapse whitespace-nowrap">
                 <thead className="bg-[#ece9d8] border-b border-gray-400 text-xs font-bold select-none text-blue-950">
                   <tr>
                     <th 
@@ -216,6 +229,18 @@ export const MasterData = ({ currentTime }: { currentTime: Date }) => {
                       </div>
                     </th>
                     <th 
+                      onClick={() => handleSort('stock')} 
+                      className="p-2 border-r border-gray-300 text-center cursor-pointer hover:bg-gray-200 transition-colors min-w-[70px]"
+                      title="Klik untuk mengurutkan berdasarkan Stok"
+                    >
+                      <div className="flex items-center justify-center gap-1.5 px-1">
+                        <span>Stok</span>
+                        <span className="text-[9px] text-gray-500 font-mono">
+                          {sortKey === 'stock' ? (sortDirection === 'asc' ? '▲' : '▼') : '↕'}
+                        </span>
+                      </div>
+                    </th>
+                    <th 
                       onClick={() => handleSort('price1')} 
                       className="p-2 border-r border-gray-300 text-right cursor-pointer hover:bg-gray-200 transition-colors min-w-[100px]"
                       title="Klik untuk mengurutkan berdasarkan Harga Lvl 1"
@@ -240,14 +265,14 @@ export const MasterData = ({ currentTime }: { currentTime: Date }) => {
                       </div>
                     </th>
                     <th 
-                      onClick={() => handleSort('stock')} 
-                      className="p-2 border-r border-gray-300 text-center cursor-pointer hover:bg-gray-200 transition-colors min-w-[70px]"
-                      title="Klik untuk mengurutkan berdasarkan Stok"
+                      onClick={() => handleSort('supplier')} 
+                      className="p-2 border-r border-gray-300 cursor-pointer hover:bg-gray-200 transition-colors min-w-[95px]"
+                      title="Klik untuk mengurutkan berdasarkan Supliyer"
                     >
-                      <div className="flex items-center justify-center gap-1.5 px-1">
-                        <span>Stok</span>
+                      <div className="flex items-center justify-between gap-1 px-1">
+                        <span>Supliyer</span>
                         <span className="text-[9px] text-gray-500 font-mono">
-                          {sortKey === 'stock' ? (sortDirection === 'asc' ? '▲' : '▼') : '↕'}
+                          {sortKey === 'supplier' ? (sortDirection === 'asc' ? '▲' : '▼') : '↕'}
                         </span>
                       </div>
                     </th>
@@ -259,9 +284,10 @@ export const MasterData = ({ currentTime }: { currentTime: Date }) => {
                       <td className="p-2 border-r border-gray-300 font-mono font-bold text-gray-700">{item.code}</td>
                       <td className="p-2 border-r border-gray-300 font-bold">{item.name}</td>
                       <td className="p-2 border-r border-gray-300 font-medium text-gray-600">{item.category || '-'}</td>
+                      <td className={`p-2 border-r border-gray-300 text-center font-mono font-bold text-sm ${item.stock <= 2 ? 'text-red-600' : 'text-emerald-700'}`}>{item.stock}</td>
                       <td className="p-2 border-r border-gray-300 text-right font-mono text-gray-800">{formatRp(item.price1)}</td>
                       <td className="p-2 border-r border-gray-300 text-right font-mono text-gray-800">{formatRp(item.price2)}</td>
-                      <td className={`p-2 border-r border-gray-300 text-center font-mono font-bold text-sm ${item.stock <= 2 ? 'text-red-600' : 'text-emerald-700'}`}>{item.stock}</td>
+                      <td className="p-2 border-r border-gray-300 font-medium text-gray-700">{item.supplier || '-'}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -274,7 +300,7 @@ export const MasterData = ({ currentTime }: { currentTime: Date }) => {
             <div className="flex flex-col h-full">
               <div className="bg-[#ece9d8] border-b border-gray-400 p-2 font-bold sticky top-0 z-20">Sesuaikan Fisik Gudang & Sistem</div>
               <table className="w-full text-left border-collapse whitespace-nowrap">
-                <thead className="bg-[#ece9d8] border-b-2 border-gray-400 font-bold text-blue-900 text-xs">
+                <thead className="bg-[#ece9d8] border-b-2 border-gray-400 font-bold text-blue-900 text-xs text-blue-950">
                   <tr>
                     <th className="p-2 border-r border-gray-300 cursor-pointer hover:bg-gray-200 select-none" onClick={() => handleSort('code')} title="Urutkan berdasarkan Kode">
                       <div className="flex items-center gap-1.5 justify-between">
@@ -288,13 +314,43 @@ export const MasterData = ({ currentTime }: { currentTime: Date }) => {
                         <span className="text-[10px] text-gray-500 font-mono">{sortKey === 'name' ? (sortDirection === 'asc' ? '▲' : '▼') : '↕'}</span>
                       </div>
                     </th>
-                    <th className="p-2 border-r border-gray-300 cursor-pointer hover:bg-gray-200 select-none text-center w-36" onClick={() => handleSort('stock')} title="Urutkan berdasarkan Stok Sistem">
+                    <th className="p-2 border-r border-gray-300 cursor-pointer hover:bg-gray-200 select-none" onClick={() => handleSort('category')} title="Urutkan berdasarkan Kategori">
+                      <div className="flex items-center gap-1.5 justify-between">
+                        <span>Kategori</span>
+                        <span className="text-[10px] text-gray-500 font-mono">{sortKey === 'category' ? (sortDirection === 'asc' ? '▲' : '▼') : '↕'}</span>
+                      </div>
+                    </th>
+                    <th className="p-2 border-r border-gray-300 cursor-pointer hover:bg-gray-200 select-none text-center" onClick={() => handleSort('stock')} title="Urutkan berdasarkan Stok Sistem">
                       <div className="flex items-center gap-1.5 justify-center">
                         <span>Stok Sistem</span>
                         <span className="text-[10px] text-gray-500 font-mono">{sortKey === 'stock' ? (sortDirection === 'asc' ? '▲' : '▼') : '↕'}</span>
                       </div>
                     </th>
-                    <th className="p-2 border-r border-gray-300 text-center w-40">Fisik Aktual</th>
+                    <th className="p-2 border-r border-gray-300 text-center w-28">Fisik Aktual</th>
+                    <th className="p-2 border-r border-gray-300 cursor-pointer hover:bg-gray-200 select-none text-right" onClick={() => handleSort('supplierPrice')} title="Urutkan berdasarkan Harga Modal">
+                      <div className="flex items-center gap-1.5 justify-end">
+                        <span>Harga Modal</span>
+                        <span className="text-[10px] text-gray-500 font-mono">{sortKey === 'supplierPrice' ? (sortDirection === 'asc' ? '▲' : '▼') : '↕'}</span>
+                      </div>
+                    </th>
+                    <th className="p-2 border-r border-gray-300 cursor-pointer hover:bg-gray-200 select-none text-right" onClick={() => handleSort('price1')} title="Urutkan berdasarkan Harga Lvl 1">
+                      <div className="flex items-center gap-1.5 justify-end">
+                        <span>Harga Lvl 1</span>
+                        <span className="text-[10px] text-gray-500 font-mono">{sortKey === 'price1' ? (sortDirection === 'asc' ? '▲' : '▼') : '↕'}</span>
+                      </div>
+                    </th>
+                    <th className="p-2 border-r border-gray-300 cursor-pointer hover:bg-gray-200 select-none text-right" onClick={() => handleSort('price2')} title="Urutkan berdasarkan Harga Lvl 2">
+                      <div className="flex items-center gap-1.5 justify-end">
+                        <span>Harga Lvl 2</span>
+                        <span className="text-[10px] text-gray-500 font-mono">{sortKey === 'price2' ? (sortDirection === 'asc' ? '▲' : '▼') : '↕'}</span>
+                      </div>
+                    </th>
+                    <th className="p-2 border-r border-gray-300 cursor-pointer hover:bg-gray-200 select-none" onClick={() => handleSort('supplier')} title="Urutkan berdasarkan Supliyer">
+                      <div className="flex items-center gap-1.5 justify-between">
+                        <span>Supliyer</span>
+                        <span className="text-[10px] text-gray-500 font-mono">{sortKey === 'supplier' ? (sortDirection === 'asc' ? '▲' : '▼') : '↕'}</span>
+                      </div>
+                    </th>
                     <th className="p-2 text-center w-28">Aksi</th>
                   </tr>
                 </thead>
@@ -302,20 +358,117 @@ export const MasterData = ({ currentTime }: { currentTime: Date }) => {
                   {sortedInventory.map((item: any) => (
                     <tr key={item.id} className="border-b border-gray-200 hover:bg-blue-50 text-xs text-black">
                       <td className="p-2 border-r border-gray-300 font-mono font-bold text-gray-700">{item.code}</td>
-                      <td className="p-2 border-r border-gray-300 font-bold">{item.name}</td>
+                      <td className="p-2 border-r border-gray-300">
+                        <input 
+                          type="text" 
+                          value={opnameNames[item.id] !== undefined ? opnameNames[item.id] : item.name} 
+                          onChange={e => setOpnameNames({...opnameNames, [item.id]: e.target.value.toUpperCase()})} 
+                          className="border border-gray-400 px-1 py-0.5 w-full font-bold outline-none focus:border-blue-500 text-black bg-white uppercase" 
+                        />
+                      </td>
+                      <td className="p-2 border-r border-gray-300">
+                        <select 
+                          value={opnameCategories[item.id] !== undefined ? opnameCategories[item.id] : (item.category || 'UMUM')} 
+                          onChange={e => {
+                            const newCat = e.target.value;
+                            const curPrice = opnameModalPrices[item.id] !== undefined ? opnameModalPrices[item.id] : (item.supplierPrice || 0);
+                            const m1 = storeSettings?.margins?.[newCat]?.level1 ?? storeSettings?.margins?.DEFAULT?.level1 ?? 75;
+                            const m2 = storeSettings?.margins?.[newCat]?.level2 ?? storeSettings?.margins?.DEFAULT?.level2 ?? 15;
+                            setOpnameCategories({...opnameCategories, [item.id]: newCat});
+                            setOpnameLvl1Prices({...opnameLvl1Prices, [item.id]: Math.round(curPrice * (1 + m1/100))});
+                            setOpnameLvl2Prices({...opnameLvl2Prices, [item.id]: Math.round(curPrice * (1 + m2/100))});
+                          }}
+                          className="border border-gray-400 px-1 py-0.5 outline-none focus:border-blue-500 text-black bg-white w-full text-xs"
+                        >
+                          {Array.from(new Set(['UMUM', ...(storeSettings?.margins ? Object.keys(storeSettings.margins).filter(k => k !== 'DEFAULT') : []), ...inventory.map((i: any) => i.category).filter(Boolean)])).map(cat => <option key={cat as string} value={(cat as string).toUpperCase()}>{(cat as string).toUpperCase()}</option>)}
+                        </select>
+                      </td>
                       <td className="p-2 border-r border-gray-300 text-center font-bold text-sm text-[#000080]">{item.stock}</td>
                       <td className="p-2 border-r border-gray-300 text-center">
-                        <input type="number" value={opnameInputs[item.id] !== undefined ? opnameInputs[item.id] : ''} onChange={e => setOpnameInputs({...opnameInputs, [item.id]: parseInt(e.target.value) || 0})} className="w-24 border border-gray-400 p-1 text-center font-bold outline-none focus:border-blue-500 text-black bg-white" placeholder={String(item.stock)} />
+                        <input 
+                          type="number" 
+                          value={opnameInputs[item.id] !== undefined ? opnameInputs[item.id] : ''} 
+                          onChange={e => setOpnameInputs({...opnameInputs, [item.id]: e.target.value === '' ? item.stock : parseInt(e.target.value) || 0})} 
+                          className="w-16 border border-gray-400 px-1 py-0.5 text-center font-bold outline-none focus:border-blue-500 text-black bg-white" 
+                          placeholder={String(item.stock)} 
+                        />
+                      </td>
+                      <td className="p-2 border-r border-gray-300">
+                        <input 
+                          type="number" 
+                          value={opnameModalPrices[item.id] !== undefined ? opnameModalPrices[item.id] : (item.supplierPrice || 0)} 
+                          onChange={e => {
+                            const val = parseInt(e.target.value) || 0;
+                            const cat = opnameCategories[item.id] !== undefined ? opnameCategories[item.id] : (item.category || 'UMUM');
+                            const m1 = storeSettings?.margins?.[cat]?.level1 ?? storeSettings?.margins?.DEFAULT?.level1 ?? 75;
+                            const m2 = storeSettings?.margins?.[cat]?.level2 ?? storeSettings?.margins?.DEFAULT?.level2 ?? 15;
+                            setOpnameModalPrices({...opnameModalPrices, [item.id]: val});
+                            setOpnameLvl1Prices({...opnameLvl1Prices, [item.id]: Math.round(val * (1 + m1/100))});
+                            setOpnameLvl2Prices({...opnameLvl2Prices, [item.id]: Math.round(val * (1 + m2/100))});
+                          }} 
+                          className="w-20 border border-gray-400 px-1 py-0.5 font-mono text-right font-bold outline-none focus:border-blue-500 text-black bg-white" 
+                        />
+                      </td>
+                      <td className="p-2 border-r border-gray-300 text-right font-mono font-bold text-blue-900">
+                        {formatRp(opnameLvl1Prices[item.id] !== undefined ? opnameLvl1Prices[item.id] : (item.price1 || 0))}
+                      </td>
+                      <td className="p-2 border-r border-gray-300 text-right font-mono font-bold text-purple-900">
+                        {formatRp(opnameLvl2Prices[item.id] !== undefined ? opnameLvl2Prices[item.id] : (item.price2 || 0))}
+                      </td>
+                      <td className="p-2 border-r border-gray-300">
+                        <select 
+                          value={opnameSuppliers[item.id] !== undefined ? opnameSuppliers[item.id] : (item.supplier || '')} 
+                          onChange={e => setOpnameSuppliers({...opnameSuppliers, [item.id]: e.target.value})} 
+                          className="border border-gray-400 px-1 py-0.5 outline-none focus:border-blue-500 text-black bg-white w-full text-xs"
+                        >
+                          <option value="">-- Supliyer --</option>
+                          {suppliers?.map((s: any) => <option key={s.id} value={s.name}>{s.name}</option>)}
+                        </select>
                       </td>
                       <td className="p-2 text-center">
-                        <button onClick={() => {
-                          if (opnameInputs[item.id] !== undefined) {
-                              setInventory(inventory.map((i:any) => i.id === item.id ? { ...i, stock: opnameInputs[item.id] } : i));
-                              const newInputs = {...opnameInputs};
-                              delete newInputs[item.id];
-                              setOpnameInputs(newInputs);
-                          }
-                        }} className={`px-3 py-1 font-bold shadow border text-xs ${opnameInputs[item.id] !== undefined && opnameInputs[item.id] !== item.stock ? 'bg-green-600 text-white border-green-800 hover:bg-green-700' : 'bg-gray-200 text-black border-gray-500 hover:bg-gray-300'}`}>Update</button>
+                        <button 
+                          onClick={() => {
+                            const updatedName = opnameNames[item.id] !== undefined ? opnameNames[item.id] : item.name;
+                            const updatedCategory = opnameCategories[item.id] !== undefined ? opnameCategories[item.id] : (item.category || 'UMUM');
+                            const updatedStock = opnameInputs[item.id] !== undefined ? opnameInputs[item.id] : item.stock;
+                            const updatedModalPrice = opnameModalPrices[item.id] !== undefined ? opnameModalPrices[item.id] : (item.supplierPrice || 0);
+                            
+                            const cat = updatedCategory || 'UMUM';
+                            const m1 = storeSettings?.margins?.[cat]?.level1 ?? storeSettings?.margins?.DEFAULT?.level1 ?? 75;
+                            const m2 = storeSettings?.margins?.[cat]?.level2 ?? storeSettings?.margins?.DEFAULT?.level2 ?? 15;
+                            const calculatedL1 = Math.round(updatedModalPrice * (1 + m1/100));
+                            const calculatedL2 = Math.round(updatedModalPrice * (1 + m2/100));
+
+                            const updatedLvl1 = opnameLvl1Prices[item.id] !== undefined ? opnameLvl1Prices[item.id] : calculatedL1;
+                            const updatedLvl2 = opnameLvl2Prices[item.id] !== undefined ? opnameLvl2Prices[item.id] : calculatedL2;
+                            const updatedSupplier = opnameSuppliers[item.id] !== undefined ? opnameSuppliers[item.id] : item.supplier;
+
+                            setInventory(inventory.map((i: any) => i.id === item.id ? { 
+                              ...i, 
+                              name: updatedName,
+                              category: updatedCategory,
+                              stock: updatedStock,
+                              supplierPrice: updatedModalPrice,
+                              price1: updatedLvl1,
+                              price2: updatedLvl2,
+                              supplier: updatedSupplier
+                            } : i));
+
+                            // Reset local edit states for this item
+                            const newInputs = {...opnameInputs}; delete newInputs[item.id]; setOpnameInputs(newInputs);
+                            const newNames = {...opnameNames}; delete newNames[item.id]; setOpnameNames(newNames);
+                            const newCats = {...opnameCategories}; delete newCats[item.id]; setOpnameCategories(newCats);
+                            const newModals = {...opnameModalPrices}; delete newModals[item.id]; setOpnameModalPrices(newModals);
+                            const newL1s = {...opnameLvl1Prices}; delete newL1s[item.id]; setOpnameLvl1Prices(newL1s);
+                            const newL2s = {...opnameLvl2Prices}; delete newL2s[item.id]; setOpnameLvl2Prices(newL2s);
+                            const newSups = {...opnameSuppliers}; delete newSups[item.id]; setOpnameSuppliers(newSups);
+
+                            alert(`Data barang "${updatedName}" berhasil diperbaharui!`);
+                          }} 
+                          className="px-3 py-1 font-bold shadow border text-xs bg-green-600 text-white border-green-800 hover:bg-green-700"
+                        >
+                          Update
+                        </button>
                       </td>
                     </tr>
                   ))}

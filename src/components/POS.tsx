@@ -70,9 +70,129 @@ export const POS = ({ currentTime }: { currentTime: Date }) => {
   const [newStock, setNewStock] = useState({code: '', name: '', category: 'UMUM', supplierPrice: 0, price1: 0, price2: 0, stock: 1});
   const [stockSuggestions, setStockSuggestions] = useState<any[]>([]);
   const [showNewCategory, setShowNewCategory] = useState(false);
+  const [inputStockDueDate, setInputStockDueDate] = useState(() => {
+    try {
+      const parts = defaultDate ? defaultDate.split('-') : new Date().toISOString().split('T')[0].split('-');
+      const d = new Date(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, parseInt(parts[2], 10));
+      d.setDate(d.getDate() + 30);
+      return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    } catch (e) {
+      return '';
+    }
+  });
+  const [manualInvoiceNumber, setManualInvoiceNumber] = useState('');
+
+  const getItemSupplierPrice = (item: any, category: string) => {
+    if (!item) return 0;
+    if (item.supplierPrice !== undefined && item.supplierPrice !== null) return item.supplierPrice;
+    if (item.price !== undefined && item.price !== null) return item.price;
+    // Fallback: backcalculate from price1
+    const margin1 = storeSettings?.margins?.[category]?.level1 ?? storeSettings?.margins?.DEFAULT?.level1 ?? 75;
+    return Math.round((item.price1 || 0) / (1 + margin1 / 100));
+  };
+
+  const getNextCodeAndOldPrice = (prefixInput: string) => {
+    if (!prefixInput) return { nextCode: '', oldPrice: 0 };
+    const cleanPrefix = prefixInput.trim().toUpperCase();
+    if (!cleanPrefix) return { nextCode: '', oldPrice: 0 };
+
+    let maxNum = 0;
+    let found = false;
+    let matchedPrefixText = cleanPrefix;
+    let latestItem: any = null;
+
+    // Check in cart first if in input stock mode and cart has items
+    let useCart = false;
+    if (isInputStockMode && cart && cart.length > 0) {
+      const cartMatches = cart.filter((item: any) => {
+        if (!item.code) return false;
+        const codeUpper = item.code.toUpperCase();
+        const prefixesToTry = [cleanPrefix];
+        if (!cleanPrefix.endsWith('-') && !cleanPrefix.endsWith('_')) {
+          prefixesToTry.push(cleanPrefix + '-');
+        }
+        return prefixesToTry.some(pref => {
+          if (codeUpper.startsWith(pref)) {
+            const suffix = codeUpper.substring(pref.length);
+            return /^(\d+)$/.test(suffix);
+          }
+          return false;
+        });
+      });
+
+      if (cartMatches.length > 0) {
+        useCart = true;
+        cartMatches.forEach((item: any) => {
+          const codeUpper = item.code.toUpperCase();
+          const prefixesToTry = [cleanPrefix];
+          if (!cleanPrefix.endsWith('-') && !cleanPrefix.endsWith('_')) {
+            prefixesToTry.push(cleanPrefix + '-');
+          }
+          prefixesToTry.forEach(pref => {
+            if (codeUpper.startsWith(pref)) {
+              const suffix = codeUpper.substring(pref.length);
+              const numMatch = suffix.match(/^(\d+)$/);
+              if (numMatch) {
+                const num = parseInt(numMatch[1], 10);
+                if (num > maxNum) {
+                  maxNum = num;
+                  latestItem = item;
+                }
+                found = true;
+                matchedPrefixText = pref;
+              }
+            }
+          });
+        });
+      }
+    }
+
+    if (!useCart) {
+      inventory.forEach((item: any) => {
+        if (!item.code) return;
+        const codeUpper = item.code.toUpperCase();
+        
+        const prefixesToTry = [cleanPrefix];
+        if (!cleanPrefix.endsWith('-') && !cleanPrefix.endsWith('_')) {
+          prefixesToTry.push(cleanPrefix + '-');
+        }
+
+        prefixesToTry.forEach(pref => {
+          if (codeUpper.startsWith(pref)) {
+            const suffix = codeUpper.substring(pref.length);
+            const numMatch = suffix.match(/^(\d+)$/);
+            if (numMatch) {
+              const num = parseInt(numMatch[1], 10);
+              if (num > maxNum) {
+                maxNum = num;
+                latestItem = item;
+              }
+              found = true;
+              matchedPrefixText = pref;
+            }
+          }
+        });
+      });
+    }
+
+    if (!found) return { nextCode: '', oldPrice: 0 };
+
+    const nextNum = maxNum + 1;
+    let padLength = 6;
+    if (latestItem) {
+      const suffix = latestItem.code.toUpperCase().substring(matchedPrefixText.length);
+      padLength = suffix.length;
+    }
+
+    const nextCode = matchedPrefixText + nextNum.toString().padStart(padLength, '0');
+    const oldPrice = latestItem ? getItemSupplierPrice(latestItem, latestItem.category || 'UMUM') : 0;
+
+    return { nextCode, oldPrice };
+  };
 
   const codeInputRef = useRef<HTMLInputElement>(null);
   const qtyInputRef = useRef<HTMLInputElement>(null);
+  const stockCodeInputRef = useRef<HTMLInputElement>(null);
 
   // --- AUTO ORDER LOGIC (AI TRIGGER) ---
   const triggerAutoOrder = (currentInv: any[]) => {
@@ -127,7 +247,7 @@ export const POS = ({ currentTime }: { currentTime: Date }) => {
   };
 
   const handleCodeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const val = e.target.value;
+    const val = e.target.value.toUpperCase();
     setCodeInput(val);
     if (val.trim().length > 0) {
       const res = inventory.filter((i: any) => i.code.toLowerCase().includes(val.toLowerCase()) || i.name.toLowerCase().includes(val.toLowerCase()));
@@ -313,117 +433,102 @@ export const POS = ({ currentTime }: { currentTime: Date }) => {
     const noFaktur = `FAK-${(() => { const d = new Date(); return String(d.getFullYear()).slice(2) + String(d.getMonth()+1).padStart(2,'0') + String(d.getDate()).padStart(2,'0'); })()}-${Math.floor(Math.random() * 10000).toString().padStart(4, '0')}`;
     
     if (isInputStockMode) {
-       const supplier = suppliers.find((s: any) => s.id.toString() === stockSupplierId);
-       const finalTotalCost = totalBelanjaBaru - (totalBelanjaBaru * stockDiscount / 100);
-
-       if (stockDiscount < 100 && finalTotalCost > 0) {
-           if ((wallets?.danaBebas || 0) < finalTotalCost) {
-               return setConfirmAction({message: 'Saldo Dana Bebas tidak mencukupi untuk pembelian stok ini!', isAlert: true});
-           }
-       }
-       
-       let currentInv = JSON.parse(JSON.stringify(inventory));
-       let newInvItems: any[] = [];
-       // Tambah mutasi stok & create data
-       cart.forEach(item => {
-          if (item.isNewStock) {
-              newInvItems.push({
-                  id: item.id,
-                  code: item.code,
-                  name: item.name,
-                  category: item.category,
-                  price1: item.price1,
-                  price2: item.price2,
-                  stock: item.qty
-              });
-          } else {
-              const idx = currentInv.findIndex((i: any) => i.code === item.code);
-              if (idx >= 0) currentInv[idx].stock += item.qty;
-          }
-       });
-
-       const purchaseFaktur = noFaktur.replace('FAK', 'INV');
-       const newTransaction = {
-          id: purchaseFaktur,
-          date: `${transactionDate} ${currentTime.toLocaleTimeString('id-ID')}`,
-          isoDate: (() => { const [y,m,d] = transactionDate.split('-'); return new Date(parseInt(y), parseInt(m)-1, parseInt(d), currentTime.getHours(), currentTime.getMinutes(), currentTime.getSeconds()).toISOString(); })(), 
-          customer: supplier?.name || 'Unknown', // Keep customer field for compatibility, or add supplier
-          supplier: supplier?.name || 'Unknown',
-          items: [...cart],
-          total: stockDiscount === 100 ? 0 : finalTotalCost, 
-          paid: stockDiscount === 100 ? 0 : finalTotalCost,
-          change: 0,
-          discountPercent: stockDiscount,
-          cashier: user.name,
-          type: 'PEMBELIAN',
-          method: paymentMethod,
-          sisa: 0,
-          returTotal: 0,
-          branch: user?.branch || storeSettings.activeBranch || 'Pusat',
-          note: transactionNote
-       };
-
-       if (stockDiscount < 100 && finalTotalCost > 0) {
-           const newExpense = {
-              id: 'EXP-' + Date.now(),
-              date: `${transactionDate} ${currentTime.toLocaleTimeString('id-ID')}`,
-              isoDate: (() => { const [y,m,d] = transactionDate.split('-'); return new Date(parseInt(y), parseInt(m)-1, parseInt(d), currentTime.getHours(), currentTime.getMinutes(), currentTime.getSeconds()).toISOString(); })(),
-              name: `Pembelian Stok ${purchaseFaktur}`,
-              amount: finalTotalCost,
-              cashier: user.name,
-              branch: user?.branch || storeSettings.activeBranch || 'Pusat',
-              wallet: 'Dana Bebas'
-           };
-           setExpenses([newExpense, ...expenses]);
-           setWallets((prev: any) => ({ ...prev, danaBebas: (prev?.danaBebas || 0) - finalTotalCost }));
-       }
-
-       // Automatically create tagihan supplier sesuai nota faktur (Hutang Supplier)
-       if (finalTotalCost > 0) {
-           const jtDate = (() => {
-              try {
-                const parts = transactionDate.split('-'); // YYYY-MM-DD
-                const d = new Date(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, parseInt(parts[2], 10));
-                d.setDate(d.getDate() + 30); // 30-day default credit term (due date)
-                const yyyy = d.getFullYear();
-                const mm = String(d.getMonth() + 1).padStart(2, '0');
-                const dd = String(d.getDate()).padStart(2, '0');
-                return `${yyyy}-${mm}-${dd}`;
-              } catch (e) {
-                return transactionDate;
-              }
-           })();
-
-           const newHutangEntry = {
-               id: 'HTG' + Date.now().toString() + Math.floor(Math.random() * 1000).toString(),
-               nomor_nota: purchaseFaktur,
-               supplier_id: stockSupplierId,
-               supplier_nama: supplier?.name || 'Unknown',
-               tanggal_beli: transactionDate,
-               tanggal_jatuh_tempo: jtDate,
-               nilai_hutang: finalTotalCost,
-               sisa_hutang: finalTotalCost,
-               status: 'belum_jatuh_tempo'
-           };
-
-           setHutangSupplier((prev: any) => [...(prev || []), newHutangEntry]);
-       }
-
-       setInventory([...newInvItems, ...currentInv]);
-       setTransactions((prev: any) => [newTransaction, ...(prev || [])]);
-       if (finalTotalCost > 0) {
-          addLog('PEMBELIAN_STOK', `No: ${purchaseFaktur} Total: Rp ${finalTotalCost.toLocaleString('id-ID')} (Hutang supplier dibuat: Rp ${finalTotalCost.toLocaleString('id-ID')})`);
-        } else {
-          addLog('PEMBELIAN_STOK', `No: ${purchaseFaktur} Total: Rp 0 (Diskon 100%)`);
+        if (!manualInvoiceNumber.trim()) {
+            return setConfirmAction({message: 'Harap isi nomor invoice terlebih dahulu!', isAlert: true});
         }
-       if (shouldPrint) setConfirmAction({message: `Pembelian Stok Tersimpan & Dicetak! (Faktur: ${purchaseFaktur})`, isAlert: true});
-       else setConfirmAction({message: 'Pembelian Stok Tersimpan!', isAlert: true});
-       setIsInputStockMode(false);
-       setCart([]);
-       setStockSupplierId('');
-       setStockDiscount(0);
-       resetKasirState();
-       return;
+        const supplier = suppliers.find((s: any) => s.id.toString() === stockSupplierId);
+        if (!supplier) {
+            return setConfirmAction({message: 'Pilih Supplier terlebih dahulu!', isAlert: true});
+        }
+        if (cart.length === 0) {
+            return setConfirmAction({message: 'Keranjang belanja stok masih kosong!', isAlert: true});
+        }
+
+        const finalTotalCost = totalBelanjaBaru - (totalBelanjaBaru * stockDiscount / 100);
+        let currentInv = JSON.parse(JSON.stringify(inventory));
+        let newInvItems: any[] = [];
+        
+        // Tambah mutasi stok & create data
+        cart.forEach(item => {
+           const idx = currentInv.findIndex((i: any) => i.code === item.code);
+           if (idx >= 0) {
+               currentInv[idx].stock += item.qty;
+               currentInv[idx].price1 = item.price1 !== undefined ? item.price1 : currentInv[idx].price1;
+               currentInv[idx].price2 = item.price2 !== undefined ? item.price2 : currentInv[idx].price2;
+               currentInv[idx].supplierPrice = item.price !== undefined ? item.price : currentInv[idx].supplierPrice;
+               currentInv[idx].supplier = supplier?.name || currentInv[idx].supplier || '';
+           } else {
+               newInvItems.push({
+                   id: item.id || 'INV-' + Date.now() + Math.floor(Math.random() * 1000),
+                   code: item.code,
+                   name: item.name,
+                   category: item.category || 'UMUM',
+                   price1: item.price1 || 0,
+                   price2: item.price2 || 0,
+                   stock: item.qty,
+                   supplierPrice: item.price !== undefined ? item.price : 0,
+                   supplier: supplier?.name || ''
+               });
+           }
+        });
+
+        const purchaseFaktur = manualInvoiceNumber.trim().toUpperCase();
+        const newTransaction = {
+           id: purchaseFaktur,
+           date: `${transactionDate} ${currentTime.toLocaleTimeString('id-ID')}`,
+           isoDate: (() => { const [y,m,d] = transactionDate.split('-'); return new Date(parseInt(y), parseInt(m)-1, parseInt(d), currentTime.getHours(), currentTime.getMinutes(), currentTime.getSeconds()).toISOString(); })(), 
+           customer: supplier?.name || 'Unknown',
+           supplier: supplier?.name || 'Unknown',
+           items: [...cart],
+           total: stockDiscount === 100 ? 0 : finalTotalCost, 
+           paid: 0, // credit purchase
+           change: 0,
+           discountPercent: stockDiscount,
+           cashier: user.name,
+           type: 'PEMBELIAN',
+           method: 'TEMPO',
+           sisa: stockDiscount === 100 ? 0 : finalTotalCost,
+           returTotal: 0,
+           branch: user?.branch || storeSettings.activeBranch || 'Pusat',
+           note: transactionNote
+        };
+
+        // Automatically create tagihan supplier sesuai nomor invoice (Hutang Supplier)
+        if (finalTotalCost > 0) {
+            const newHutangEntry = {
+                id: 'HTG' + Date.now().toString() + Math.floor(Math.random() * 1000).toString(),
+                nomor_nota: purchaseFaktur,
+                supplier_id: stockSupplierId,
+                supplier_nama: supplier?.name || 'Unknown',
+                tanggal_beli: transactionDate,
+                tanggal_jatuh_tempo: inputStockDueDate,
+                nilai_hutang: finalTotalCost,
+                sisa_hutang: finalTotalCost,
+                status: 'belum_jatuh_tempo'
+            };
+
+            setHutangSupplier((prev: any) => [...(prev || []), newHutangEntry]);
+        }
+
+        setInventory([...newInvItems, ...currentInv]);
+        setTransactions((prev: any) => [newTransaction, ...(prev || [])]);
+        
+        if (finalTotalCost > 0) {
+           addLog('PEMBELIAN_STOK', `No Invoice: ${purchaseFaktur} Total: Rp ${finalTotalCost.toLocaleString('id-ID')} (Tersimpan sebagai Hutang Supplier Jt: ${inputStockDueDate})`);
+        } else {
+           addLog('PEMBELIAN_STOK', `No Invoice: ${purchaseFaktur} Total: Rp 0 (Diskon 100%)`);
+        }
+        
+        if (shouldPrint) setConfirmAction({message: `Pembelian Stok Tersimpan & Dicetak! (Invoice: ${purchaseFaktur})`, isAlert: true});
+        else setConfirmAction({message: 'Pembelian Stok Berhasil Tersimpan ke Master Data & Hutang Supplier!', isAlert: true});
+        
+        setIsInputStockMode(false);
+        setCart([]);
+        setStockSupplierId('');
+        setStockDiscount(0);
+        setManualInvoiceNumber('');
+        resetKasirState();
+        return;
     }
 
     const piutangPaymentItem = cart.find(c => c.isPiutangPayment);
@@ -558,6 +663,21 @@ export const POS = ({ currentTime }: { currentTime: Date }) => {
         });
     }
 
+    if (isInputStockMode) {
+      const hasUnrounded = cart.some(item => (item.price1 || 0) % 1000 !== 0 || (item.price2 || 0) % 1000 !== 0);
+      if (hasUnrounded) {
+         return setConfirmAction({
+             message: 'PERINGATAN: Terdapat item dengan harga level 1 atau level 2 yang belum dibulatkan ke ribuan (memiliki pecahan ratusan). Anda sangat disarankan untuk membulatkannya terlebih dahulu! Tetap paksa simpan?',
+             onConfirm: () => {
+                 setConfirmAction({
+                     message: isPiutangPayment ? 'Simpan pelunasan piutang ini?' : 'Simpan transaksi ini?',
+                     onConfirm: () => processTransaction(false)
+                 });
+             }
+         });
+      }
+    }
+
     setConfirmAction({
       message: isPiutangPayment ? 'Simpan pelunasan piutang ini?' : 'Simpan transaksi ini?',
       onConfirm: () => processTransaction(false)
@@ -642,6 +762,23 @@ export const POS = ({ currentTime }: { currentTime: Date }) => {
     });
   };
 
+  const handleRoundPrices = () => {
+    setCart((prevCart) =>
+      prevCart.map((item) => {
+        return {
+          ...item,
+          price1: Math.ceil((item.price1 || 0) / 1000) * 1000,
+          price2: Math.ceil((item.price2 || 0) / 1000) * 1000
+        };
+      })
+    );
+    setNewStock(prev => ({
+      ...prev,
+      price1: Math.ceil((prev.price1 || 0) / 1000) * 1000,
+      price2: Math.ceil((prev.price2 || 0) / 1000) * 1000
+    }));
+  };
+
   const handleResetBaru = () => {
     if (cart.length > 0) {
       if (cart.some(c => c.isReturn)) {
@@ -691,7 +828,16 @@ export const POS = ({ currentTime }: { currentTime: Date }) => {
     const handleKeyDown = (e: KeyboardEvent) => {
       // Ignore if user is typing in a text input (unless we want global override carefully)
       // Actually F-keys don't write text, so we can always listen
-      if (e.key === 'F8') {
+      if (e.key === 'F1') {
+        e.preventDefault();
+        if (isInputStockMode) {
+          stockCodeInputRef.current?.focus();
+          stockCodeInputRef.current?.select();
+        } else {
+          codeInputRef.current?.focus();
+          codeInputRef.current?.select();
+        }
+      } else if (e.key === 'F8') {
         e.preventDefault();
         handleSimpan();
       } else if (e.key === 'F9') {
@@ -726,6 +872,13 @@ export const POS = ({ currentTime }: { currentTime: Date }) => {
     setActiveReturTrx(null);
     setIsInputStockMode(false);
     setGlobalDiscount(0);
+    setManualInvoiceNumber('');
+    try {
+      const parts = defaultDate ? defaultDate.split('-') : new Date().toISOString().split('T')[0].split('-');
+      const d = new Date(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, parseInt(parts[2], 10));
+      d.setDate(d.getDate() + 30);
+      setInputStockDueDate(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`);
+    } catch (e) {}
   };
 
   const handleSwitchKasirRequest = (e: React.ChangeEvent<HTMLSelectElement>) => {
@@ -761,13 +914,23 @@ export const POS = ({ currentTime }: { currentTime: Date }) => {
             </div>
 
             <div className="flex items-center">
-              <label className="w-24 uppercase">Tunai/Kredit</label>
-              <select value={paymentMethod} onChange={(e) => setPaymentMethod(e.target.value)} className="border border-gray-400 px-1 py-0.5 w-[220px] bg-white text-black font-normal outline-none shadow-inner">
-                <option value="TUNAI">TUNAI</option>
-                <option value="1 Minggu">1 Minggu</option>
-                <option value="Qriss/TF">Qriss/TF</option>
-                <option value="DP">DP</option>
-              </select>
+              <label className="w-24 uppercase">{isInputStockMode ? 'Jatuh Tempo' : 'Tunai/Kredit'}</label>
+              {isInputStockMode ? (
+                <div className="relative border border-gray-400 bg-white w-[220px] flex items-center overflow-hidden hover:border-blue-500 shadow-inner">
+                  <span className="px-2 py-0.5 text-black font-normal pointer-events-none truncate flex-1">
+                    {formatDateDisplay(inputStockDueDate)}
+                  </span>
+                  <input type="date" value={inputStockDueDate} onChange={(e) => setInputStockDueDate(e.target.value)} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" />
+                  <div className="bg-gray-100 border-l border-gray-300 h-full px-2 flex items-center justify-center pointer-events-none"><Calendar className="w-3 h-3 text-gray-700" /></div>
+                </div>
+              ) : (
+                <select value={paymentMethod} onChange={(e) => setPaymentMethod(e.target.value)} className="border border-gray-400 px-1 py-0.5 w-[220px] bg-white text-black font-normal outline-none shadow-inner">
+                  <option value="TUNAI">TUNAI</option>
+                  <option value="1 Minggu">1 Minggu</option>
+                  <option value="Qriss/TF">Qriss/TF</option>
+                  <option value="DP">DP</option>
+                </select>
+              )}
             </div>
             
             <div className="flex items-center">
@@ -844,38 +1007,121 @@ export const POS = ({ currentTime }: { currentTime: Date }) => {
         {/* INPUT ROW ATAU FORM INPUT BARU */}
         {isInputStockMode ? (
           <div className="bg-[#ece9d8] border border-gray-400 p-2 flex flex-wrap gap-2 items-end shadow-sm mt-1 z-20 relative">
-            <div className="flex flex-col gap-1 w-[120px]">
-                <label className="text-xs font-bold text-gray-700">Kode Barang:</label>
-                <input className="border border-gray-400 p-1 w-full outline-none focus:border-blue-500" value={newStock.code} onChange={e => {
-                    const val = e.target.value;
-                    setNewStock({...newStock, code: val});
-                    if (val.trim().length > 0) {
-                        setStockSuggestions(inventory.filter((i: any) => i.code.toLowerCase().includes(val.toLowerCase()) || i.name.toLowerCase().includes(val.toLowerCase())));
-                    } else setStockSuggestions([]);
-                }} />
+            <div className="flex flex-col gap-1 w-[160px] relative">
+                <div className="flex justify-between items-center w-full">
+                    <label className="text-xs font-bold text-gray-700">Kode Barang (F1):</label>
+                    {(() => {
+                        const res = getNextCodeAndOldPrice(newStock.code);
+                        if (res.nextCode && res.nextCode !== newStock.code.toUpperCase()) {
+                            return (
+                                <button 
+                                    type="button" 
+                                    onClick={() => {
+                                        const margin1 = storeSettings?.margins?.[newStock.category]?.level1 ?? storeSettings?.margins?.DEFAULT?.level1 ?? 75;
+                                        const margin2 = storeSettings?.margins?.[newStock.category]?.level2 ?? storeSettings?.margins?.DEFAULT?.level2 ?? 15;
+                                        const sPrice = res.oldPrice || newStock.supplierPrice;
+                                        setNewStock({
+                                            ...newStock,
+                                            code: res.nextCode,
+                                            supplierPrice: sPrice,
+                                            price1: Math.round(sPrice * (1 + margin1/100)),
+                                            price2: Math.round(sPrice * (1 + margin2/100))
+                                        });
+                                    }}
+                                    className="text-[9px] bg-blue-100 hover:bg-blue-200 text-blue-800 px-1 py-0.5 rounded font-black border border-blue-450 cursor-pointer animate-pulse"
+                                    title="Klik untuk auto-complete kode +1"
+                                >
+                                    +1 KODE
+                                </button>
+                            );
+                        }
+                        return null;
+                    })()}
+                </div>
+                <input 
+                    ref={stockCodeInputRef}
+                    className="border border-gray-400 p-1 w-full outline-none focus:border-blue-500 font-bold" 
+                    value={newStock.code} 
+                    onBlur={() => {
+                        const res = getNextCodeAndOldPrice(newStock.code);
+                        if (res.nextCode) {
+                            const margin1 = storeSettings?.margins?.[newStock.category]?.level1 ?? storeSettings?.margins?.DEFAULT?.level1 ?? 75;
+                            const margin2 = storeSettings?.margins?.[newStock.category]?.level2 ?? storeSettings?.margins?.DEFAULT?.level2 ?? 15;
+                            const sPrice = res.oldPrice || newStock.supplierPrice;
+                            setNewStock({
+                                ...newStock,
+                                code: res.nextCode,
+                                supplierPrice: sPrice,
+                                price1: Math.round(sPrice * (1 + margin1/100)),
+                                price2: Math.round(sPrice * (1 + margin2/100))
+                            });
+                        }
+                    }}
+                    onChange={e => {
+                        const val = e.target.value.toUpperCase();
+                        
+                        // Check if ends with hyphen for instant autocomplete
+                        if (val.endsWith('-')) {
+                            const res = getNextCodeAndOldPrice(val);
+                            if (res.nextCode) {
+                                const margin1 = storeSettings?.margins?.[newStock.category]?.level1 ?? storeSettings?.margins?.DEFAULT?.level1 ?? 75;
+                                const margin2 = storeSettings?.margins?.[newStock.category]?.level2 ?? storeSettings?.margins?.DEFAULT?.level2 ?? 15;
+                                const sPrice = res.oldPrice || newStock.supplierPrice;
+                                setNewStock({
+                                    ...newStock,
+                                    code: res.nextCode,
+                                    supplierPrice: sPrice,
+                                    price1: Math.round(sPrice * (1 + margin1/100)),
+                                    price2: Math.round(sPrice * (1 + margin2/100))
+                                });
+                                return;
+                            }
+                        }
+                        
+                        setNewStock({...newStock, code: val});
+                        if (val.trim().length > 0) {
+                            setStockSuggestions(inventory.filter((i: any) => i.code.toLowerCase().includes(val.toLowerCase()) || i.name.toLowerCase().includes(val.toLowerCase())));
+                        } else setStockSuggestions([]);
+                    }} 
+                />
             </div>
             <div className="flex flex-col gap-1 flex-1 min-w-[120px] relative">
                 <label className="text-xs font-bold text-gray-700">Nama Barang:</label>
-                <input className="border border-gray-400 p-1 w-full outline-none focus:border-blue-500" value={newStock.name} onChange={e => {
-                    const val = e.target.value;
+                <input className="border border-gray-400 p-1 w-full outline-none focus:border-blue-500 font-bold" value={newStock.name} onChange={e => {
+                    const val = e.target.value.toUpperCase();
                     setNewStock({...newStock, name: val});
                     if (val.trim().length > 0) {
                         setStockSuggestions(inventory.filter((i: any) => i.code.toLowerCase().includes(val.toLowerCase()) || i.name.toLowerCase().includes(val.toLowerCase())));
                     } else setStockSuggestions([]);
                 }} />
                 {stockSuggestions.length > 0 && (
-                  <div className="absolute top-full left-0 mt-0.5 w-[500px] bg-white border border-gray-400 shadow-xl max-h-[250px] overflow-y-auto text-black z-[999]">
+                  <div className="absolute top-full left-0 mt-0.5 w-[700px] bg-white border border-gray-400 shadow-xl max-h-[250px] overflow-y-auto text-black z-[999]">
                     <table className="w-full text-left border-collapse">
                       <thead className="bg-[#ece9d8] sticky top-0 border-b-2 border-gray-400 font-normal">
-                        <tr><th className="px-2 py-1.5 border-r border-gray-300">Kode</th><th className="px-2 py-1.5 border-r border-gray-300">Nama Barang</th><th className="px-2 py-1.5 border-r border-gray-300">Kategori</th><th className="px-2 py-1.5 text-right">Stok</th></tr>
+                        <tr><th className="px-2 py-1.5 border-r border-gray-300">Kode</th><th className="px-2 py-1.5 border-r border-gray-300">Nama Barang</th><th className="px-2 py-1.5 border-r border-gray-300">Kategori</th><th className="px-2 py-1.5 border-r border-gray-300 text-right">Harga Lvl 2</th><th className="px-2 py-1.5 border-r border-gray-300">Supliyer</th><th className="px-2 py-1.5 text-right">Stok</th></tr>
                       </thead>
                       <tbody>
                         {stockSuggestions.map((item: any) => (
                           <tr key={item.id} onClick={() => {
-                              setNewStock({ code: item.code, name: item.name, category: item.category || 'UMUM', supplierPrice: 0, price1: item.price1, price2: item.price2, stock: 1 });
+                              const sPrice = getItemSupplierPrice(item, item.category || 'UMUM');
+                              const currentSupplier = suppliers.find((s: any) => s.id.toString() === stockSupplierId);
+                              const currentSupplierName = currentSupplier ? currentSupplier.name.trim().toUpperCase() : '';
+                              const itemSupplierName = item.supplier ? item.supplier.trim().toUpperCase() : '';
+                              
+                              let targetCode = item.code;
+                              if (currentSupplierName && itemSupplierName && currentSupplierName !== itemSupplierName) {
+                                  const prefixMatch = item.code.match(/^(.*?)\d+$/);
+                                  const prefix = prefixMatch ? prefixMatch[1] : item.code;
+                                  const res = getNextCodeAndOldPrice(prefix);
+                                  if (res.nextCode) {
+                                      targetCode = res.nextCode;
+                                  }
+                              }
+                              
+                              setNewStock({ code: targetCode, name: item.name, category: item.category || 'UMUM', supplierPrice: sPrice, price1: item.price1, price2: item.price2, stock: 1 });
                               setStockSuggestions([]);
                           }} className="border-b border-gray-200 hover:bg-blue-100 cursor-pointer">
-                            <td className="px-2 py-1.5 border-r border-gray-300 font-mono text-gray-500">{item.code}</td><td className="px-2 py-1.5 border-r border-gray-300 font-bold">{item.name}</td><td className="px-2 py-1.5 border-r border-gray-300 text-sm">{item.category || '-'}</td><td className={`px-2 py-1.5 text-right font-bold ${item.stock <= 2 ? 'text-red-600' : 'text-black'}`}>{item.stock}</td>
+                            <td className="px-2 py-1.5 border-r border-gray-300 font-mono text-gray-500">{item.code}</td><td className="px-2 py-1.5 border-r border-gray-300 font-bold">{item.name}</td><td className="px-2 py-1.5 border-r border-gray-300 text-sm">{item.category || '-'}</td><td className="px-2 py-1.5 border-r border-gray-300 text-right text-purple-800 font-mono text-xs">{formatRp(item.price2)}</td><td className="px-2 py-1.5 border-r border-gray-300 text-xs font-semibold text-gray-700">{item.supplier || '-'}</td><td className={`px-2 py-1.5 text-right font-bold ${item.stock <= 2 ? 'text-red-600' : 'text-black'}`}>{item.stock}</td>
                           </tr>
                         ))}
                       </tbody>
@@ -889,14 +1135,14 @@ export const POS = ({ currentTime }: { currentTime: Date }) => {
                     {showNewCategory ? (
                         <>
                         <input className="border border-gray-400 p-1 px-1.5 w-full outline-none focus:border-blue-500 text-xs" autoFocus value={newStock.category} onChange={e => setNewStock({...newStock, category: e.target.value.toUpperCase()})} placeholder="Kategori Baru" />
-                        <button onClick={() => setShowNewCategory(false)} className="bg-gray-300 px-2 font-bold hover:bg-gray-400 border border-gray-400 border-l-0 text-xs">x</button>
+                        <button onClick={() => setShowNewCategory(false)} className="bg-gray-300 px-2 font-bold hover:bg-gray-400 border border-gray-400 border-l-0 text-xs text-black">x</button>
                         </>
                     ) : (
                         <>
-                        <select className="border border-gray-400 p-1 px-1.5 w-full outline-none focus:border-blue-500 text-xs" value={newStock.category} onChange={e => setNewStock({...newStock, category: e.target.value})}>
-                            {Array.from(new Set(['UMUM', ...(storeSettings?.margins ? Object.keys(storeSettings.margins).filter(k => k !== 'DEFAULT') : []), ...inventory.map((i: any) => i.category).filter(Boolean)])).map(cat => <option key={cat as string} value={cat as string}>{cat as string}</option>)}
+                        <select className="border border-gray-400 p-1 px-1.5 w-full outline-none focus:border-blue-500 text-xs text-black bg-white" value={newStock.category} onChange={e => setNewStock({...newStock, category: e.target.value.toUpperCase()})}>
+                            {Array.from(new Set(['UMUM', ...(storeSettings?.margins ? Object.keys(storeSettings.margins).filter(k => k !== 'DEFAULT') : []), ...inventory.map((i: any) => i.category).filter(Boolean)])).map(cat => <option key={cat as string} value={(cat as string).toUpperCase()}>{(cat as string).toUpperCase()}</option>)}
                         </select>
-                        <button onClick={() => { setShowNewCategory(true); setNewStock({...newStock, category: ''}); }} className="bg-gray-300 px-2 font-bold hover:bg-gray-400 border border-gray-400 border-l-0 text-xs">+</button>
+                        <button onClick={() => { setShowNewCategory(true); setNewStock({...newStock, category: ''}); }} className="bg-gray-300 px-2 font-bold hover:bg-gray-400 border border-gray-400 border-l-0 text-xs text-black">+</button>
                         </>
                     )}
                 </div>
@@ -914,20 +1160,58 @@ export const POS = ({ currentTime }: { currentTime: Date }) => {
                 <label className="text-xs font-bold text-gray-700">Stok:</label>
                 <input type="number" className="border border-gray-400 p-1 w-full outline-none focus:border-blue-500" value={newStock.stock || ''} onChange={e => setNewStock({...newStock, stock: parseInt(e.target.value) || 0})} />
             </div>
+            <div className="flex flex-col gap-1 w-[110px]">
+                <label className="text-xs font-bold text-gray-700">Lvl 1 (Jual):</label>
+                <input 
+                    type="number" 
+                    className={`border border-gray-400 p-1 w-full outline-none font-bold ${newStock.price1 % 1000 !== 0 ? 'bg-yellow-200 text-black' : 'bg-white text-blue-900'}`} 
+                    value={newStock.price1 || ''} 
+                    onChange={e => setNewStock({...newStock, price1: parseInt(e.target.value) || 0})} 
+                    placeholder="0"
+                />
+            </div>
+            <div className="flex flex-col gap-1 w-[110px]">
+                <label className="text-xs font-bold text-gray-700">Lvl 2 (Grosir):</label>
+                <input 
+                    type="number" 
+                    className={`border border-gray-400 p-1 w-full outline-none font-bold ${newStock.price2 % 1000 !== 0 ? 'bg-yellow-200 text-black' : 'bg-white text-purple-900'}`} 
+                    value={newStock.price2 || ''} 
+                    onChange={e => setNewStock({...newStock, price2: parseInt(e.target.value) || 0})} 
+                    placeholder="0"
+                />
+            </div>
             <div className="flex items-center gap-1">
                 <button onClick={() => {
                     if (!newStock.name || !newStock.code) return alert('Kode dan Nama barang wajib diisi!');
                     
+                    let targetCode = newStock.code;
+                    const existingItem = inventory.find((i: any) => i.code === newStock.code);
+                    if (existingItem) {
+                        const currentSupplier = suppliers.find((s: any) => s.id.toString() === stockSupplierId);
+                        const currentSupplierName = currentSupplier ? currentSupplier.name.trim().toUpperCase() : '';
+                        const existingSupplierName = existingItem.supplier ? existingItem.supplier.trim().toUpperCase() : '';
+                        
+                        if (currentSupplierName && existingSupplierName && currentSupplierName !== existingSupplierName) {
+                            const prefixMatch = newStock.code.match(/^(.*?)\d+$/);
+                            const prefix = prefixMatch ? prefixMatch[1] : newStock.code;
+                            const res = getNextCodeAndOldPrice(prefix);
+                            if (res.nextCode) {
+                                targetCode = res.nextCode;
+                                alert(`Peringatan: Kode "${newStock.code}" sudah terpakai untuk supliyer "${existingItem.supplier}". Kode otomatis diubah ke urutan berikutnya: "${targetCode}" agar tidak tercampur.`);
+                            }
+                        }
+                    }
+
                     const val = newStock.supplierPrice || 0;
                     const margin1 = storeSettings?.margins?.[newStock.category]?.level1 ?? storeSettings?.margins?.DEFAULT?.level1 ?? 75;
                     const margin2 = storeSettings?.margins?.[newStock.category]?.level2 ?? storeSettings?.margins?.DEFAULT?.level2 ?? 15;
-                    const p1 = Math.round(val * (1 + margin1/100));
-                    const p2 = Math.round(val * (1 + margin2/100));
+                    const p1 = newStock.price1 || Math.round(val * (1 + margin1/100));
+                    const p2 = newStock.price2 || Math.round(val * (1 + margin2/100));
 
                     const stockId = Date.now().toString();
                     const item = {
                         id: stockId,
-                        code: newStock.code,
+                        code: targetCode,
                         name: newStock.name,
                         category: newStock.category,
                         price1: p1,
@@ -951,15 +1235,27 @@ export const POS = ({ currentTime }: { currentTime: Date }) => {
             <input ref={codeInputRef} type="text" value={codeInput} onChange={handleCodeChange} onKeyDown={handleCodeSubmit} className="bg-white border border-gray-400 px-2 py-1.5 h-[34px] w-full outline-none focus:border-blue-600 shadow-inner" placeholder="Ketik Kode/Nama Barang..." />
             
             {suggestions.length > 0 && (
-              <div className="absolute top-full left-0 mt-0.5 w-[500px] bg-white border border-gray-400 shadow-xl max-h-[250px] overflow-y-auto text-black z-50">
+              <div className="absolute top-full left-0 mt-0.5 w-[700px] bg-white border border-gray-400 shadow-xl max-h-[250px] overflow-y-auto text-black z-50">
                 <table className="w-full text-left border-collapse">
                   <thead className="bg-[#ece9d8] sticky top-0 border-b-2 border-gray-400 font-normal">
-                    <tr><th className="px-2 py-1.5 border-r border-gray-300">Kode</th><th className="px-2 py-1.5 border-r border-gray-300">Nama Barang</th><th className="px-2 py-1.5 border-r border-gray-300 text-right">Harga Lvl 1</th><th className="px-2 py-1.5 text-right">Stok</th></tr>
+                    <tr>
+                      <th className="px-2 py-1.5 border-r border-gray-300">Kode</th>
+                      <th className="px-2 py-1.5 border-r border-gray-300">Nama Barang</th>
+                      <th className="px-2 py-1.5 border-r border-gray-300 text-right">Stok</th>
+                      <th className="px-2 py-1.5 border-r border-gray-300 text-right">Harga Lvl 1</th>
+                      <th className="px-2 py-1.5 border-r border-gray-300 text-right">Harga Lvl 2</th>
+                      <th className="px-2 py-1.5">Supliyer</th>
+                    </tr>
                   </thead>
                   <tbody>
                     {suggestions.map((item: any) => (
                       <tr key={item.id} onClick={() => handleSelectSuggestion(item)} className="border-b border-gray-200 hover:bg-blue-100 cursor-pointer">
-                        <td className="px-2 py-1.5 border-r border-gray-300 font-mono text-gray-500">{item.code}</td><td className="px-2 py-1.5 border-r border-gray-300 font-bold">{item.name}</td><td className="px-2 py-1.5 text-right border-r border-gray-300 text-blue-800">{formatRp(item.price1)}</td><td className={`px-2 py-1.5 text-right font-bold ${item.stock <= 2 ? 'text-red-600' : 'text-black'}`}>{item.stock}</td>
+                        <td className="px-2 py-1.5 border-r border-gray-300 font-mono text-gray-500">{item.code}</td>
+                        <td className="px-2 py-1.5 border-r border-gray-300 font-bold">{item.name}</td>
+                        <td className={`px-2 py-1.5 text-right border-r border-gray-300 font-bold ${item.stock <= 2 ? 'text-red-600' : 'text-black'}`}>{item.stock}</td>
+                        <td className="px-2 py-1.5 text-right border-r border-gray-300 text-blue-800 font-mono text-xs">{formatRp(item.price1)}</td>
+                        <td className="px-2 py-1.5 text-right border-r border-gray-300 text-purple-800 font-mono text-xs">{formatRp(item.price2)}</td>
+                        <td className="px-2 py-1.5 text-xs font-semibold text-gray-700">{item.supplier || '-'}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -1030,8 +1326,34 @@ export const POS = ({ currentTime }: { currentTime: Date }) => {
                         />
                     ) : formatRp(item.price)}
                   </td>
-                  {isInputStockMode && <td className="border-r border-gray-300 px-2 py-1.5 text-right font-medium text-blue-800">{formatRp(item.price1)}</td>}
-                  {isInputStockMode && <td className="border-r border-gray-300 px-2 py-1.5 text-right font-medium text-purple-800">{formatRp(item.price2)}</td>}
+                  {isInputStockMode && (
+                    <td className="border-r border-gray-300 px-1 py-1 text-center font-medium">
+                      <input 
+                        type="number" 
+                        value={item.price1 || ''} 
+                        onChange={(e) => {
+                            const val1 = parseInt(e.target.value) || 0;
+                            setCart(cart.map(c => c.cartUniqueId === item.cartUniqueId ? { ...c, price1: val1 } : c));
+                        }}
+                        className={`w-24 text-right border border-gray-400 px-1 py-0.5 outline-none font-bold text-blue-800 ${item.price1 % 1000 !== 0 ? 'bg-yellow-200 text-black' : 'bg-white'}`}
+                        placeholder="0"
+                      />
+                    </td>
+                  )}
+                  {isInputStockMode && (
+                    <td className="border-r border-gray-300 px-1 py-1 text-center font-medium">
+                      <input 
+                        type="number" 
+                        value={item.price2 || ''} 
+                        onChange={(e) => {
+                            const val2 = parseInt(e.target.value) || 0;
+                            setCart(cart.map(c => c.cartUniqueId === item.cartUniqueId ? { ...c, price2: val2 } : c));
+                        }}
+                        className={`w-24 text-right border border-gray-400 px-1 py-0.5 outline-none font-bold text-purple-800 ${item.price2 % 1000 !== 0 ? 'bg-yellow-200 text-black' : 'bg-white'}`}
+                        placeholder="0"
+                      />
+                    </td>
+                  )}
                   <td className="border-r border-gray-300 px-2 py-1.5 text-right bg-blue-50/50 font-bold text-blue-900 text-sm">
                     <span className={item.isReturn ? "text-green-600" : ""}>{item.isReturn ? '[KREDIT] ' : ''}{formatRp(item.price * item.qty)}</span>
                   </td>
@@ -1062,7 +1384,35 @@ export const POS = ({ currentTime }: { currentTime: Date }) => {
         {/* BOTTOM SECTION */}
         <div className="flex mt-1 justify-between items-stretch gap-3 w-full pb-3">
           {/* Left Totals */}
-          <div className="flex flex-col justify-end gap-1 w-[280px] p-2 bg-[#8fb4d9] border border-white/50 shadow-sm shrink-0 rounded-sm">
+          <div className="flex flex-col justify-start gap-1 w-[280px] p-2 bg-[#8fb4d9] border border-white/50 shadow-sm shrink-0 rounded-sm">
+             {isInputStockMode && (
+               <div className="flex gap-1.5 items-center bg-[#ece9d8] p-1 rounded border border-gray-400">
+                 <button 
+                   type="button" 
+                   className="w-[110px] bg-blue-800 text-white font-extrabold text-[10px] py-1 px-1 rounded shadow cursor-default leading-tight text-center uppercase"
+                   title="Isi manual Nomor Invoice nota dari supliyer"
+                 >
+                   INVOICE
+                 </button>
+                 <input 
+                   type="text" 
+                   value={manualInvoiceNumber} 
+                   onChange={(e) => setManualInvoiceNumber(e.target.value)} 
+                   placeholder="Isi manual..." 
+                   className="border border-gray-400 bg-white px-2 py-0.5 leading-none text-left flex-1 min-w-0 outline-none font-bold text-xs shadow-inner text-black rounded-[3px] uppercase"
+                 />
+               </div>
+             )}
+             {isInputStockMode && (
+               <button 
+                 type="button" 
+                 onClick={handleRoundPrices} 
+                 className="w-full bg-[#f1c40f] hover:bg-[#d4ac0d] text-blue-950 font-black py-1 px-2 border border-yellow-600 shadow shadow-inner text-xs uppercase tracking-wider cursor-pointer animate-pulse transition-all duration-300 rounded-[3px] leading-tight"
+                 title="Klik untuk membulatkan semua Harga Jual (Lvl 1 & 2) ke Ribuan teratas"
+               >
+                 ▲ BULATKAN HARGA (KE RIBUAN)
+               </button>
+             )}
              <div className="flex items-center h-[26px]">
                <span className="w-[110px] font-semibold text-blue-900 shrink-0 text-xs tracking-wide">SUBTOTAL</span>
                <input type="text" readOnly value={formatRp(totalBelanjaBaru)} className="border border-gray-400 bg-white px-1 leading-none text-right flex-1 min-w-0 h-full outline-none font-bold text-sm shadow-inner" />
@@ -1088,12 +1438,12 @@ export const POS = ({ currentTime }: { currentTime: Date }) => {
              ) : (
                  <>
                  <div className="flex items-center h-[26px]">
-                   <span className="w-[110px] font-semibold text-blue-900 shrink-0 text-xs tracking-wide">POTONGAN RETUR</span>
+                   <span className="w-[110px] font-semibold text-blue-900 shrink-0 text-xs tracking-wide">RETUR</span>
                    <input type="text" readOnly value={formatRp(totalNilaiRetur)} className="border border-gray-400 bg-white px-1 leading-none text-right flex-1 min-w-0 h-full outline-none font-bold text-sm shadow-inner" />
                  </div>
                  <div className="flex items-center h-[26px]">
-                   <select value={discountType} onChange={(e) => setDiscountType(e.target.value)} className="w-[110px] font-semibold text-blue-900 shrink-0 text-xs tracking-wide outline-none bg-transparent cursor-pointer uppercase">
-                     <option value="Rp">DISKON RP</option>
+                   <select value={discountType} onChange={(e) => setDiscountType(e.target.value)} className="w-[110px] font-semibold text-blue-900 shrink-0 text-xs tracking-wide outline-none bg-transparent cursor-pointer uppercase text-left pl-0">
+                     <option value="Rp">DISKON</option>
                      <option value="%">DISKON %</option>
                    </select>
                    <input type="text" value={discountType === 'Rp' ? formatRp(globalDiscount || 0) : (globalDiscount || '')} onChange={e => { const val = e.target.value.replace(/\D/g, ''); setGlobalDiscount(val ? parseInt(val, 10) : 0); }} className="border border-gray-400 bg-white px-1 leading-none text-right flex-1 min-w-0 h-full outline-none font-bold text-sm shadow-inner text-black" placeholder={discountType === 'Rp' ? "Rp 0" : "0"} />
@@ -1125,9 +1475,9 @@ export const POS = ({ currentTime }: { currentTime: Date }) => {
                  </>
              )}
              {isInputStockMode && (
-                 <div className="flex items-center">
-                   <span className="w-[85px] font-semibold text-blue-900 shrink-0 text-xs">Total Biaya</span>
-                   <input type="text" readOnly value={formatRp(totalBelanjaBaru - (totalBelanjaBaru * stockDiscount / 100))} className="border border-gray-400 bg-white px-1 py-0.5 text-right flex-1 min-w-0 outline-none font-bold text-sm shadow-inner" />
+                 <div className="flex items-center h-[26px]">
+                   <span className="w-[110px] font-semibold text-blue-900 shrink-0 text-xs tracking-wide">TOTAL BIAYA</span>
+                   <input type="text" readOnly value={formatRp(totalBelanjaBaru - (totalBelanjaBaru * stockDiscount / 100))} className="border border-gray-400 bg-white px-1 leading-none text-right flex-1 min-w-0 h-full outline-none font-bold text-sm shadow-inner" />
                  </div>
               )}
           </div>
@@ -1160,7 +1510,7 @@ export const POS = ({ currentTime }: { currentTime: Date }) => {
           </div>
 
           {/* Right Action Buttons */}
-          <div className="flex flex-col items-end justify-end pr-0.5 pb-0.5 gap-2 shrink-0">
+          <div className="flex flex-col items-end justify-start pr-0.5 pb-0.5 gap-2 shrink-0">
             <div className="flex flex-col items-end gap-1.5">
               <div className="flex gap-1.5">
                 <div className="flex flex-col gap-1 w-[120px]">
@@ -1240,7 +1590,7 @@ export const POS = ({ currentTime }: { currentTime: Date }) => {
                           </thead>
                           <tbody>
                               {(() => {
-                                  const filteredTx = transactions.filter((t: any) => !searchNotaRetur || t.id.toLowerCase().includes(searchNotaRetur.toLowerCase()));
+                                  const filteredTx = transactions.filter((t: any) => t.id.startsWith('FAK-') && (!searchNotaRetur || t.id.toLowerCase().includes(searchNotaRetur.toLowerCase())));
                                   const sortedTx = smartSort(filteredTx, returSortKey, returSortDirection).slice(0, searchNotaRetur ? 200 : 50);
                                   return sortedTx.map((t: any) => (
                                       <tr key={t.id} className="hover:bg-blue-50 border-b border-gray-300">
