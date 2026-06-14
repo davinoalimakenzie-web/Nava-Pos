@@ -695,116 +695,7 @@ export const MasterData = ({ currentTime }: { currentTime: Date }) => {
             <div className="flex flex-col h-full">
               <div className="flex justify-between items-center bg-[#ece9d8] border-b border-gray-400 p-2 shadow-sm sticky top-0 z-20">
                 <span className="font-bold">Manajemen Hutang Supplier</span>
-                <button className="bg-gray-200 border border-gray-500 px-3 py-1 font-bold shadow hover:bg-gray-300" onClick={() => setShowAddHutangModal(true)}>+ Catat Hutang Baru</button>
               </div>
-              {showAddHutangModal && (
-                 <div className="bg-[#ece9d8] border border-gray-400 p-3 flex flex-wrap gap-2 items-end mb-2 shadow-sm rounded-sm m-2">
-                    <div className="flex flex-col gap-1">
-                        <label className="text-xs font-bold text-gray-700">No. Nota:</label>
-                        <input className="border border-gray-400 p-1 w-24" value={newHutang.nota} onChange={e => setNewHutang({...newHutang, nota: e.target.value})} />
-                    </div>
-                    <div className="flex flex-col gap-1 flex-1">
-                        <label className="text-xs font-bold text-gray-700">Supplier:</label>
-                        <select className="border border-gray-400 p-1 w-full" value={newHutang.supplier_id} onChange={e => {
-                            const sup = suppliers.find((s: any) => String(s.id) === e.target.value);
-                            setNewHutang({...newHutang, supplier_id: e.target.value, supplier_nama: sup?.name || ''});
-                        }}>
-                            <option value="">-- Pilih --</option>
-                            {suppliers?.map((s: any) => <option key={s.id} value={s.id}>{s.name}</option>)}
-                        </select>
-                    </div>
-                    <div className="flex flex-col gap-1">
-                        <label className="text-xs font-bold text-gray-700">Tgl Beli:</label>
-                        <input type="date" className="border border-gray-400 p-1" value={newHutang.tanggal_beli} onChange={e => setNewHutang({...newHutang, tanggal_beli: e.target.value})} />
-                    </div>
-                    <div className="flex flex-col gap-1">
-                        <label className="text-xs font-bold text-gray-700">Jatuh Tempo:</label>
-                        <input type="date" className="border border-gray-400 p-1" value={newHutang.tanggal_jatuh_tempo} onChange={e => setNewHutang({...newHutang, tanggal_jatuh_tempo: e.target.value})} />
-                    </div>
-                    <div className="flex flex-col gap-1">
-                        <label className="text-xs font-bold text-gray-700">Nilai (Rp):</label>
-                        <input type="number" className="border border-gray-400 p-1 w-32" value={newHutang.nilai} onChange={e => setNewHutang({...newHutang, nilai: e.target.value})} />
-                    </div>
-                    <button onClick={() => {
-                        if (!newHutang.nota || !newHutang.supplier_id || !newHutang.nilai || !newHutang.tanggal_jatuh_tempo) return alert('Data belum lengkap!');
-                        const rp = parseInt(newHutang.nilai) || 0;
-                        setHutangSupplier([...(hutangSupplier || []), {
-                            id: 'HTG' + Date.now().toString(),
-                            nomor_nota: newHutang.nota,
-                            supplier_id: newHutang.supplier_id,
-                            supplier_nama: newHutang.supplier_nama,
-                            tanggal_beli: newHutang.tanggal_beli,
-                            tanggal_jatuh_tempo: newHutang.tanggal_jatuh_tempo,
-                            nilai_hutang: rp,
-                            sisa_hutang: rp,
-                            status: 'belum_jatuh_tempo'
-                        }]);
-                        setNewHutang({nota: '', supplier_id: '', supplier_nama: '', tanggal_beli: '', tanggal_jatuh_tempo: '', nilai: ''});
-                        setShowAddHutangModal(false);
-                    }} className="bg-green-600 text-white font-bold py-1 px-4 shadow hover:bg-green-700">Simpan</button>
-                    <button onClick={() => setShowAddHutangModal(false)} className="bg-gray-400 text-white font-bold py-1 px-4 shadow hover:bg-gray-500">Batal</button>
-                 </div>
-              )}
-
-              {showPaymentModal && selectedHutang && (
-                  <div className="fixed inset-0 bg-black/50 z-[100] flex items-center justify-center p-4 backdrop-blur-sm">
-                      <div className="bg-[#ece9d8] border-2 border-gray-400 w-full max-w-sm flex flex-col shadow-xl">
-                          <div className="bg-[#000080] text-white px-2 py-1 flex items-center font-bold text-xs justify-between">
-                              <span>Pembayaran Hutang</span>
-                              <button onClick={() => {setShowPaymentModal(false); setSelectedHutang(null);}} className="bg-gray-300 text-black px-1.5 font-bold border border-gray-400 hover:bg-red-500 hover:text-white">X</button>
-                          </div>
-                          <div className="p-4 flex flex-col gap-3 text-black text-sm">
-                              <div><strong>Supplier:</strong> {selectedHutang.supplier_nama}</div>
-                              <div><strong>Nota:</strong> {selectedHutang.nomor_nota}</div>
-                              <div><strong>Sisa Hutang:</strong> <span className="text-red-600 font-bold text-lg">{formatRp(selectedHutang.sisa_hutang)}</span></div>
-                              
-                              <label className="font-bold mt-2">Nominal Pembayaran (Rp):</label>
-                              <input type="number" className="border border-gray-400 p-2 w-full" value={paymentAmount} onChange={e => setPaymentAmount(e.target.value)} placeholder="0" />
-                              
-                              <p className="text-[10px] text-gray-500 italic mt-1">*Pembayaran otomatis akan mengurangi saldo Dana Bebas dan masuk ke pencatatan Pengeluaran.</p>
-
-                              <div className="flex gap-2 justify-end mt-2">
-                                  <button onClick={() => {setShowPaymentModal(false); setSelectedHutang(null);}} className="px-4 py-1.5 bg-gray-200 border border-gray-500 font-bold shadow hover:bg-gray-300">Batal</button>
-                                  <button onClick={() => {
-                                      const rp = parseInt(paymentAmount);
-                                      if (!rp || rp <= 0 || rp > selectedHutang.sisa_hutang) return alert('Nominal tidak valid!');
-                                      
-                                      // 1. Kurangi Hutang
-                                      const updatedHutang = hutangSupplier.map((h: any) => {
-                                          if (h.id === selectedHutang.id) {
-                                              return {
-                                                  ...h, 
-                                                  sisa_hutang: h.sisa_hutang - rp,
-                                                  status: (h.sisa_hutang - rp) === 0 ? 'lunas' : h.status
-                                              };
-                                          }
-                                          return h;
-                                      });
-                                      setHutangSupplier(updatedHutang);
-
-                                      // 2. Tambah Pengeluaran
-                                      const expense = {
-                                          id: 'EXP-' + Date.now(),
-                                          date: `${new Date().toLocaleDateString('en-CA')} ${new Date().toLocaleTimeString('id-ID')}`,
-                                          isoDate: new Date().toISOString(),
-                                          name: `Pembayaran Hutang SUP: ${selectedHutang.supplier_nama} (Nota: ${selectedHutang.nomor_nota})`,
-                                          amount: rp,
-                                          cashier: 'Sistem',
-                                          branch: 'Pusat',
-                                          wallet: 'Dana Bebas'
-                                      };
-                                      setExpenses([expense, ...expenses]);
-
-                                      setShowPaymentModal(false);
-                                      setSelectedHutang(null);
-                                      setPaymentAmount('');
-                                      alert('Pembayaran berhasil dicatat!');
-                                  }} className="px-4 py-1.5 bg-green-600 text-white border border-green-800 font-bold shadow hover:bg-green-700">Bayar</button>
-                              </div>
-                          </div>
-                      </div>
-                  </div>
-              )}
 
               <table className="w-full text-left border-collapse whitespace-nowrap">
                 <thead className="bg-slate-50 border-b-2 border-gray-400 font-normal">
@@ -839,13 +730,12 @@ export const MasterData = ({ currentTime }: { currentTime: Date }) => {
                         <span className="font-mono text-[9px] text-[#000080]">{hutangSortKey === 'nilai_hutang' ? (hutangSortDirection === 'asc' ? '▲' : '▼') : '↕'}</span>
                       </div>
                     </th>
-                    <th className="p-2 border-r border-gray-300 text-right cursor-pointer hover:bg-gray-200 text-xs font-bold text-blue-900 select-none" onClick={() => handleHutangSort('sisa_hutang')} title="Urutkan Sisa Hutang">
+                    <th className="p-2 text-right cursor-pointer hover:bg-gray-200 text-xs font-bold text-blue-900 select-none" onClick={() => handleHutangSort('sisa_hutang')} title="Urutkan Sisa Hutang">
                       <div className="flex items-center gap-1.5 justify-end">
                         <span>Sisa Hutang</span>
                         <span className="font-mono text-[9px] text-[#000080]">{hutangSortKey === 'sisa_hutang' ? (hutangSortDirection === 'asc' ? '▲' : '▼') : '↕'}</span>
                       </div>
                     </th>
-                    <th className="p-2 text-center w-24 text-xs font-bold text-blue-900 select-none">Aksi</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -861,10 +751,7 @@ export const MasterData = ({ currentTime }: { currentTime: Date }) => {
                             {diffDays < 0 ? <span className="text-red-600 text-xs ml-1 font-bold">(Telat)</span> : null}
                         </td>
                         <td className="p-2 border-r border-gray-300 text-right">{formatRp(h.nilai_hutang)}</td>
-                        <td className="p-2 border-r border-gray-300 text-right font-bold text-red-600">{formatRp(h.sisa_hutang)}</td>
-                        <td className="p-2 text-center">
-                            <button onClick={() => { setSelectedHutang(h); setShowPaymentModal(true); }} className="px-3 py-1 bg-yellow-400 hover:bg-yellow-500 font-bold border border-yellow-600 shadow-sm text-yellow-950">Bayar</button>
-                        </td>
+                        <td className="p-2 text-right font-bold text-red-600">{formatRp(h.sisa_hutang)}</td>
                         </tr>
                     );
                   })}

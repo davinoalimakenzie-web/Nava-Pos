@@ -67,7 +67,7 @@ export const POS = ({ currentTime }: { currentTime: Date }) => {
   const [stockDiscount, setStockDiscount] = useState(0);
   const [globalDiscount, setGlobalDiscount] = useState(0);
   const [discountType, setDiscountType] = useState<string>('Rp');
-  const [newStock, setNewStock] = useState({code: '', name: '', category: 'UMUM', supplierPrice: 0, price1: 0, price2: 0, stock: 1});
+  const [newStock, setNewStock] = useState({code: '', name: '', category: 'UMUM', supplierPrice: 0, price1: 0, price2: 0, stock: '' as any});
   const [stockSuggestions, setStockSuggestions] = useState<any[]>([]);
   const [showNewCategory, setShowNewCategory] = useState(false);
   const [inputStockDueDate, setInputStockDueDate] = useState(() => {
@@ -175,7 +175,14 @@ export const POS = ({ currentTime }: { currentTime: Date }) => {
       });
     }
 
-    if (!found) return { nextCode: '', oldPrice: 0 };
+    if (!found) {
+      let matchedPrefixText = cleanPrefix;
+      if (!cleanPrefix.endsWith('-') && !cleanPrefix.endsWith('_')) {
+        matchedPrefixText = cleanPrefix + '-';
+      }
+      const nextCode = matchedPrefixText + "000001";
+      return { nextCode, oldPrice: 0 };
+    }
 
     const nextNum = maxNum + 1;
     let padLength = 6;
@@ -500,8 +507,10 @@ export const POS = ({ currentTime }: { currentTime: Date }) => {
                 nomor_nota: purchaseFaktur,
                 supplier_id: stockSupplierId,
                 supplier_nama: supplier?.name || 'Unknown',
+                supplier_name: supplier?.name || 'Unknown',
                 tanggal_beli: transactionDate,
                 tanggal_jatuh_tempo: inputStockDueDate,
+                jatuh_tempo: inputStockDueDate,
                 nilai_hutang: finalTotalCost,
                 sisa_hutang: finalTotalCost,
                 status: 'belum_jatuh_tempo'
@@ -842,7 +851,7 @@ export const POS = ({ currentTime }: { currentTime: Date }) => {
         handleSimpan();
       } else if (e.key === 'F9') {
         e.preventDefault();
-        handleCetakButton();
+        if (!isInputStockMode) handleCetakButton();
       } else if (e.key === 'F5') {
         e.preventDefault();
         handleResetBaru();
@@ -854,7 +863,7 @@ export const POS = ({ currentTime }: { currentTime: Date }) => {
         if (!cart.some(c => c.isReturn)) handleSavePending();
       } else if (e.key === 'F2') {
         e.preventDefault();
-        if (!cart.some(c => c.isReturn)) setShowPiutangModal(true);
+        if (!cart.some(c => c.isReturn) && !isInputStockMode) setShowPiutangModal(true);
       }
     };
     window.addEventListener('keydown', handleKeyDown);
@@ -940,7 +949,51 @@ export const POS = ({ currentTime }: { currentTime: Date }) => {
                   <select 
                     className={`border border-gray-400 px-1 py-0.5 flex-1 outline-none text-black font-normal shadow-inner ${!stockSupplierId ? 'bg-yellow-100' : 'bg-white'}`}
                     value={stockSupplierId}
-                    onChange={(e) => setStockSupplierId(e.target.value)}
+                    onChange={(e) => {
+                      const supId = e.target.value;
+                      setStockSupplierId(supId);
+                      if (supId) {
+                        const currentSupplier = suppliers.find((s: any) => s.id.toString() === supId);
+                        if (currentSupplier) {
+                          const existingSupplierItems = [
+                            ...cart,
+                            ...inventory
+                          ].filter((i: any) => (i.supplier === currentSupplier.name || i.supplier_nama === currentSupplier.name) && i.code);
+
+                          let prefix = '';
+                          if (existingSupplierItems.length > 0) {
+                            const lastItemCode = existingSupplierItems[existingSupplierItems.length - 1].code;
+                            const prefixMatch = lastItemCode.match(/^(.*?)\d+$/);
+                            prefix = prefixMatch ? prefixMatch[1] : lastItemCode;
+                          } else {
+                            const cleanSupplierName = currentSupplier.name.replace(/[^A-Za-z0-9]/g, '').toUpperCase();
+                            prefix = (cleanSupplierName.substring(0, 3) || 'BRG') + '-';
+                          }
+
+                          const res = getNextCodeAndOldPrice(prefix);
+                          if (res.nextCode) {
+                            setNewStock((prev: any) => ({
+                              ...prev,
+                              code: res.nextCode,
+                              supplier: currentSupplier.name
+                            }));
+                          } else {
+                            const matchedPrefix = prefix.endsWith('-') || prefix.endsWith('_') ? prefix : prefix + '-';
+                            setNewStock((prev: any) => ({
+                              ...prev,
+                              code: matchedPrefix + "000001",
+                              supplier: currentSupplier.name
+                            }));
+                          }
+                        }
+                      } else {
+                        setNewStock((prev: any) => ({
+                          ...prev,
+                          code: '',
+                          supplier: ''
+                        }));
+                      }
+                    }}
                   >
                     <option value="">-- WAJIB PILIH --</option>
                     {suppliers.map((s: any) => <option key={s.id} value={s.id}>{s.name}</option>)}
@@ -1098,7 +1151,7 @@ export const POS = ({ currentTime }: { currentTime: Date }) => {
                   <div className="absolute top-full left-0 mt-0.5 w-[700px] bg-white border border-gray-400 shadow-xl max-h-[250px] overflow-y-auto text-black z-[999]">
                     <table className="w-full text-left border-collapse">
                       <thead className="bg-[#ece9d8] sticky top-0 border-b-2 border-gray-400 font-normal">
-                        <tr><th className="px-2 py-1.5 border-r border-gray-300">Kode</th><th className="px-2 py-1.5 border-r border-gray-300">Nama Barang</th><th className="px-2 py-1.5 border-r border-gray-300">Kategori</th><th className="px-2 py-1.5 border-r border-gray-300 text-right">Harga Lvl 2</th><th className="px-2 py-1.5 border-r border-gray-300">Supliyer</th><th className="px-2 py-1.5 text-right">Stok</th></tr>
+                        <tr><th className="px-2 py-1.5 border-r border-gray-300">Kode</th><th className="px-2 py-1.5 border-r border-gray-300">Nama Barang</th><th className="px-2 py-1.5 border-r border-gray-300">Kategori</th><th className="px-2 py-1.5 border-r border-gray-300 text-right">Harga Level 2</th><th className="px-2 py-1.5 border-r border-gray-300">Supliyer</th><th className="px-2 py-1.5 text-right">Stok</th></tr>
                       </thead>
                       <tbody>
                         {stockSuggestions.map((item: any) => (
@@ -1118,7 +1171,7 @@ export const POS = ({ currentTime }: { currentTime: Date }) => {
                                   }
                               }
                               
-                              setNewStock({ code: targetCode, name: item.name, category: item.category || 'UMUM', supplierPrice: sPrice, price1: item.price1, price2: item.price2, stock: 1 });
+                              setNewStock({ code: targetCode, name: item.name, category: item.category || 'UMUM', supplierPrice: sPrice, price1: item.price1, price2: item.price2, stock: '' as any });
                               setStockSuggestions([]);
                           }} className="border-b border-gray-200 hover:bg-blue-100 cursor-pointer">
                             <td className="px-2 py-1.5 border-r border-gray-300 font-mono text-gray-500">{item.code}</td><td className="px-2 py-1.5 border-r border-gray-300 font-bold">{item.name}</td><td className="px-2 py-1.5 border-r border-gray-300 text-sm">{item.category || '-'}</td><td className="px-2 py-1.5 border-r border-gray-300 text-right text-purple-800 font-mono text-xs">{formatRp(item.price2)}</td><td className="px-2 py-1.5 border-r border-gray-300 text-xs font-semibold text-gray-700">{item.supplier || '-'}</td><td className={`px-2 py-1.5 text-right font-bold ${item.stock <= 2 ? 'text-red-600' : 'text-black'}`}>{item.stock}</td>
@@ -1158,10 +1211,10 @@ export const POS = ({ currentTime }: { currentTime: Date }) => {
             </div>
             <div className="flex flex-col gap-1 w-[70px]">
                 <label className="text-xs font-bold text-gray-700">Stok:</label>
-                <input type="number" className="border border-gray-400 p-1 w-full outline-none focus:border-blue-500" value={newStock.stock || ''} onChange={e => setNewStock({...newStock, stock: parseInt(e.target.value) || 0})} />
+                <input type="number" className="border border-gray-400 p-1 w-full outline-none focus:border-blue-500" value={newStock.stock || ''} onChange={e => setNewStock({...newStock, stock: e.target.value === '' ? '' : (parseInt(e.target.value) || 0)})} />
             </div>
             <div className="flex flex-col gap-1 w-[110px]">
-                <label className="text-xs font-bold text-gray-700">Lvl 1 (Jual):</label>
+                <label className="text-xs font-bold text-gray-700">Level 1:</label>
                 <input 
                     type="number" 
                     className={`border border-gray-400 p-1 w-full outline-none font-bold ${newStock.price1 % 1000 !== 0 ? 'bg-yellow-200 text-black' : 'bg-white text-blue-900'}`} 
@@ -1171,7 +1224,7 @@ export const POS = ({ currentTime }: { currentTime: Date }) => {
                 />
             </div>
             <div className="flex flex-col gap-1 w-[110px]">
-                <label className="text-xs font-bold text-gray-700">Lvl 2 (Grosir):</label>
+                <label className="text-xs font-bold text-gray-700">Level 2:</label>
                 <input 
                     type="number" 
                     className={`border border-gray-400 p-1 w-full outline-none font-bold ${newStock.price2 % 1000 !== 0 ? 'bg-yellow-200 text-black' : 'bg-white text-purple-900'}`} 
@@ -1217,12 +1270,119 @@ export const POS = ({ currentTime }: { currentTime: Date }) => {
                         price1: p1,
                         price2: p2,
                         price: newStock.supplierPrice,
-                        qty: newStock.stock,
+                        qty: parseInt(newStock.stock as any) || 0,
                         cartUniqueId: Date.now(),
                         isNewStock: true
                     };
-                    setCart([...cart, item]);
-                    setNewStock({code: '', name: '', category: 'UMUM', supplierPrice: 0, price1: 0, price2: 0, stock: 1});
+                    const updatedCart = [...cart, item];
+                    setCart(updatedCart);
+
+                    // Auto-generate next code for the next consecutive input
+                    let nextCode = '';
+                    if (stockSupplierId) {
+                      const currentSupplier = suppliers.find((s: any) => s.id.toString() === stockSupplierId);
+                      if (currentSupplier) {
+                        const existingSupplierItems = [
+                          ...updatedCart,
+                          ...inventory
+                        ].filter((i: any) => (i.supplier === currentSupplier.name || i.supplier_nama === currentSupplier.name) && i.code);
+
+                        let prefix = '';
+                        if (existingSupplierItems.length > 0) {
+                          const lastItemCode = existingSupplierItems[existingSupplierItems.length - 1].code;
+                          const prefixMatch = lastItemCode.match(/^(.*?)\d+$/);
+                          prefix = prefixMatch ? prefixMatch[1] : lastItemCode;
+                        } else {
+                          const cleanSupplierName = currentSupplier.name.replace(/[^A-Za-z0-9]/g, '').toUpperCase();
+                          prefix = (cleanSupplierName.substring(0, 3) || 'BRG') + '-';
+                        }
+
+                        const cleanPrefix = prefix.trim().toUpperCase();
+                        let maxNum = 0;
+                        let matchedPrefixText = cleanPrefix;
+                        let latestSupplierItem = null;
+
+                        const prefixesToTry = [cleanPrefix];
+                        if (!cleanPrefix.endsWith('-') && !cleanPrefix.endsWith('_')) {
+                          prefixesToTry.push(cleanPrefix + '-');
+                        }
+
+                        // Look in updatedCart first
+                        const cartMatches = updatedCart.filter((itm: any) => {
+                          if (!itm.code) return false;
+                          const codeUpper = itm.code.toUpperCase();
+                          return prefixesToTry.some(pref => {
+                            if (codeUpper.startsWith(pref)) {
+                              const suffix = codeUpper.substring(pref.length);
+                              return /^(\d+)$/.test(suffix);
+                            }
+                            return false;
+                          });
+                        });
+
+                        if (cartMatches.length > 0) {
+                          cartMatches.forEach((itm: any) => {
+                            const codeUpper = itm.code.toUpperCase();
+                            prefixesToTry.forEach(pref => {
+                              if (codeUpper.startsWith(pref)) {
+                                const suffix = codeUpper.substring(pref.length);
+                                const numMatch = suffix.match(/^(\d+)$/);
+                                if (numMatch) {
+                                  const num = parseInt(numMatch[1], 10);
+                                  if (num > maxNum) {
+                                    maxNum = num;
+                                    latestSupplierItem = itm;
+                                  }
+                                  matchedPrefixText = pref;
+                                }
+                              }
+                            });
+                          });
+                        } else {
+                          // Look in inventory
+                          const invMatches = inventory.filter((itm: any) => {
+                            if (!itm.code) return false;
+                            const codeUpper = itm.code.toUpperCase();
+                            return prefixesToTry.some(pref => codeUpper.startsWith(pref));
+                          });
+                          invMatches.forEach((itm: any) => {
+                            const codeUpper = itm.code.toUpperCase();
+                            prefixesToTry.forEach(pref => {
+                              if (codeUpper.startsWith(pref)) {
+                                const suffix = codeUpper.substring(pref.length);
+                                const numMatch = suffix.match(/^(\d+)$/);
+                                if (numMatch) {
+                                  const num = parseInt(numMatch[1], 10);
+                                  if (num > maxNum) {
+                                    maxNum = num;
+                                    latestSupplierItem = itm;
+                                  }
+                                  matchedPrefixText = pref;
+                                }
+                              }
+                            });
+                          });
+                        }
+
+                        const nextNum = maxNum + 1;
+                        let padLength = 6;
+                        if (latestSupplierItem) {
+                          const suffix = latestSupplierItem.code.toUpperCase().substring(matchedPrefixText.length);
+                          padLength = suffix.length;
+                        }
+                        nextCode = matchedPrefixText + nextNum.toString().padStart(padLength, '0');
+                      }
+                    }
+
+                    setNewStock({
+                      code: nextCode,
+                      name: '',
+                      category: 'UMUM',
+                      supplierPrice: 0,
+                      price1: 0,
+                      price2: 0,
+                      stock: '' as any
+                    });
                 }} className="bg-[#00a651] text-white font-bold py-1 px-4 hover:bg-green-700 shadow border border-green-800">Masukkan Keranjang</button>
             </div>
           </div>
@@ -1242,8 +1402,8 @@ export const POS = ({ currentTime }: { currentTime: Date }) => {
                       <th className="px-2 py-1.5 border-r border-gray-300">Kode</th>
                       <th className="px-2 py-1.5 border-r border-gray-300">Nama Barang</th>
                       <th className="px-2 py-1.5 border-r border-gray-300 text-right">Stok</th>
-                      <th className="px-2 py-1.5 border-r border-gray-300 text-right">Harga Lvl 1</th>
-                      <th className="px-2 py-1.5 border-r border-gray-300 text-right">Harga Lvl 2</th>
+                      <th className="px-2 py-1.5 border-r border-gray-300 text-right">Harga Level 1</th>
+                      <th className="px-2 py-1.5 border-r border-gray-300 text-right">Harga Level 2</th>
                       <th className="px-2 py-1.5">Supliyer</th>
                     </tr>
                   </thead>
@@ -1294,8 +1454,8 @@ export const POS = ({ currentTime }: { currentTime: Date }) => {
                 <th className="font-bold border-r border-b-2 border-gray-400 px-2 py-1.5 w-16 text-center">Jumlah</th>
                 <th className="font-bold border-r border-b-2 border-gray-400 px-2 py-1.5 w-16 text-center">Satuan</th>
                 <th className="font-bold border-r border-b-2 border-gray-400 px-2 py-1.5 w-28 text-right">{isInputStockMode ? 'Harga Supliyer' : 'Harga'}</th>
-                {isInputStockMode && <th className="font-bold border-r border-b-2 border-gray-400 px-2 py-1.5 w-28 text-right">Lvl 1 (Jual)</th>}
-                {isInputStockMode && <th className="font-bold border-r border-b-2 border-gray-400 px-2 py-1.5 w-28 text-right">Lvl 2 (Grosir)</th>}
+                {isInputStockMode && <th className="font-bold border-r border-b-2 border-gray-400 px-2 py-1.5 w-28 text-right">Level 1</th>}
+                {isInputStockMode && <th className="font-bold border-r border-b-2 border-gray-400 px-2 py-1.5 w-28 text-right">Level 2</th>}
                 <th className="font-bold border-r border-b-2 border-gray-400 px-2 py-1.5 w-28 text-right">Total</th>
                 <th className="font-bold border-b-2 border-gray-400 px-2 py-1.5 w-16 text-center">Aksi</th>
               </tr>
@@ -1515,13 +1675,13 @@ export const POS = ({ currentTime }: { currentTime: Date }) => {
               <div className="flex gap-1.5">
                 <div className="flex flex-col gap-1 w-[120px]">
                   <button onClick={handleSimpan} className="border-2 border-gray-500 bg-gray-200 px-3 py-1.5 w-full hover:bg-gray-300 text-black font-bold shadow-sm text-xs">Simpan [F8]</button>
-                    <button onClick={handleCetakButton} className="border-2 border-gray-500 bg-gray-200 px-3 py-1.5 w-full hover:bg-gray-300 text-black font-bold shadow-sm text-xs">Cetak [F9]</button>
+                    <button onClick={handleCetakButton} disabled={isInputStockMode} className={`border-2 border-gray-500 bg-gray-200 px-3 py-1.5 w-full text-black font-bold shadow-sm text-xs ${isInputStockMode ? 'opacity-50 cursor-not-allowed bg-gray-300' : 'hover:bg-gray-300'}`}>Cetak [F9]</button>
                     <button onClick={handleResetBaru} className={`border-2 border-gray-500 bg-gray-200 px-3 py-1.5 w-full text-black font-bold shadow-sm text-xs ${cart.some(c => c.isReturn) ? 'opacity-50 hover:bg-red-200' : 'hover:bg-gray-300'}`}>Baru [F5]</button>
-                    <button onClick={() => setShowHistoryModal(true)} disabled={cart.some(c => c.isReturn)} className={`border-2 border-gray-500 bg-gray-200 px-3 py-1.5 w-full text-black font-bold shadow-sm text-xs ${cart.some(c => c.isReturn) ? 'opacity-50 cursor-not-allowed' : 'hover:bg-gray-300'}`}>Return</button>
-                    <button onClick={() => setShowBonModal(true)} disabled={cart.some(c => c.isReturn)} className={`border-2 border-gray-500 bg-gray-200 px-3 py-1.5 w-full text-black font-bold text-red-700 shadow-sm text-xs ${cart.some(c => c.isReturn) ? 'opacity-50 cursor-not-allowed' : 'hover:bg-gray-300'}`}>Kasbon</button>
+                    <button onClick={() => setShowHistoryModal(true)} disabled={cart.some(c => c.isReturn) || isInputStockMode} className={`border-2 border-gray-500 bg-gray-200 px-3 py-1.5 w-full text-black font-bold shadow-sm text-xs ${cart.some(c => c.isReturn) || isInputStockMode ? 'opacity-50 cursor-not-allowed' : 'hover:bg-gray-300'}`}>Return</button>
+                    <button onClick={() => setShowBonModal(true)} disabled={cart.some(c => c.isReturn) || isInputStockMode} className={`border-2 border-gray-500 bg-gray-200 px-3 py-1.5 w-full text-black font-bold text-red-700 shadow-sm text-xs ${cart.some(c => c.isReturn) || isInputStockMode ? 'opacity-50 cursor-not-allowed bg-gray-300' : 'hover:bg-gray-300'}`}>Kasbon</button>
                   </div>
                   <div className="flex flex-col gap-1 w-[130px]">
-                    <button onClick={() => setShowPiutangModal(true)} disabled={cart.some(c => c.isReturn)} className={`border-2 border-gray-500 bg-gray-200 px-3 py-1.5 w-full text-black font-bold shadow-sm text-xs relative ${cart.some(c => c.isReturn) ? 'opacity-50 cursor-not-allowed' : 'hover:bg-gray-300'}`}>
+                    <button onClick={() => setShowPiutangModal(true)} disabled={cart.some(c => c.isReturn) || isInputStockMode} className={`border-2 border-gray-500 bg-gray-200 px-3 py-1.5 w-full text-black font-bold shadow-sm text-xs relative ${cart.some(c => c.isReturn) || isInputStockMode ? 'opacity-50 cursor-not-allowed' : 'hover:bg-gray-300'}`}>
                       Piutang [F2]
                       {piutangData.length > 0 && <span className="absolute -top-1.5 -right-1.5 bg-red-600 text-white text-[10px] px-1.5 py-0.5 rounded-full shadow-lg">{piutangData.length}</span>}
                     </button>
@@ -1530,8 +1690,8 @@ export const POS = ({ currentTime }: { currentTime: Date }) => {
                       Daftar Pnd [F4]
                       {pendingTransactions.length > 0 && <span className="absolute -top-1.5 -right-1.5 bg-red-600 text-white text-[10px] px-1.5 py-0.5 rounded-full shadow-lg">{pendingTransactions.length}</span>}
                     </button>
-                    <button onClick={() => setIsBarcodeMode(!isBarcodeMode)} className={`border-2 border-gray-500 px-3 py-1.5 w-full font-bold shadow-sm text-xs text-white ${isBarcodeMode ? 'bg-green-600 hover:bg-green-700' : 'bg-red-600 hover:bg-red-700'}`}>Auto Scan</button>
-                    <button onClick={handlePromoToggle} disabled={cart.some(c => c.isReturn)} className={`border-2 border-gray-500 px-3 py-1.5 w-full font-bold shadow-sm text-xs text-white ${cart.some(c => c.isReturn) ? 'opacity-50 cursor-not-allowed bg-red-600' : (isPromoActive ? 'bg-green-600 hover:bg-green-700' : 'bg-red-600 hover:bg-red-700')}`}>Promo</button>
+                    <button onClick={() => setIsBarcodeMode(!isBarcodeMode)} disabled={isInputStockMode} className={`border-2 border-gray-500 px-3 py-1.5 w-full font-bold shadow-sm text-xs text-white ${isInputStockMode ? 'opacity-50 cursor-not-allowed bg-gray-400' : (isBarcodeMode ? 'bg-green-600 hover:bg-green-700' : 'bg-red-600 hover:bg-red-700')}`}>Auto Scan</button>
+                    <button onClick={handlePromoToggle} disabled={cart.some(c => c.isReturn) || isInputStockMode} className={`border-2 border-gray-500 px-3 py-1.5 w-full font-bold shadow-sm text-xs text-white ${cart.some(c => c.isReturn) || isInputStockMode ? 'opacity-50 cursor-not-allowed bg-gray-400' : (isPromoActive ? 'bg-green-600 hover:bg-green-700' : 'bg-red-600 hover:bg-red-700')}`}>Promo</button>
                   </div>
                 </div>
               </div>

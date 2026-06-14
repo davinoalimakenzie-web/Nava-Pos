@@ -185,7 +185,7 @@ export const Dashboard = ({ currentTime }: { currentTime: Date }) => {
           const prompt = `Lakukan analisis Cashflow berdasarkan data berikut:
           - Saldo Dana Laci (Real-time): Rp${saldoDanaLaci}
           - Total Hutang Supplier Aktif: Rp${hSupplier.reduce((sum: number, h: any) => sum + h.sisa_hutang, 0)} (${hSupplier.length} nota)
-          - Rincian Hutang: ${JSON.stringify(hSupplier.map((h: any) => ({ supplier: h.supplier_name, sisa: h.sisa_hutang, jatuh_tempo: h.jatuh_tempo })))}
+          - Rincian Hutang: ${JSON.stringify(hSupplier.map((h: any) => ({ supplier: h.supplier_name || h.supplier_nama || 'Unknown', sisa: h.sisa_hutang, jatuh_tempo: h.jatuh_tempo || h.tanggal_jatuh_tempo })))}
           - Total Kasbon Karyawan: Rp${tKasbon.reduce((sum: number, e: any) => sum + e.amount, 0)}
           - Kewajiban Lain (Aktif): Rp${kLain.reduce((sum: number, k: any) => sum + k.nilai, 0)}
           
@@ -755,7 +755,7 @@ export const Dashboard = ({ currentTime }: { currentTime: Date }) => {
   todayDate.setHours(0,0,0,0);
   const hutangMendesak = (hutangSupplier || []).filter((h: any) => {
       if (h.sisa_hutang <= 0) return false;
-      const jtDate = new Date(h.jatuh_tempo);
+      const jtDate = new Date(h.jatuh_tempo || h.tanggal_jatuh_tempo);
       const diffTime = jtDate.getTime() - todayDate.getTime();
       const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
       return diffDays <= 14;

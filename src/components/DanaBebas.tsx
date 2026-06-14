@@ -366,7 +366,7 @@ export const DanaBebas = ({ currentTime, headless = false }: { currentTime?: Dat
       id: 'EXP-' + Date.now(),
       date: `${tDate} ${new Date().toLocaleTimeString('id-ID')}`,
       isoDate: new Date().toISOString(),
-      name: `Pelunasan Supplier: ${targetHutang.supplier_name} (${targetHutang.id}) - ${typeLabel}`,
+      name: `Pelunasan Supplier: ${targetHutang.supplier_name || targetHutang.supplier_nama} (${targetHutang.id}) - ${typeLabel}`,
       amount: amt,
       cashier: user?.name || 'Owner',
       branch: pelunasanCabang,
@@ -401,14 +401,14 @@ export const DanaBebas = ({ currentTime, headless = false }: { currentTime?: Dat
     setExpenses([newExpense, ...expenses]);
 
     // Log action
-    addLog('DANA_BEBAS', `Pelunasan supplier ${targetHutang.supplier_name} sebesar Rp ${amt.toLocaleString('id-ID')} menggunakan Dana Bebas`);
+    addLog('DANA_BEBAS', `Pelunasan supplier ${targetHutang.supplier_name || targetHutang.supplier_nama} sebesar Rp ${amt.toLocaleString('id-ID')} menggunakan Dana Bebas`);
 
     setSelectedHutangId('');
     setPelunasanAmount('');
     setPelunasanType('full');
     setPelunasanBukti(null);
     setConfirmPelunasanData(null);
-    showToast('success', `Berhasil membayar supplier ${targetHutang.supplier_name} sebesar ${formatRp(amt)}!`);
+    showToast('success', `Berhasil membayar supplier ${targetHutang.supplier_name || targetHutang.supplier_nama} sebesar ${formatRp(amt)}!`);
   };
 
   // Flow 3: Approve & Pay Salary waitlisted item
@@ -845,7 +845,7 @@ export const DanaBebas = ({ currentTime, headless = false }: { currentTime?: Dat
                          const noFaktur = h.nomor_nota || h.id;
                          return (
                            <option key={h.id} value={h.id}>
-                             {noFaktur} / {h.supplier_name} / {formatRp(h.sisa_hutang)} / {jtStr}
+                             {noFaktur} / {h.supplier_name || h.supplier_nama || 'Unknown'} / {formatRp(h.sisa_hutang)} / {jtStr}
                            </option>
                          );
                       })}
@@ -1333,13 +1333,13 @@ export const DanaBebas = ({ currentTime, headless = false }: { currentTime?: Dat
               {/* Content */}
               <div className="p-4 flex flex-col gap-3">
                 <p className="text-xs text-gray-800 font-medium">
-                  Apakah Anda yakin ingin melakukan pembayaran hutang ke <strong className="text-blue-950">{targetHutang.supplier_name}</strong>?
+                  Apakah Anda yakin ingin melakukan pembayaran hutang ke <strong className="text-blue-950">{targetHutang.supplier_name || targetHutang.supplier_nama}</strong>?
                 </p>
                 
                 <div className="border border-amber-300 bg-amber-50/50 p-3 rounded-xs text-xs flex flex-col gap-1.5 text-left">
                   <div className="flex justify-between border-b border-amber-200 pb-1 text-[11px]">
                     <span className="text-gray-500 font-medium font-sans">Nama Supplier :</span>
-                    <span className="font-bold text-gray-900">{targetHutang.supplier_name}</span>
+                    <span className="font-bold text-gray-900">{targetHutang.supplier_name || targetHutang.supplier_nama}</span>
                   </div>
                   <div className="flex justify-between border-b border-amber-200 pb-1 text-[11px]">
                     <span className="text-gray-500 font-medium font-sans">Sisa Tagihan :</span>
