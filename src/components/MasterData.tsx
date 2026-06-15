@@ -243,10 +243,10 @@ export const MasterData = ({ currentTime }: { currentTime: Date }) => {
                     <th 
                       onClick={() => handleSort('price1')} 
                       className="p-2 border-r border-gray-300 text-right cursor-pointer hover:bg-gray-200 transition-colors min-w-[100px]"
-                      title="Klik untuk mengurutkan berdasarkan Harga Lvl 1"
+                      title="Klik untuk mengurutkan berdasarkan Harga Level 1"
                     >
                       <div className="flex items-center justify-end gap-1 px-1">
-                        <span>Harga Lvl 1</span>
+                        <span>Harga Level 1</span>
                         <span className="text-[9px] text-gray-500 font-mono">
                           {sortKey === 'price1' ? (sortDirection === 'asc' ? '▲' : '▼') : '↕'}
                         </span>
@@ -255,10 +255,10 @@ export const MasterData = ({ currentTime }: { currentTime: Date }) => {
                     <th 
                       onClick={() => handleSort('price2')} 
                       className="p-2 border-r border-gray-300 text-right cursor-pointer hover:bg-gray-200 transition-colors min-w-[100px]"
-                      title="Klik untuk mengurutkan berdasarkan Harga Lvl 2"
+                      title="Klik untuk mengurutkan berdasarkan Harga Level 2"
                     >
                       <div className="flex items-center justify-end gap-1 px-1">
-                        <span>Harga Lvl 2</span>
+                        <span>Harga Level 2</span>
                         <span className="text-[9px] text-gray-500 font-mono">
                           {sortKey === 'price2' ? (sortDirection === 'asc' ? '▲' : '▼') : '↕'}
                         </span>
@@ -282,9 +282,37 @@ export const MasterData = ({ currentTime }: { currentTime: Date }) => {
                   {sortedInventory.map((item: any) => (
                     <tr key={item.id} className="border-b border-gray-200 hover:bg-blue-50 text-xs text-black">
                       <td className="p-2 border-r border-gray-300 font-mono font-bold text-gray-700">{item.code}</td>
-                      <td className="p-2 border-r border-gray-300 font-bold">{item.name}</td>
+                      <td 
+                        onClick={() => {
+                          const updated = inventory.map((i: any) => i.id === item.id ? { ...i, isBestSeller: !i.isBestSeller } : i);
+                          setInventory(updated);
+                        }}
+                        className="p-2 border-r border-gray-300 font-bold cursor-pointer hover:bg-yellow-50 select-none transition-colors"
+                        title="Klik untuk tanda/hapus Best Seller"
+                      >
+                        <div className="flex items-center gap-1">
+                          {item.isBestSeller ? (
+                            <span className="text-amber-500 font-extrabold text-sm select-none">★</span>
+                          ) : (
+                            <span className="text-gray-300 opacity-60 font-normal hover:text-amber-400 select-none">☆</span>
+                          )}
+                          <span>{item.name}</span>
+                        </div>
+                      </td>
                       <td className="p-2 border-r border-gray-300 font-medium text-gray-600">{item.category || '-'}</td>
-                      <td className={`p-2 border-r border-gray-300 text-center font-mono font-bold text-sm ${item.stock <= 2 ? 'text-red-600' : 'text-emerald-700'}`}>{item.stock}</td>
+                      <td 
+                        onClick={() => {
+                          const updated = inventory.map((i: any) => i.id === item.id ? { ...i, isBestSeller: !i.isBestSeller } : i);
+                          setInventory(updated);
+                        }}
+                        className={`p-2 border-r border-gray-300 text-center font-mono font-bold text-sm cursor-pointer hover:bg-yellow-50 select-none transition-colors ${item.stock <= 2 ? 'text-red-600' : 'text-emerald-700'}`}
+                        title="Klik untuk tanda/hapus Best Seller"
+                      >
+                        <div className="flex justify-center items-center gap-1">
+                          <span>{item.stock}</span>
+                          {item.isBestSeller && <span className="text-amber-500 font-extrabold text-[12px] select-none">★</span>}
+                        </div>
+                      </td>
                       <td className="p-2 border-r border-gray-300 text-right font-mono text-gray-800">{formatRp(item.price1)}</td>
                       <td className="p-2 border-r border-gray-300 text-right font-mono text-gray-800">{formatRp(item.price2)}</td>
                       <td className="p-2 border-r border-gray-300 font-medium text-gray-700">{item.supplier || '-'}</td>
@@ -333,15 +361,15 @@ export const MasterData = ({ currentTime }: { currentTime: Date }) => {
                         <span className="text-[10px] text-gray-500 font-mono">{sortKey === 'supplierPrice' ? (sortDirection === 'asc' ? '▲' : '▼') : '↕'}</span>
                       </div>
                     </th>
-                    <th className="p-2 border-r border-gray-300 cursor-pointer hover:bg-gray-200 select-none text-right" onClick={() => handleSort('price1')} title="Urutkan berdasarkan Harga Lvl 1">
+                    <th className="p-2 border-r border-gray-300 cursor-pointer hover:bg-gray-200 select-none text-right" onClick={() => handleSort('price1')} title="Urutkan berdasarkan Harga Level 1">
                       <div className="flex items-center gap-1.5 justify-end">
-                        <span>Harga Lvl 1</span>
+                        <span>Harga Level 1</span>
                         <span className="text-[10px] text-gray-500 font-mono">{sortKey === 'price1' ? (sortDirection === 'asc' ? '▲' : '▼') : '↕'}</span>
                       </div>
                     </th>
-                    <th className="p-2 border-r border-gray-300 cursor-pointer hover:bg-gray-200 select-none text-right" onClick={() => handleSort('price2')} title="Urutkan berdasarkan Harga Lvl 2">
+                    <th className="p-2 border-r border-gray-300 cursor-pointer hover:bg-gray-200 select-none text-right" onClick={() => handleSort('price2')} title="Urutkan berdasarkan Harga Level 2">
                       <div className="flex items-center gap-1.5 justify-end">
-                        <span>Harga Lvl 2</span>
+                        <span>Harga Level 2</span>
                         <span className="text-[10px] text-gray-500 font-mono">{sortKey === 'price2' ? (sortDirection === 'asc' ? '▲' : '▼') : '↕'}</span>
                       </div>
                     </th>
@@ -490,7 +518,7 @@ export const MasterData = ({ currentTime }: { currentTime: Date }) => {
                      alert('Data berhasil diexport ke Excel & pesan dikirim ke Supliyer!');
                  }} className="bg-green-600 text-white px-4 py-1.5 shadow font-bold hover:bg-green-700 rounded-sm">Export to Excel</button>
                </div>
-               {orderData.filter((o: any) => o.sisaStock <= 2).length === 0 ? (
+               {orderData.filter((o: any) => o.sisaStock <= 3).length === 0 ? (
                    <p className="text-gray-500 italic mt-2">Tidak ada barang yang perlu diorder saat ini (Stok Aman).</p>
                ) : (
                    <table className="w-full text-left border-collapse whitespace-nowrap mt-2 border border-gray-400 shadow-sm">
@@ -536,7 +564,7 @@ export const MasterData = ({ currentTime }: { currentTime: Date }) => {
                         </tr>
                       </thead>
                       <tbody>
-                        {sortedOrderData.filter((o: any) => o.sisaStock <= 2).map((o: any) => (
+                        {sortedOrderData.filter((o: any) => o.sisaStock <= 3).map((o: any) => (
                            <tr key={o.id} className="border-b border-gray-200 hover:bg-blue-50">
                               <td className="p-2 border-r border-gray-300 font-bold">{o.id}<br/><span className="text-[10px] text-gray-500 font-normal">{o.date}</span></td>
                               <td className="p-2 border-r border-gray-300 font-bold text-blue-800">{o.supplier}</td>

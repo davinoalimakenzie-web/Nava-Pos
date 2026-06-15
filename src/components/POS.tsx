@@ -27,8 +27,11 @@ export const POS = ({ currentTime }: { currentTime: Date }) => {
     setMasterDataTab, setPendingUser, setShowAuthModal, storeSettings,
     appLogs, addLog, employees,
     isInputStockMode, setIsInputStockMode,
+    isOrderSupplierMode, setIsOrderSupplierMode,
     wallets, setWallets,
-    setReprintTx
+    setReprintTx,
+    stockSupplierId, setStockSupplierId,
+    poType, setPoType
   } = useAppContext();
 
   const selectedCustomer = customers.find((c: any) => String(c.id) === String(selectedCustomerId));
@@ -43,6 +46,13 @@ export const POS = ({ currentTime }: { currentTime: Date }) => {
   const [searchNotaRetur, setSearchNotaRetur] = useState('');
   const [returSortKey, setReturSortKey] = useState('date');
   const [returSortDirection, setReturSortDirection] = useState<'asc' | 'desc'>('desc');
+
+  const [showKirimPOModal, setShowKirimPOModal] = useState(false);
+  const [poWANumber, setPoWANumber] = useState('');
+  const [poEmailAddress, setPoEmailAddress] = useState('');
+  const [poChannelExcel, setPoChannelExcel] = useState(true);
+  const [poChannelWA, setPoChannelWA] = useState(true);
+  const [poChannelEmail, setPoChannelEmail] = useState(false);
 
   const handleReturSort = (key: string) => {
     if (returSortKey === key) {
@@ -63,7 +73,6 @@ export const POS = ({ currentTime }: { currentTime: Date }) => {
   const [printActionModal, setPrintActionModal] = useState(false);
   const [waNumber, setWaNumber] = useState('');
   const [isPromoActive, setIsPromoActive] = useState(false);
-  const [stockSupplierId, setStockSupplierId] = useState('');
   const [stockDiscount, setStockDiscount] = useState(0);
   const [globalDiscount, setGlobalDiscount] = useState(0);
   const [discountType, setDiscountType] = useState<string>('Rp');
@@ -207,7 +216,7 @@ export const POS = ({ currentTime }: { currentTime: Date }) => {
         let newOrders = [...prevOrders];
         let added = false;
         currentInv.forEach(inv => {
-            if (inv.stock <= 2) {
+            if (inv.stock <= 3) {
                 const existingIdx = newOrders.findIndex(o => o.item === inv.name && o.status === 'Pending');
                 if (existingIdx === -1) {
                     newOrders.unshift({
@@ -439,6 +448,43 @@ export const POS = ({ currentTime }: { currentTime: Date }) => {
     const isPiutang = paymentMethod === 'Qriss/TF' || paymentMethod === 'DP' || paymentMethod === '1 Minggu';
     const noFaktur = `FAK-${(() => { const d = new Date(); return String(d.getFullYear()).slice(2) + String(d.getMonth()+1).padStart(2,'0') + String(d.getDate()).padStart(2,'0'); })()}-${Math.floor(Math.random() * 10000).toString().padStart(4, '0')}`;
     
+    if (isOrderSupplierMode) {
+        const supplier = suppliers.find((s: any) => s.id.toString() === stockSupplierId);
+        if (!supplier) {
+            return setConfirmAction({message: 'Pilih Supplier terlebih dahulu!', isAlert: true});
+        }
+        if (cart.length === 0) {
+            return setConfirmAction({message: 'Keranjang order supliyer masih kosong!', isAlert: true});
+        }
+
+        // Add all order products as pending orders
+        setOrderData((prevOrders: any[]) => {
+            let newOrders = [...prevOrders];
+            cart.forEach(cartItem => {
+                const matchItem = inventory.find((it: any) => it.code === cartItem.code);
+                newOrders.unshift({
+                    id: 'ORD-MANUAL-' + Math.floor(1000 + Math.random() * 9000),
+                    date: transactionDate || defaultDate,
+                    supplier: supplier.name,
+                    item: cartItem.name,
+                    sisaStock: matchItem ? matchItem.stock : 0,
+                    targetOrder: cartItem.qty,
+                    status: 'Pending'
+                });
+            });
+            return newOrders;
+        });
+
+        addLog('ORDER_SUPLIYER', `Membuat PO Order Supliyer (${supplier.name}) untuk ${cart.length} item.`);
+        setConfirmAction({message: 'PO Order Supliyer Berhasil Dibuat & Ditambahkan ke Daftar Order Supliyer!', isAlert: true});
+        
+        setIsOrderSupplierMode(false);
+        setCart([]);
+        setStockSupplierId('');
+        resetKasirState();
+        return;
+    }
+
     if (isInputStockMode) {
         if (!manualInvoiceNumber.trim()) {
             return setConfirmAction({message: 'Harap isi nomor invoice terlebih dahulu!', isAlert: true});
@@ -640,7 +686,69 @@ export const POS = ({ currentTime }: { currentTime: Date }) => {
     }
   };
 
+  const handleAutoFillPO = (type: string, supplierId: string) => {
+    if (!supplierId) {
+      setCart([]);
+      return;
+    }
+    
+    let filteredItems: any[] = [];
+    if (supplierId === 'MIX') {
+      filteredItems = inventory;
+    } else {
+      const currentSupplier = suppliers.find((s: any) => s.id.toString() === supplierId);
+      if (currentSupplier) {
+        filteredItems = inventory.filter((i: any) => i.supplier === currentSupplier.name);
+      }
+    }
+    
+    let matchedProductItems: any[] = [];
+    if (type === 'Daftar Antrian') {
+      matchedProductItems = filteredItems.filter((i: any) => i.stock <= 3);
+    } else if (type === 'Best Seller') {
+      matchedProductItems = filteredItems.filter((i: any) => i.isBestSeller);
+    } else {
+      matchedProductItems = filteredItems.filter((i: any) => i.stock <= 3 || i.isBestSeller);
+    }
+    
+    const formattedCartItems = matchedProductItems.map((item: any) => {
+      return {
+        id: item.id,
+        code: item.code,
+        name: item.name,
+        category: item.category || 'UMUM',
+        price1: 0,
+        price2: 0,
+        price: item.supplierPrice || 0,
+        qty: 10,
+        cartUniqueId: 'PO-FILLED-' + item.id + '-' + Math.random(),
+        isNewStock: false,
+        isOrderSupplier: true
+      };
+    });
+    
+    setCart(formattedCartItems);
+    addLog('PEMBELIAN_STOK', `Auto-fill PO: ${formattedCartItems.length} barang termuat (${type})`);
+  };
+
   const handleSimpan = () => {
+    if (isOrderSupplierMode) {
+      if (!stockSupplierId) {
+        return setConfirmAction({message: 'Pilih supliyer terlebih dahulu!', isAlert: true});
+      }
+      if (stockSupplierId === 'MIX') {
+        return setConfirmAction({
+          message: 'Kirim Order Ditolak! Order supliyer tidak boleh dikirim menggunakan opsi MIX SUPLIYER (karena order hanya boleh ditujukan ke 1 supliyer). Silakan pilih supliyer spesifik terlebih dahulu!',
+          isAlert: true
+        });
+      }
+      if (cart.length === 0) {
+        return setConfirmAction({message: 'Keranjang order PO untuk supliyer masih kosong!', isAlert: true});
+      }
+      setShowKirimPOModal(true);
+      return;
+    }
+
     const isPiutangPayment = cart.some(c => c.isPiutangPayment);
     if (isInputStockMode && !stockSupplierId) return setConfirmAction({message: 'Pilih supliyer terlebih dahulu!', isAlert: true});
     if (!isInputStockMode && !isPiutangPayment && !selectedCustomer) return setConfirmAction({message: 'Pilih pelanggan terlebih dahulu!', isAlert: true});
@@ -741,9 +849,16 @@ export const POS = ({ currentTime }: { currentTime: Date }) => {
       });
     }
     if (cart.length === 0) return setConfirmAction({message: 'Keranjang masih kosong!', isAlert: true});
-    if (!selectedCustomer) return setConfirmAction({message: 'Pilih pelanggan terlebih dahulu!', isAlert: true});
+    
+    if (!isOrderSupplierMode && !selectedCustomer) {
+      return setConfirmAction({message: 'Pilih pelanggan terlebih dahulu!', isAlert: true});
+    }
+    if (isOrderSupplierMode && !stockSupplierId) {
+      return setConfirmAction({message: 'Pilih supliyer terlebih dahulu!', isAlert: true});
+    }
+
     setConfirmAction({
-      message: 'Simpan transaksi ke daftar pending?',
+      message: isOrderSupplierMode ? 'Simpan PO ke daftar pending?' : 'Simpan transaksi ke daftar pending?',
       onConfirm: () => {
         const rawId = Date.now();
         const dateObj = new Date();
@@ -753,19 +868,38 @@ export const POS = ({ currentTime }: { currentTime: Date }) => {
         let pendingUser = user?.name || 'Kasir';
         if (storeSettings?.activeBranch) pendingUser += ' (' + storeSettings.activeBranch + ')';
         
+        let customerNameVal = '';
+        let customerIdVal = '';
+        let idVal = '';
+        
+        if (isOrderSupplierMode) {
+          const currentSupplier = suppliers.find((s: any) => s.id.toString() === stockSupplierId);
+          const targetName = stockSupplierId === 'MIX' ? 'MIX SUPLIYER' : (currentSupplier?.name || 'UMUM');
+          customerNameVal = `PO: ${targetName}`;
+          customerIdVal = `PO_${stockSupplierId}`;
+          idVal = `${yyyymmdd}${hhmmss}-PENDING-PO-${targetName.toUpperCase().replace(/\s+/g, ' ').substring(0, 25)}`;
+        } else {
+          customerNameVal = selectedCustomer.name;
+          customerIdVal = selectedCustomerId;
+          idVal = `${yyyymmdd}${hhmmss}-PENDING-${selectedCustomer.name.toUpperCase().replace(/\s+/g, ' ').substring(0, 30)}`;
+        }
+
         const newPending = {
-          id: `${yyyymmdd}${hhmmss}-PENDING-${selectedCustomer.name.toUpperCase().replace(/\s+/g, ' ').substring(0, 30)}`,
+          id: idVal,
           time: dateObj.toLocaleTimeString('id-ID'),
           dateString: dateObj.toLocaleDateString('id-ID', {day: '2-digit', month: 'short', year: 'numeric'}),
-          customerName: selectedCustomer.name,
-          customerId: selectedCustomerId,
+          customerName: customerNameVal,
+          customerId: customerIdVal,
           sales: pendingUser,
           items: [...cart],
           total: totalBelanja,
+          isOrderSupplierMode: isOrderSupplierMode,
+          stockSupplierId: stockSupplierId,
+          poType: poType
         };
 
         setPendingTransactions([newPending, ...pendingTransactions]);
-        addLog('PENDING_TRANSAKSI', `Penundaan transaksi untuk pelanggan ${selectedCustomer.name}`);
+        addLog('PENDING_TRANSAKSI', isOrderSupplierMode ? `Penundaan PO untuk supliyer ${customerNameVal}` : `Penundaan transaksi untuk pelanggan ${customerNameVal}`);
         resetKasirState();
       }
     });
@@ -807,6 +941,21 @@ export const POS = ({ currentTime }: { currentTime: Date }) => {
   };
 
   useEffect(() => {
+    if (isOrderSupplierMode && stockSupplierId) {
+      if (stockSupplierId === 'MIX') {
+        setPoWANumber('0812-4455-6677');
+        setPoEmailAddress('supplier.group@mixorder.com');
+      } else {
+        const currentSupplier = suppliers.find((s: any) => s.id.toString() === stockSupplierId);
+        if (currentSupplier) {
+          setPoWANumber(currentSupplier.contact || '0812-3456-7890');
+          setPoEmailAddress(currentSupplier.email || 'info@supplier.com');
+        }
+      }
+    }
+  }, [stockSupplierId, isOrderSupplierMode, suppliers]);
+
+  useEffect(() => {
     if (selectedCustomer) {
       const currentMonth = new Date().getMonth();
       const currentYear = new Date().getFullYear();
@@ -839,7 +988,7 @@ export const POS = ({ currentTime }: { currentTime: Date }) => {
       // Actually F-keys don't write text, so we can always listen
       if (e.key === 'F1') {
         e.preventDefault();
-        if (isInputStockMode) {
+        if (isInputStockMode || isOrderSupplierMode) {
           stockCodeInputRef.current?.focus();
           stockCodeInputRef.current?.select();
         } else {
@@ -851,24 +1000,24 @@ export const POS = ({ currentTime }: { currentTime: Date }) => {
         handleSimpan();
       } else if (e.key === 'F9') {
         e.preventDefault();
-        if (!isInputStockMode) handleCetakButton();
+        if (!isInputStockMode && !isOrderSupplierMode) handleCetakButton();
       } else if (e.key === 'F5') {
         e.preventDefault();
         handleResetBaru();
       } else if (e.key === 'F4') {
         e.preventDefault();
-        if (!cart.some(c => c.isReturn)) setShowPendingModal(true);
+        if (!cart.some(c => c.isReturn) && !isInputStockMode) setShowPendingModal(true);
       } else if (e.key === 'F3') {
         e.preventDefault();
-        if (!cart.some(c => c.isReturn)) handleSavePending();
+        if (!cart.some(c => c.isReturn) && !isInputStockMode) handleSavePending();
       } else if (e.key === 'F2') {
         e.preventDefault();
-        if (!cart.some(c => c.isReturn) && !isInputStockMode) setShowPiutangModal(true);
+        if (!cart.some(c => c.isReturn) && !isInputStockMode && !isOrderSupplierMode) setShowPiutangModal(true);
       }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [cart, selectedCustomer, stockSupplierId, paymentMethod, transactionNote, amountPaid, isInputStockMode]);
+  }, [cart, selectedCustomer, stockSupplierId, paymentMethod, transactionNote, amountPaid, isInputStockMode, isOrderSupplierMode]);
 
   const resetKasirState = () => {
     setCart([]);
@@ -880,6 +1029,7 @@ export const POS = ({ currentTime }: { currentTime: Date }) => {
     setStagedItem(null);
     setActiveReturTrx(null);
     setIsInputStockMode(false);
+    setIsOrderSupplierMode(false);
     setGlobalDiscount(0);
     setManualInvoiceNumber('');
     try {
@@ -903,7 +1053,7 @@ export const POS = ({ currentTime }: { currentTime: Date }) => {
 
   return (
     <div className="flex-1 flex flex-col bg-[#8fb4d9] border border-[#8fb4d9] overflow-hidden">
-      <LegacyWindowHeader title={isInputStockMode ? "POS - INPUT STOCK BARU (PEMBELIAN)" : "POS - TRANSAKSI PENJUALAN"} currentTime={currentTime} />
+      <LegacyWindowHeader title={isOrderSupplierMode ? "POS - REKAP ORDER SUPLIYER (PO)" : isInputStockMode ? "POS - INPUT STOCK BARU (PEMBELIAN)" : "POS - TRANSAKSI PENJUALAN"} currentTime={currentTime} />
       
       <div className="p-2 flex-1 flex flex-col gap-1 overflow-hidden">
         
@@ -923,8 +1073,22 @@ export const POS = ({ currentTime }: { currentTime: Date }) => {
             </div>
 
             <div className="flex items-center">
-              <label className="w-24 uppercase">{isInputStockMode ? 'Jatuh Tempo' : 'Tunai/Kredit'}</label>
-              {isInputStockMode ? (
+              <label className="w-24 uppercase">{isOrderSupplierMode ? 'Status PO' : isInputStockMode ? 'Jatuh Tempo' : 'Tunai/Kredit'}</label>
+              {isOrderSupplierMode ? (
+                <select 
+                  value={poType || "Daftar Antrian"} 
+                  onChange={(e) => {
+                    const newType = e.target.value;
+                    setPoType(newType);
+                    handleAutoFillPO(newType, stockSupplierId);
+                  }}
+                  className="border border-gray-400 px-1 py-0.5 w-[220px] bg-white text-black font-bold outline-none shadow-inner cursor-pointer"
+                >
+                  <option value="Daftar Antrian">1. Daftar Antrian</option>
+                  <option value="Best Seller">2. Best Seller</option>
+                  <option value="Mix Order">3. Mix Order</option>
+                </select>
+              ) : isInputStockMode ? (
                 <div className="relative border border-gray-400 bg-white w-[220px] flex items-center overflow-hidden hover:border-blue-500 shadow-inner">
                   <span className="px-2 py-0.5 text-black font-normal pointer-events-none truncate flex-1">
                     {formatDateDisplay(inputStockDueDate)}
@@ -943,16 +1107,29 @@ export const POS = ({ currentTime }: { currentTime: Date }) => {
             </div>
             
             <div className="flex items-center">
-              <label className="w-24 uppercase">{isInputStockMode ? 'Supliyer' : 'Pelanggan'} <span className="text-red-500">*</span></label>
+              <label className="w-24 uppercase">{(isInputStockMode || isOrderSupplierMode) ? 'Supliyer' : 'Pelanggan'} <span className="text-red-500">*</span></label>
               <div className="flex gap-1 w-[220px] relative">
-                {isInputStockMode ? (
+                {(isInputStockMode || isOrderSupplierMode) ? (
                   <select 
                     className={`border border-gray-400 px-1 py-0.5 flex-1 outline-none text-black font-normal shadow-inner ${!stockSupplierId ? 'bg-yellow-100' : 'bg-white'}`}
                     value={stockSupplierId}
                     onChange={(e) => {
                       const supId = e.target.value;
                       setStockSupplierId(supId);
+                      
+                      if (isOrderSupplierMode) {
+                        handleAutoFillPO(poType, supId);
+                      }
+                      
                       if (supId) {
+                        if (supId === 'MIX') {
+                          setNewStock((prev: any) => ({
+                            ...prev,
+                            code: '',
+                            supplier: 'MIX SUPLIYER'
+                          }));
+                          return;
+                        }
                         const currentSupplier = suppliers.find((s: any) => s.id.toString() === supId);
                         if (currentSupplier) {
                           const existingSupplierItems = [
@@ -996,6 +1173,7 @@ export const POS = ({ currentTime }: { currentTime: Date }) => {
                     }}
                   >
                     <option value="">-- WAJIB PILIH --</option>
+                    {isOrderSupplierMode && <option value="MIX">MIX SUPLIYER</option>}
                     {suppliers.map((s: any) => <option key={s.id} value={s.id}>{s.name}</option>)}
                   </select>
                 ) : (
@@ -1032,10 +1210,11 @@ export const POS = ({ currentTime }: { currentTime: Date }) => {
               <div className="relative">
                  <button onClick={() => setShowInputMenu(!showInputMenu)} className="bg-gray-200 border border-gray-500 text-black px-3 py-0.5 font-bold shadow-sm hover:bg-gray-300">Input ▾</button>
                  {showInputMenu && (
-                    <div className="absolute top-full right-0 mt-1 bg-[#ece9d8] border-2 border-gray-400 shadow-xl z-[999] w-56 flex flex-col text-left text-black font-normal">
+                    <div className="absolute top-full right-0 mt-1 bg-[#ece9d8] border-2 border-gray-400 shadow-xl z-[999] w-64 flex flex-col text-left text-black font-normal">
                        <button onClick={() => { setShowExpenseModal(true); setShowInputMenu(false); }} className="px-3 py-2 hover:bg-blue-100 text-left border-b border-gray-300 font-bold">Input Pengeluaran</button>
-                       <button onClick={() => { setIsInputStockMode(true); setCart([]); setStockDiscount(100); setShowInputMenu(false); }} className="px-3 py-2 hover:bg-blue-100 text-left border-b border-gray-300 font-bold">Input Stock Baru</button>
-                       <button onClick={() => { setActiveTab('masterdata'); setMasterDataTab('order'); setShowInputMenu(false); }} className="px-3 py-2 hover:bg-blue-100 text-left border-b border-gray-300 font-bold">Order Supliyer</button>
+                       <button onClick={() => { setIsInputStockMode(true); setIsOrderSupplierMode(false); setCart([]); setStockDiscount(100); setShowInputMenu(false); }} className="px-3 py-2 hover:bg-blue-100 text-left border-b border-gray-300 font-bold">Input Stock Baru</button>
+                       <button onClick={() => { setIsOrderSupplierMode(true); setIsInputStockMode(false); setCart([]); setShowInputMenu(false); }} className="px-3 py-2 hover:bg-blue-100 text-left border-b border-gray-300 font-bold text-green-700">Format Order Supliyer (PO)</button>
+                       <button onClick={() => { setActiveTab('masterdata'); setMasterDataTab('order'); setShowInputMenu(false); }} className="px-3 py-2 hover:bg-blue-100 text-left border-b border-gray-300 font-bold">Antrian PO / Order (Master)</button>
                     </div>
                  )}
               </div>
@@ -1058,7 +1237,7 @@ export const POS = ({ currentTime }: { currentTime: Date }) => {
         </div>
 
         {/* INPUT ROW ATAU FORM INPUT BARU */}
-        {isInputStockMode ? (
+        {(isInputStockMode || isOrderSupplierMode) ? (
           <div className="bg-[#ece9d8] border border-gray-400 p-2 flex flex-wrap gap-2 items-end shadow-sm mt-1 z-20 relative">
             <div className="flex flex-col gap-1 w-[160px] relative">
                 <div className="flex justify-between items-center w-full">
@@ -1209,30 +1388,45 @@ export const POS = ({ currentTime }: { currentTime: Date }) => {
                     setNewStock({...newStock, supplierPrice: val, price1: Math.round(val * (1 + margin1/100)), price2: Math.round(val * (1 + margin2/100))});
                 }} />
             </div>
-            <div className="flex flex-col gap-1 w-[70px]">
-                <label className="text-xs font-bold text-gray-700">Stok:</label>
-                <input type="number" className="border border-gray-400 p-1 w-full outline-none focus:border-blue-500" value={newStock.stock || ''} onChange={e => setNewStock({...newStock, stock: e.target.value === '' ? '' : (parseInt(e.target.value) || 0)})} />
-            </div>
-            <div className="flex flex-col gap-1 w-[110px]">
-                <label className="text-xs font-bold text-gray-700">Level 1:</label>
-                <input 
-                    type="number" 
-                    className={`border border-gray-400 p-1 w-full outline-none font-bold ${newStock.price1 % 1000 !== 0 ? 'bg-yellow-200 text-black' : 'bg-white text-blue-900'}`} 
-                    value={newStock.price1 || ''} 
-                    onChange={e => setNewStock({...newStock, price1: parseInt(e.target.value) || 0})} 
-                    placeholder="0"
-                />
-            </div>
-            <div className="flex flex-col gap-1 w-[110px]">
-                <label className="text-xs font-bold text-gray-700">Level 2:</label>
-                <input 
-                    type="number" 
-                    className={`border border-gray-400 p-1 w-full outline-none font-bold ${newStock.price2 % 1000 !== 0 ? 'bg-yellow-200 text-black' : 'bg-white text-purple-900'}`} 
-                    value={newStock.price2 || ''} 
-                    onChange={e => setNewStock({...newStock, price2: parseInt(e.target.value) || 0})} 
-                    placeholder="0"
-                />
-            </div>
+            {isOrderSupplierMode ? (
+              <>
+                <div className="flex flex-col gap-1 w-[80px]">
+                    <label className="text-xs font-bold text-gray-700">Sisa Stok:</label>
+                    <input type="text" readOnly className="border border-gray-400 p-1 w-full bg-gray-100 font-bold text-center text-red-700" value={`${inventory.find((i: any) => i.code === newStock.code)?.stock ?? 0} Pcs`} />
+                </div>
+                <div className="flex flex-col gap-1 w-[100px]">
+                    <label className="text-xs font-bold text-gray-700">Qty Order:</label>
+                    <input type="number" className="border border-gray-400 p-1 w-full outline-none focus:border-blue-500 font-bold text-center text-blue-900" value={newStock.stock || ''} onChange={e => setNewStock({...newStock, stock: e.target.value === '' ? '' : (parseInt(e.target.value) || 0)})} placeholder="Qty PO" />
+                </div>
+              </>
+            ) : (
+              <>
+                <div className="flex flex-col gap-1 w-[70px]">
+                    <label className="text-xs font-bold text-gray-700">Stok:</label>
+                    <input type="number" className="border border-gray-400 p-1 w-full outline-none focus:border-blue-500" value={newStock.stock || ''} onChange={e => setNewStock({...newStock, stock: e.target.value === '' ? '' : (parseInt(e.target.value) || 0)})} />
+                </div>
+                <div className="flex flex-col gap-1 w-[110px]">
+                    <label className="text-xs font-bold text-gray-700">Level 1:</label>
+                    <input 
+                        type="number" 
+                        className={`border border-gray-400 p-1 w-full outline-none font-bold ${newStock.price1 % 1000 !== 0 ? 'bg-yellow-200 text-black' : 'bg-white text-blue-900'}`} 
+                        value={newStock.price1 || ''} 
+                        onChange={e => setNewStock({...newStock, price1: parseInt(e.target.value) || 0})} 
+                        placeholder="0"
+                    />
+                </div>
+                <div className="flex flex-col gap-1 w-[110px]">
+                    <label className="text-xs font-bold text-gray-700">Level 2:</label>
+                    <input 
+                        type="number" 
+                        className={`border border-gray-400 p-1 w-full outline-none font-bold ${newStock.price2 % 1000 !== 0 ? 'bg-yellow-200 text-black' : 'bg-white text-purple-900'}`} 
+                        value={newStock.price2 || ''} 
+                        onChange={e => setNewStock({...newStock, price2: parseInt(e.target.value) || 0})} 
+                        placeholder="0"
+                    />
+                </div>
+              </>
+            )}
             <div className="flex items-center gap-1">
                 <button onClick={() => {
                     if (!newStock.name || !newStock.code) return alert('Kode dan Nama barang wajib diisi!');
@@ -1267,12 +1461,13 @@ export const POS = ({ currentTime }: { currentTime: Date }) => {
                         code: targetCode,
                         name: newStock.name,
                         category: newStock.category,
-                        price1: p1,
-                        price2: p2,
-                        price: newStock.supplierPrice,
+                        price1: isOrderSupplierMode ? 0 : p1,
+                        price2: isOrderSupplierMode ? 0 : p2,
+                        price: newStock.supplierPrice || 0,
                         qty: parseInt(newStock.stock as any) || 0,
-                        cartUniqueId: Date.now(),
-                        isNewStock: true
+                        cartUniqueId: Date.now() + Math.random(),
+                        isNewStock: !isOrderSupplierMode,
+                        isOrderSupplier: isOrderSupplierMode
                     };
                     const updatedCart = [...cart, item];
                     setCart(updatedCart);
@@ -1450,10 +1645,10 @@ export const POS = ({ currentTime }: { currentTime: Date }) => {
               <tr className="bg-[#ece9d8]">
                 <th className="font-bold border-r border-b-2 border-gray-400 px-2 py-1.5 w-24">Kode</th>
                 <th className="font-bold border-r border-b-2 border-gray-400 px-2 py-1.5">Nama</th>
-                {isInputStockMode && <th className="font-bold border-r border-b-2 border-gray-400 px-2 py-1.5">Kategori</th>}
+                {(isInputStockMode || isOrderSupplierMode) && <th className="font-bold border-r border-b-2 border-gray-400 px-2 py-1.5">Kategori</th>}
                 <th className="font-bold border-r border-b-2 border-gray-400 px-2 py-1.5 w-16 text-center">Jumlah</th>
                 <th className="font-bold border-r border-b-2 border-gray-400 px-2 py-1.5 w-16 text-center">Satuan</th>
-                <th className="font-bold border-r border-b-2 border-gray-400 px-2 py-1.5 w-28 text-right">{isInputStockMode ? 'Harga Supliyer' : 'Harga'}</th>
+                <th className="font-bold border-r border-b-2 border-gray-400 px-2 py-1.5 w-28 text-right">{(isInputStockMode || isOrderSupplierMode) ? 'Harga Supliyer' : 'Harga'}</th>
                 {isInputStockMode && <th className="font-bold border-r border-b-2 border-gray-400 px-2 py-1.5 w-28 text-right">Level 1</th>}
                 {isInputStockMode && <th className="font-bold border-r border-b-2 border-gray-400 px-2 py-1.5 w-28 text-right">Level 2</th>}
                 <th className="font-bold border-r border-b-2 border-gray-400 px-2 py-1.5 w-28 text-right">Total</th>
@@ -1465,15 +1660,15 @@ export const POS = ({ currentTime }: { currentTime: Date }) => {
                 <tr key={idx} className="border-b border-gray-200 hover:bg-blue-50">
                   <td className="border-r border-gray-300 px-2 py-1.5">{item.code}</td>
                   <td className="border-r border-gray-300 px-2 py-1.5 font-bold">{item.name}</td>
-                  {isInputStockMode && <td className="border-r border-gray-300 px-2 py-1.5">{item.category || 'UMUM'}</td>}
+                  {(isInputStockMode || isOrderSupplierMode) && <td className="border-r border-gray-300 px-2 py-1.5">{item.category || 'UMUM'}</td>}
                   <td className="border-r border-gray-300 px-2 py-1.5 text-center font-bold text-blue-900">
-                    {item.isReturn ? (
-                       <input type="number" min="1" max={item.originalQty || item.qty} value={item.qty} onChange={e => { let n = parseInt(e.target.value) || 1; if (n > (item.originalQty || item.qty)) n = item.originalQty || item.qty; setCart(cart.map(c => c.cartUniqueId === item.cartUniqueId ? {...c, qty: n} : c)); }} className="w-16 outline-none border border-gray-400 text-center shadow-inner font-bold text-blue-900" />
+                    {item.isReturn || isOrderSupplierMode || isInputStockMode ? (
+                       <input type="number" min="1" value={item.qty} onChange={e => { let n = parseInt(e.target.value) || 1; setCart(cart.map(c => c.cartUniqueId === item.cartUniqueId ? {...c, qty: n} : c)); }} className="w-16 outline-none border border-gray-400 text-center shadow-inner font-bold text-blue-900" />
                     ) : item.qty}
                   </td>
                   <td className="border-r border-gray-300 px-2 py-1.5 text-center">Pcs</td>
                   <td className="border-r border-gray-300 px-2 py-1.5 text-right font-medium">
-                    {isInputStockMode ? (
+                    {(isInputStockMode || isOrderSupplierMode) ? (
                         <input 
                           type="number" 
                           value={item.price || ''} 
@@ -1568,7 +1763,7 @@ export const POS = ({ currentTime }: { currentTime: Date }) => {
                  type="button" 
                  onClick={handleRoundPrices} 
                  className="w-full bg-[#f1c40f] hover:bg-[#d4ac0d] text-blue-950 font-black py-1 px-2 border border-yellow-600 shadow shadow-inner text-xs uppercase tracking-wider cursor-pointer animate-pulse transition-all duration-300 rounded-[3px] leading-tight"
-                 title="Klik untuk membulatkan semua Harga Jual (Lvl 1 & 2) ke Ribuan teratas"
+                 title="Klik untuk membulatkan semua Harga Jual (Level 1 & 2) ke Ribuan teratas"
                >
                  ▲ BULATKAN HARGA (KE RIBUAN)
                </button>
@@ -1674,24 +1869,26 @@ export const POS = ({ currentTime }: { currentTime: Date }) => {
             <div className="flex flex-col items-end gap-1.5">
               <div className="flex gap-1.5">
                 <div className="flex flex-col gap-1 w-[120px]">
-                  <button onClick={handleSimpan} className="border-2 border-gray-500 bg-gray-200 px-3 py-1.5 w-full hover:bg-gray-300 text-black font-bold shadow-sm text-xs">Simpan [F8]</button>
-                    <button onClick={handleCetakButton} disabled={isInputStockMode} className={`border-2 border-gray-500 bg-gray-200 px-3 py-1.5 w-full text-black font-bold shadow-sm text-xs ${isInputStockMode ? 'opacity-50 cursor-not-allowed bg-gray-300' : 'hover:bg-gray-300'}`}>Cetak [F9]</button>
+                  <button onClick={handleSimpan} className="border-2 border-gray-500 bg-gray-200 px-3 py-1.5 w-full hover:bg-gray-300 text-black font-bold shadow-sm text-xs">
+                    {isOrderSupplierMode ? 'Kirim [F8]' : 'Simpan [F8]'}
+                  </button>
+                    <button onClick={handleCetakButton} disabled={isInputStockMode || isOrderSupplierMode} className={`border-2 border-gray-500 bg-gray-200 px-3 py-1.5 w-full text-black font-bold shadow-sm text-xs ${isInputStockMode || isOrderSupplierMode ? 'opacity-50 cursor-not-allowed bg-gray-300' : 'hover:bg-gray-300'}`}>Cetak [F9]</button>
                     <button onClick={handleResetBaru} className={`border-2 border-gray-500 bg-gray-200 px-3 py-1.5 w-full text-black font-bold shadow-sm text-xs ${cart.some(c => c.isReturn) ? 'opacity-50 hover:bg-red-200' : 'hover:bg-gray-300'}`}>Baru [F5]</button>
-                    <button onClick={() => setShowHistoryModal(true)} disabled={cart.some(c => c.isReturn) || isInputStockMode} className={`border-2 border-gray-500 bg-gray-200 px-3 py-1.5 w-full text-black font-bold shadow-sm text-xs ${cart.some(c => c.isReturn) || isInputStockMode ? 'opacity-50 cursor-not-allowed' : 'hover:bg-gray-300'}`}>Return</button>
-                    <button onClick={() => setShowBonModal(true)} disabled={cart.some(c => c.isReturn) || isInputStockMode} className={`border-2 border-gray-500 bg-gray-200 px-3 py-1.5 w-full text-black font-bold text-red-700 shadow-sm text-xs ${cart.some(c => c.isReturn) || isInputStockMode ? 'opacity-50 cursor-not-allowed bg-gray-300' : 'hover:bg-gray-300'}`}>Kasbon</button>
+                    <button onClick={() => setShowHistoryModal(true)} disabled={cart.some(c => c.isReturn) || isInputStockMode || isOrderSupplierMode} className={`border-2 border-gray-500 bg-gray-200 px-3 py-1.5 w-full text-black font-bold shadow-sm text-xs ${cart.some(c => c.isReturn) || isInputStockMode || isOrderSupplierMode ? 'opacity-50 cursor-not-allowed bg-gray-300' : 'hover:bg-gray-300'}`}>Return</button>
+                    <button onClick={() => setShowBonModal(true)} disabled={cart.some(c => c.isReturn) || isInputStockMode || isOrderSupplierMode} className={`border-2 border-gray-500 bg-gray-200 px-3 py-1.5 w-full text-black font-bold text-red-700 shadow-sm text-xs ${cart.some(c => c.isReturn) || isInputStockMode || isOrderSupplierMode ? 'opacity-50 cursor-not-allowed bg-gray-300' : 'hover:bg-gray-300'}`}>Kasbon</button>
                   </div>
                   <div className="flex flex-col gap-1 w-[130px]">
-                    <button onClick={() => setShowPiutangModal(true)} disabled={cart.some(c => c.isReturn) || isInputStockMode} className={`border-2 border-gray-500 bg-gray-200 px-3 py-1.5 w-full text-black font-bold shadow-sm text-xs relative ${cart.some(c => c.isReturn) || isInputStockMode ? 'opacity-50 cursor-not-allowed' : 'hover:bg-gray-300'}`}>
+                    <button onClick={() => setShowPiutangModal(true)} disabled={cart.some(c => c.isReturn) || isInputStockMode || isOrderSupplierMode} className={`border-2 border-gray-500 bg-gray-200 px-3 py-1.5 w-full text-black font-bold shadow-sm text-xs relative ${cart.some(c => c.isReturn) || isInputStockMode || isOrderSupplierMode ? 'opacity-50 cursor-not-allowed bg-gray-300' : 'hover:bg-gray-300'}`}>
                       Piutang [F2]
                       {piutangData.length > 0 && <span className="absolute -top-1.5 -right-1.5 bg-red-600 text-white text-[10px] px-1.5 py-0.5 rounded-full shadow-lg">{piutangData.length}</span>}
                     </button>
-                    <button onClick={handleSavePending} disabled={cart.some(c => c.isReturn)} className={`border-2 border-gray-500 bg-gray-200 px-3 py-1.5 w-full text-black font-bold shadow-sm text-xs ${cart.some(c => c.isReturn) ? 'opacity-50 cursor-not-allowed' : 'hover:bg-gray-300'}`}>Pending [F3]</button>
-                    <button onClick={() => setShowPendingModal(true)} disabled={cart.some(c => c.isReturn)} className={`border-2 border-gray-500 bg-gray-200 px-3 py-1.5 w-full text-black font-bold shadow-sm text-xs relative ${cart.some(c => c.isReturn) ? 'opacity-50 cursor-not-allowed' : 'hover:bg-gray-300'}`}>
+                    <button onClick={handleSavePending} disabled={cart.some(c => c.isReturn) || isInputStockMode} className={`border-2 border-gray-500 bg-gray-200 px-3 py-1.5 w-full text-black font-bold shadow-sm text-xs ${cart.some(c => c.isReturn) || isInputStockMode ? 'opacity-50 cursor-not-allowed bg-gray-300' : 'hover:bg-gray-300'}`}>Pending [F3]</button>
+                    <button onClick={() => setShowPendingModal(true)} disabled={cart.some(c => c.isReturn) || isInputStockMode} className={`border-2 border-gray-500 bg-gray-200 px-3 py-1.5 w-full text-black font-bold shadow-sm text-xs relative ${cart.some(c => c.isReturn) || isInputStockMode ? 'opacity-50 cursor-not-allowed bg-gray-300' : 'hover:bg-gray-300'}`}>
                       Daftar Pnd [F4]
                       {pendingTransactions.length > 0 && <span className="absolute -top-1.5 -right-1.5 bg-red-600 text-white text-[10px] px-1.5 py-0.5 rounded-full shadow-lg">{pendingTransactions.length}</span>}
                     </button>
-                    <button onClick={() => setIsBarcodeMode(!isBarcodeMode)} disabled={isInputStockMode} className={`border-2 border-gray-500 px-3 py-1.5 w-full font-bold shadow-sm text-xs text-white ${isInputStockMode ? 'opacity-50 cursor-not-allowed bg-gray-400' : (isBarcodeMode ? 'bg-green-600 hover:bg-green-700' : 'bg-red-600 hover:bg-red-700')}`}>Auto Scan</button>
-                    <button onClick={handlePromoToggle} disabled={cart.some(c => c.isReturn) || isInputStockMode} className={`border-2 border-gray-500 px-3 py-1.5 w-full font-bold shadow-sm text-xs text-white ${cart.some(c => c.isReturn) || isInputStockMode ? 'opacity-50 cursor-not-allowed bg-gray-400' : (isPromoActive ? 'bg-green-600 hover:bg-green-700' : 'bg-red-600 hover:bg-red-700')}`}>Promo</button>
+                    <button onClick={() => setIsBarcodeMode(!isBarcodeMode)} disabled={isInputStockMode || isOrderSupplierMode} className={`border-2 border-gray-500 px-3 py-1.5 w-full font-bold shadow-sm text-xs text-white ${isInputStockMode || isOrderSupplierMode ? 'opacity-50 cursor-not-allowed bg-gray-400' : (isBarcodeMode ? 'bg-green-600 hover:bg-green-700' : 'bg-red-600 hover:bg-red-700')}`}>Auto Scan</button>
+                    <button onClick={handlePromoToggle} disabled={cart.some(c => c.isReturn) || isInputStockMode || isOrderSupplierMode} className={`border-2 border-gray-500 px-3 py-1.5 w-full font-bold shadow-sm text-xs text-white ${cart.some(c => c.isReturn) || isInputStockMode || isOrderSupplierMode ? 'opacity-50 cursor-not-allowed bg-gray-400' : (isPromoActive ? 'bg-green-600 hover:bg-green-700' : 'bg-red-600 hover:bg-red-700')}`}>Promo</button>
                   </div>
                 </div>
               </div>
@@ -1903,6 +2100,168 @@ export const POS = ({ currentTime }: { currentTime: Date }) => {
                      }} className="px-5 py-2 border-2 border-blue-900 bg-blue-700 text-white hover:bg-blue-800 font-bold shadow-sm text-xs">YA, LANJUTKAN</button>
                    </>
                 )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Kirim PO Modal */}
+      {showKirimPOModal && (
+        <div className="fixed inset-0 bg-black/60 z-[9999] flex items-center justify-center p-4 backdrop-blur-sm">
+          <div className="bg-[#ece9d8] border-2 border-gray-500 w-full max-w-lg flex flex-col shadow-2xl text-black">
+            <div className="bg-[#005a9c] text-white px-3 py-2 flex items-center justify-between cursor-default">
+              <span className="font-bold text-sm tracking-wide">📦 CONVERT & KIRIM PO SUPLIYER</span>
+              <button onClick={() => setShowKirimPOModal(false)} className="bg-red-650 hover:bg-red-700 px-2 py-0.5 border border-white/50 shadow-sm leading-none font-bold text-xs text-white">X</button>
+            </div>
+            <div className="p-4 bg-white border border-gray-400 mx-1.5 my-1.5 font-sans">
+              <div className="mb-4 bg-blue-50 border border-blue-200 p-2 text-xs">
+                <span className="font-bold text-blue-900 block mb-1">DATA REKAPITULASI PO:</span>
+                <div>Supliyer: <span className="font-bold text-blue-950">{suppliers.find((s: any) => s.id.toString() === stockSupplierId)?.name || 'MIX SUPLIYER'}</span></div>
+                <div>Status PO: <span className="font-bold text-purple-900">{poType}</span></div>
+                <div>Jumlah Barang: <span className="font-bold text-black">{cart.length} item</span></div>
+                <div>Total Nilai PO: <span className="font-bold text-green-700 font-mono">{formatRp(totalBelanja)}</span></div>
+              </div>
+
+              <span className="font-bold text-sm text-gray-800 block mb-3">PILIH SALURAN PENGIRIMAN:</span>
+
+              <div className="flex flex-col gap-4">
+                {/* Excel Option */}
+                <div className="border border-gray-300 p-3 bg-gray-50 hover:bg-gray-100 flex items-start gap-3">
+                  <input 
+                    type="checkbox" 
+                    id="chan-excel" 
+                    className="mt-1" 
+                    checked={poChannelExcel} 
+                    onChange={e => setPoChannelExcel(e.target.checked)} 
+                  />
+                  <div className="flex-1">
+                    <label htmlFor="chan-excel" className="font-bold text-sm text-green-800 cursor-pointer flex items-center gap-2">
+                      <span>📄 Convert to Microsoft Excel (.xls)</span>
+                    </label>
+                    <p className="text-xs text-gray-500 mt-1">Mengunduh/mengekspor dokumen rekap PO dalam format file spreadsheet Excel.</p>
+                  </div>
+                </div>
+
+                {/* WA Option */}
+                <div className="border border-gray-300 p-3 bg-gray-50 hover:bg-gray-100 flex items-start gap-3">
+                  <input 
+                    type="checkbox" 
+                    id="chan-wa" 
+                    className="mt-1" 
+                    checked={poChannelWA} 
+                    onChange={e => setPoChannelWA(e.target.checked)} 
+                  />
+                  <div className="flex-1">
+                    <label htmlFor="chan-wa" className="font-bold text-sm text-green-750 cursor-pointer">
+                      <span>💬 Kirim via WhatsApp (WA)</span>
+                    </label>
+                    <p className="text-xs text-gray-500 my-1">Mengirim salinan pesan order PO ini secara instan ke kontak telepon supliyer.</p>
+                    {poChannelWA && (
+                      <input 
+                        type="text" 
+                        placeholder="No. Telp / WA Supliyer (Cth: 08123456789)" 
+                        value={poWANumber} 
+                        onChange={e => setPoWANumber(e.target.value)} 
+                        className="mt-1.5 p-1.5 border border-gray-400 outline-none w-full font-mono text-xs focus:border-green-600 bg-white"
+                      />
+                    )}
+                  </div>
+                </div>
+
+                {/* Email Option */}
+                <div className="border border-gray-300 p-3 bg-gray-50 hover:bg-gray-100 flex items-start gap-3">
+                  <input 
+                    type="checkbox" 
+                    id="chan-email" 
+                    className="mt-1" 
+                    checked={poChannelEmail} 
+                    onChange={e => setPoChannelEmail(e.target.checked)} 
+                  />
+                  <div className="flex-1">
+                    <label htmlFor="chan-email" className="font-bold text-sm text-blue-750 cursor-pointer">
+                      <span>📧 Kirim via Email</span>
+                    </label>
+                    <p className="text-xs text-gray-500 my-1">Gunakan relai surat terintegrasi untuk meluncurkan lampiran PDF rekap langsung ke pos surat elektronik.</p>
+                    {poChannelEmail && (
+                      <input 
+                        type="email" 
+                        placeholder="Alamat Email Supliyer (Cth: sales@supliyer.com)" 
+                        value={poEmailAddress} 
+                        onChange={e => setPoEmailAddress(e.target.value)} 
+                        className="mt-1.5 p-1.5 border border-gray-400 outline-none w-full font-mono text-xs focus:border-blue-600 bg-white"
+                      />
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex justify-end gap-2 text-sm mt-6">
+                <button 
+                  onClick={() => setShowKirimPOModal(false)} 
+                  className="px-4 py-1.5 border-2 border-gray-500 bg-gray-200 hover:bg-gray-300 font-bold shadow-sm cursor-pointer"
+                >
+                  Batal
+                </button>
+                <button 
+                  onClick={() => {
+                    if (!poChannelExcel && !poChannelWA && !poChannelEmail) {
+                      return setConfirmAction({message: 'Pilih minimal satu saluran pengirimaan (Excel, WA, atau Email)!', isAlert: true});
+                    }
+                    if (poChannelWA && !poWANumber.trim()) {
+                      return setConfirmAction({message: 'Isi No. WhatsApp penerima!', isAlert: true});
+                    }
+                    if (poChannelEmail && !poEmailAddress.trim()) {
+                      return setConfirmAction({message: 'Isi Alamat Email penerima!', isAlert: true});
+                    }
+
+                    const currentSupplierObj = suppliers.find((s: any) => s.id.toString() === stockSupplierId);
+                    const supName = currentSupplierObj ? currentSupplierObj.name : 'Buana Jaya / BJ';
+
+                    let actionReport = `Order PO berhasil diproses dan dikirim ke "${supName}"!\n`;
+                    if (poChannelExcel) actionReport += `- Excel: File "PO_Navapos_${supName.replace(/[^A-Za-z0-9]/g, '')}.xls" siap diunduh!\n`;
+                    if (poChannelWA) actionReport += `- WhatsApp: Pesan terkirim otomatis ke "${poWANumber}"!\n`;
+                    if (poChannelEmail) actionReport += `- Email: Surat PO dikirim ke "${poEmailAddress}"!\n`;
+
+                    setConfirmAction({
+                      message: actionReport,
+                      isAlert: true,
+                      onConfirm: () => {
+                        addLog('PEMBELIAN_STOK', `Mengirim lembaran PO ke supliyer ${supName} via ` + [
+                          poChannelExcel ? 'Excel' : '',
+                          poChannelWA ? 'WhatsApp' : '',
+                          poChannelEmail ? 'Email' : ''
+                        ].filter(Boolean).join(', '));
+
+                        if (poChannelExcel) {
+                          const excelContent = `KODE\tNAMA BARANG\tQTY ORDER\tHARGA MODAL\tTOTAL\n` + 
+                            cart.map(c => `${c.code}\t${c.name}\t${c.qty}\t${c.price}\t${c.price * c.qty}`).join('\n');
+                          const blob = new Blob([excelContent], {type: 'text/plain;charset=utf-8'});
+                          const url = URL.createObjectURL(blob);
+                          const link = document.createElement('a');
+                          link.href = url;
+                          link.download = `PO_Order_${supName.replace(/\s+/g, '_')}.xls`;
+                          document.body.appendChild(link);
+                          link.click();
+                          document.body.removeChild(link);
+                        }
+
+                        if (poChannelWA) {
+                          const prefixTxt = `Halo ${supName}, berikut daftar Order PO kami:\n` + 
+                            cart.map(c => `- [${c.code}] ${c.name} x${c.qty} pcs`).join('\n') + 
+                            `\nTotal: ${formatRp(totalBelanja)}`;
+                          window.open(`https://web.whatsapp.com/send?phone=${poWANumber.replace(/[^0-9]/g, '')}&text=${encodeURIComponent(prefixTxt)}`, '_blank');
+                        }
+
+                        setShowKirimPOModal(false);
+                        resetKasirState();
+                      }
+                    });
+                  }} 
+                  className="px-5 py-1.5 border-2 border-green-800 bg-green-600 hover:bg-green-700 text-white font-bold shadow-sm cursor-pointer"
+                >
+                  📨 Kirim PO Sekarang
+                </button>
               </div>
             </div>
           </div>

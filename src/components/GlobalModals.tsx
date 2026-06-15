@@ -21,7 +21,11 @@ export const GlobalModals = () => {
         setInventory, setTransactions, setOrderData,
         appLogs, addLog,
         wallets, setWallets,
-        reprintTx, setReprintTx
+        reprintTx, setReprintTx,
+        isOrderSupplierMode, setIsOrderSupplierMode,
+        isInputStockMode, setIsInputStockMode,
+        stockSupplierId, setStockSupplierId,
+        poType, setPoType
     } = useAppContext();
 
     const [newExpenseName, setNewExpenseName] = useState('');
@@ -68,7 +72,16 @@ export const GlobalModals = () => {
 
     const loadPendingTransaction = (pendingItem: any) => {
         setCart(pendingItem.items);
-        setSelectedCustomerId(pendingItem.customerId);
+        if (pendingItem.isOrderSupplierMode) {
+            setIsOrderSupplierMode(true);
+            setIsInputStockMode(false);
+            setStockSupplierId(pendingItem.stockSupplierId || '');
+            setPoType(pendingItem.poType || 'Daftar Antrian');
+        } else {
+            setIsOrderSupplierMode(false);
+            setIsInputStockMode(false);
+            setSelectedCustomerId(pendingItem.customerId);
+        }
         setPendingTransactions(pendingTransactions.filter((p: any) => p.id !== pendingItem.id));
         setShowPendingModal(false);
     };
@@ -541,8 +554,8 @@ export const GlobalModals = () => {
                         <input type="text" required value={newCustomerPhone} onChange={(e) => setNewCustomerPhone(e.target.value)} className="w-full p-1.5 border border-gray-400 mb-2 outline-none focus:border-blue-600" />
                         <label className="block mb-1">Level Harga:</label>
                         <select value={newCustomerLevel} onChange={(e) => setNewCustomerLevel(e.target.value)} className="w-full p-1.5 border border-gray-400 mb-4 outline-none focus:border-blue-600">
-                        <option value={1}>Level 1 (NON member)</option>
-                        <option value={2}>Level 2 (Grosir)</option>
+                        <option value={1}>Level 1</option>
+                        <option value={2}>Level 2</option>
                         <option value={3}>Level 3 (Affiliate/Expo)</option>
                         </select>
                         <div className="flex justify-end gap-2">

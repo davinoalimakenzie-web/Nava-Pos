@@ -13,12 +13,13 @@ import {
   initialPendingTransactions,
   initialLeaveRequests,
   defaultDate,
-  initialUsers
+  initialUsers,
+  initialSuppliers
 } from '../data';
 
 const AppContext = createContext<any>(null);
 
-const DUMMY_VERSION = "18";
+const DUMMY_VERSION = "19";
 
 const initialHutangSupplier: any[] = [];
 
@@ -138,7 +139,7 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
   const [kewajibanLain, setKewajibanLain] = useSyncState<any[]>('kewajibanLain', [], storeSettings.syncEnabled);
   const [waitingPayments, setWaitingPayments] = useSyncState<any[]>('waitingPayments', [], storeSettings.syncEnabled);
 
-  const [suppliers, setSuppliers] = useSyncState<any[]>('suppliers', [], storeSettings.syncEnabled);
+  const [suppliers, setSuppliers] = useSyncState<any[]>('suppliers', initialSuppliers, storeSettings.syncEnabled);
   const [supplierReturns, setSupplierReturns] = useSyncState<any[]>('supplierReturns', [], storeSettings.syncEnabled);
 
   const [botMemory, setBotMemory] = useSyncState<string>('botMemory', 'Saya adalah AI bot asisten cerdas untuk Nava POS.', storeSettings.syncEnabled);
@@ -181,8 +182,12 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
   // Tab states
   const [masterDataTab, setMasterDataTab] = useState('stock');
   const [isInputStockMode, setIsInputStockMode] = useState(false);
+  const [isOrderSupplierMode, setIsOrderSupplierMode] = useState(false);
   const [isKalkulatorOpen, setIsKalkulatorOpen] = useState(false);
   const [reprintTx, setReprintTx] = useState<any>(null);
+
+  const [stockSupplierId, setStockSupplierId] = useState('');
+  const [poType, setPoType] = useState('Daftar Antrian');
 
   return (
     <AppContext.Provider value={{
@@ -226,8 +231,11 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
       storeSettings, setStoreSettings,
       appLogs, addLog,
       isInputStockMode, setIsInputStockMode,
+      isOrderSupplierMode, setIsOrderSupplierMode,
       isKalkulatorOpen, setIsKalkulatorOpen,
-      reprintTx, setReprintTx
+      reprintTx, setReprintTx,
+      stockSupplierId, setStockSupplierId,
+      poType, setPoType
     }}>
       {children}
     </AppContext.Provider>

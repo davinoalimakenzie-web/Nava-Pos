@@ -186,15 +186,15 @@ export const SettingsPanel = ({ currentTime }: { currentTime: Date }) => {
                       <input name="category" required className="border border-gray-400 p-2" placeholder="Cth: OBAT" />
                     </div>
                     <div className="flex flex-col gap-1 w-[80px]">
-                      <label className="text-xs font-bold">Lvl 1 (%):</label>
+                      <label className="text-xs font-bold">Level 1 (%):</label>
                       <input name="level1" type="number" required className="border border-gray-400 p-2" defaultValue="50" />
                     </div>
                     <div className="flex flex-col gap-1 w-[80px]">
-                      <label className="text-xs font-bold">Lvl 2 (%):</label>
+                      <label className="text-xs font-bold">Level 2 (%):</label>
                       <input name="level2" type="number" required className="border border-gray-400 p-2" defaultValue="10" />
                     </div>
                     <div className="flex flex-col gap-1 w-[80px]">
-                      <label className="text-xs font-bold">Lvl 3 (%):</label>
+                      <label className="text-xs font-bold">Level 3 (%):</label>
                       <input name="level3" type="number" required className="border border-gray-400 p-2" defaultValue="5" />
                     </div>
                     <button type="submit" className="bg-green-600 text-white font-bold px-4 py-2 hover:bg-green-700">Tambah</button>
@@ -1076,7 +1076,7 @@ export const SettingsPanel = ({ currentTime }: { currentTime: Date }) => {
               <tbody>
                 {smartSort(customers, custSortKey, custSortDirection).map((c: any) => (
                   <tr key={c.id} className="border-b border-gray-200 hover:bg-blue-50">
-                    <td className="p-2 border-r border-gray-300 text-center font-mono text-gray-500">#{c.id}</td><td className="p-2 border-r border-gray-300 font-bold">{c.name}</td><td className="p-2 border-r border-gray-300">{c.phone || '-'}</td><td className="p-2 border-r border-gray-300 text-center">Level {c.level} {c.level == 1 ? '(NON member)' : ''}</td><td className="p-2 text-center"><button className="px-2 text-blue-700 font-bold hover:underline">Edit</button></td>
+                    <td className="p-2 border-r border-gray-300 text-center font-mono text-gray-500">#{c.id}</td><td className="p-2 border-r border-gray-300 font-bold">{c.name}</td><td className="p-2 border-r border-gray-300">{c.phone || '-'}</td><td className="p-2 border-r border-gray-300 text-center">Level {c.level}</td><td className="p-2 text-center"><button className="px-2 text-blue-700 font-bold hover:underline">Edit</button></td>
                   </tr>
                 ))}
               </tbody>
