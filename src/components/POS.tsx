@@ -53,6 +53,10 @@ export const POS = ({ currentTime }: { currentTime: Date }) => {
   const [poChannelExcel, setPoChannelExcel] = useState(true);
   const [poChannelWA, setPoChannelWA] = useState(true);
   const [poChannelEmail, setPoChannelEmail] = useState(false);
+  const [moqTargetPcs, setMoqTargetPcs] = useState(50);
+  const [moqTargetValue, setMoqTargetValue] = useState(2000000);
+  const [idealBufferStock, setIdealBufferStock] = useState(24);
+  const [poQtyMode, setPoQtyMode] = useState<'FIXED' | 'BUFFER'>('BUFFER');
 
   const handleReturSort = (key: string) => {
     if (returSortKey === key) {
@@ -712,6 +716,10 @@ export const POS = ({ currentTime }: { currentTime: Date }) => {
     }
     
     const formattedCartItems = matchedProductItems.map((item: any) => {
+      const currentStockVal = item.stock || 0;
+      const calculatedQty = poQtyMode === 'BUFFER'
+        ? Math.max(1, idealBufferStock - currentStockVal)
+        : 12; // Default 12 pcs (1 dozen) for wholesale fixed preset
       return {
         id: item.id,
         code: item.code,
@@ -720,7 +728,7 @@ export const POS = ({ currentTime }: { currentTime: Date }) => {
         price1: 0,
         price2: 0,
         price: item.supplierPrice || 0,
-        qty: 10,
+        qty: calculatedQty,
         cartUniqueId: 'PO-FILLED-' + item.id + '-' + Math.random(),
         isNewStock: false,
         isOrderSupplier: true
@@ -728,7 +736,7 @@ export const POS = ({ currentTime }: { currentTime: Date }) => {
     });
     
     setCart(formattedCartItems);
-    addLog('PEMBELIAN_STOK', `Auto-fill PO: ${formattedCartItems.length} barang termuat (${type})`);
+    addLog('PEMBELIAN_STOK', `Auto-fill PO: ${formattedCartItems.length} barang termuat (${type}, mode: ${poQtyMode})`);
   };
 
   const handleSimpan = () => {
@@ -956,6 +964,26 @@ export const POS = ({ currentTime }: { currentTime: Date }) => {
   }, [stockSupplierId, isOrderSupplierMode, suppliers]);
 
   useEffect(() => {
+    if (isOrderSupplierMode && stockSupplierId && cart.length > 0) {
+      setCart((prevCart) =>
+        prevCart.map((item) => {
+          if (item.cartUniqueId && item.cartUniqueId.startsWith('PO-FILLED-')) {
+            const currentStockVal = (inventory.find(i => i.id === item.id)?.stock) || 0;
+            const calculatedQty = poQtyMode === 'BUFFER'
+              ? Math.max(1, idealBufferStock - currentStockVal)
+              : 12;
+            return {
+              ...item,
+              qty: calculatedQty
+            };
+          }
+          return item;
+        })
+      );
+    }
+  }, [poQtyMode, idealBufferStock]);
+
+  useEffect(() => {
     if (selectedCustomer) {
       const currentMonth = new Date().getMonth();
       const currentYear = new Date().getFullYear();
@@ -1057,6 +1085,117 @@ export const POS = ({ currentTime }: { currentTime: Date }) => {
       
       <div className="p-2 flex-1 flex flex-col gap-1 overflow-hidden">
         
+        {/* WHOLESALE SUPPLIER ORDER ASSISTANT BAR */}
+        {isOrderSupplierMode && (
+          <div className="bg-[#ece9d8] border border-gray-400 p-2 flex flex-col md:flex-row items-center justify-between shadow-sm text-black text-xs gap-3 font-sans" id="supplier-po-assistant">
+            {/* Left section: MOQ Trackers */}
+            <div className="flex flex-wrap items-center gap-4 w-full md:w-auto">
+              <div className="flex items-center gap-1.5 min-w-[200px]">
+                <span className="font-bold text-blue-900">📦 Min Qty MOQ:</span>
+                <input 
+                  type="number" 
+                  value={moqTargetPcs} 
+                  onChange={e => setMoqTargetPcs(parseInt(e.target.value) || 0)} 
+                  className="bg-white text-black w-12 border border-gray-400 font-bold text-center py-0.5 outline-none rounded"
+                />
+                <span className="text-gray-600">pcs</span>
+                {/* Visual meter */}
+                {(() => {
+                  const totalPcs = cart.reduce((sum, item) => sum + (parseInt(item.qty) || 0), 0);
+                  const isMet = totalPcs >= moqTargetPcs;
+                  const pct = Math.min(100, Math.round((totalPcs / (moqTargetPcs || 1)) * 100));
+                  return (
+                    <div className="flex items-center gap-1 ml-2">
+                      <div className="w-16 h-3.5 bg-gray-200 rounded border border-gray-400 relative overflow-hidden">
+                        <div className={`h-full transition-all duration-350 ${isMet ? 'bg-green-500' : 'bg-amber-500'}`} style={{ width: `${pct}%` }}></div>
+                        <span className="absolute inset-0 text-[8px] font-bold text-center leading-3">{pct}%</span>
+                      </div>
+                      <span className={`font-mono text-[10px] font-bold px-1 rounded ${isMet ? 'bg-green-100 text-green-800 border border-green-300' : 'bg-amber-100 text-amber-800 border border-amber-300'}`}>
+                        {totalPcs}/{moqTargetPcs}
+                      </span>
+                    </div>
+                  );
+                })()}
+              </div>
+
+              <div className="flex items-center gap-1.5 min-w-[260px]">
+                <span className="font-bold text-blue-900">💰 Target PO:</span>
+                <span className="text-gray-500">Rp</span>
+                <input 
+                  type="text" 
+                  value={moqTargetValue.toLocaleString('id-ID')} 
+                  onChange={e => {
+                    const parsed = parseInt(e.target.value.replace(/[^0-9]/g, '')) || 0;
+                    setMoqTargetValue(parsed);
+                  }} 
+                  className="bg-white text-black w-20 border border-gray-400 font-bold text-center py-0.5 outline-none rounded"
+                />
+                {(() => {
+                  const isMet = totalBelanja >= moqTargetValue;
+                  const pct = Math.min(100, Math.round((totalBelanja / (moqTargetValue || 1)) * 100));
+                  return (
+                    <div className="flex items-center gap-1 ml-2">
+                      <div className="w-16 h-3.5 bg-gray-200 rounded border border-gray-400 relative overflow-hidden">
+                        <div className={`h-full transition-all duration-350 ${isMet ? 'bg-green-500' : 'bg-amber-500'}`} style={{ width: `${pct}%` }}></div>
+                        <span className="absolute inset-0 text-[8px] font-bold text-center leading-3">{pct}%</span>
+                      </div>
+                      <span className={`font-mono text-[10px] font-bold px-1 rounded ${isMet ? 'bg-green-100 text-green-800 border border-green-300' : 'bg-amber-100 text-amber-800 border border-amber-300'}`}>
+                        {Math.round(totalBelanja / 1000)}k/{Math.round(moqTargetValue / 1000)}k
+                      </span>
+                    </div>
+                  );
+                })()}
+              </div>
+            </div>
+
+            {/* Right section: Buffer control presets */}
+            <div className="flex items-center gap-2 w-full md:w-auto justify-end">
+              <div className="flex items-center gap-1">
+                <span className="font-bold text-gray-700">📊 Hitung Qty:</span>
+                <select 
+                  value={poQtyMode} 
+                  onChange={e => {
+                    const mode = e.target.value as 'FIXED' | 'BUFFER';
+                    setPoQtyMode(mode);
+                  }}
+                  className="bg-white border border-gray-400 font-bold text-black py-0.5 px-1 outline-none text-xs rounded cursor-pointer"
+                >
+                  <option value="FIXED">Setiap Item 12 Pcs (1 Lusin)</option>
+                  <option value="BUFFER">Auto-Buffer (Target minus Stok)</option>
+                </select>
+              </div>
+
+              {poQtyMode === 'BUFFER' && (
+                <div className="flex items-center gap-1 bg-blue-50 border border-blue-200 px-1.5 py-0.5 rounded">
+                  <span className="text-blue-900 font-bold text-[10px]">Plafon Stok:</span>
+                  <input 
+                    type="number" 
+                    value={idealBufferStock} 
+                    onChange={e => setIdealBufferStock(parseInt(e.target.value) || 0)} 
+                    className="bg-white text-black w-8 border border-gray-400 font-bold text-center py-0.5 outline-none text-xs rounded ml-1"
+                    title="Ideal Stock Buffer. Pembelian PO = Plafon - Stok Saat Ini"
+                  />
+                  <span className="text-gray-600 text-[10px] ml-0.5">pcs</span>
+                </div>
+              )}
+
+              <button 
+                type="button" 
+                onClick={() => {
+                  if (stockSupplierId) {
+                    handleAutoFillPO(poType, stockSupplierId);
+                  } else {
+                    setConfirmAction({message: 'Silakan pilih Supliyer terlebih dahulu agar dapat mengkalkulasi PO!', isAlert: true});
+                  }
+                }}
+                className="bg-blue-600 hover:bg-blue-700 text-white px-2 py-0.5 border border-blue-800 rounded font-bold shadow-sm text-xs flex items-center gap-1 cursor-pointer"
+              >
+                🔄 Refresh PO
+              </button>
+            </div>
+          </div>
+        )}
+
         {/* TOP CONTROLS */}
         <div className="flex justify-between items-end font-semibold text-blue-900 relative w-full mt-1">
           {/* Kolom Kiri */}
