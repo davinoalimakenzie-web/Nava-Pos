@@ -16,6 +16,8 @@ import { InputCashflow } from './components/InputCashflow';
 import { DanaBank } from './components/DanaBank';
 import { KalkulatorUser } from './components/KalkulatorUser';
 
+import { ControlPanel } from './components/ControlPanel';
+
 const AppContent = () => {
   const { user, activeTab } = useAppContext();
   const [currentTime, setCurrentTime] = useState(new Date());
@@ -49,14 +51,7 @@ const AppContent = () => {
             {activeTab === 'buku_besar' && <BukuBesar />}
             {activeTab === 'input_cashflow' && <InputCashflow />}
             {activeTab === 'dana_bank' && <DanaBank />}
-            {activeTab === 'control_panel' && (
-              <div className="flex-1 flex items-center justify-center bg-[#8fb4d9]">
-                <div className="bg-white p-8 border-2 border-slate-400 shadow-xl text-center">
-                  <h2 className="text-2xl font-bold text-slate-800 mb-2">CONTROL PANEL</h2>
-                  <p className="text-slate-500">Modul Control Panel sedang dalam pengembangan.</p>
-                </div>
-              </div>
-            )}
+            {activeTab === 'control_panel' && <ControlPanel />}
             {activeTab === 'table_kas' && (
               <div className="flex-1 flex items-center justify-center bg-[#8fb4d9]">
                 <div className="bg-white p-8 border-2 border-slate-400 shadow-xl text-center">
