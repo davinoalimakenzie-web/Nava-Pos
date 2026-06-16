@@ -1085,117 +1085,6 @@ export const POS = ({ currentTime }: { currentTime: Date }) => {
       
       <div className="p-2 flex-1 flex flex-col gap-1 overflow-hidden">
         
-        {/* WHOLESALE SUPPLIER ORDER ASSISTANT BAR */}
-        {isOrderSupplierMode && (
-          <div className="bg-[#ece9d8] border border-gray-400 p-2 flex flex-col md:flex-row items-center justify-between shadow-sm text-black text-xs gap-3 font-sans" id="supplier-po-assistant">
-            {/* Left section: MOQ Trackers */}
-            <div className="flex flex-wrap items-center gap-4 w-full md:w-auto">
-              <div className="flex items-center gap-1.5 min-w-[200px]">
-                <span className="font-bold text-blue-900">📦 Min Qty MOQ:</span>
-                <input 
-                  type="number" 
-                  value={moqTargetPcs} 
-                  onChange={e => setMoqTargetPcs(parseInt(e.target.value) || 0)} 
-                  className="bg-white text-black w-12 border border-gray-400 font-bold text-center py-0.5 outline-none rounded"
-                />
-                <span className="text-gray-600">pcs</span>
-                {/* Visual meter */}
-                {(() => {
-                  const totalPcs = cart.reduce((sum, item) => sum + (parseInt(item.qty) || 0), 0);
-                  const isMet = totalPcs >= moqTargetPcs;
-                  const pct = Math.min(100, Math.round((totalPcs / (moqTargetPcs || 1)) * 100));
-                  return (
-                    <div className="flex items-center gap-1 ml-2">
-                      <div className="w-16 h-3.5 bg-gray-200 rounded border border-gray-400 relative overflow-hidden">
-                        <div className={`h-full transition-all duration-350 ${isMet ? 'bg-green-500' : 'bg-amber-500'}`} style={{ width: `${pct}%` }}></div>
-                        <span className="absolute inset-0 text-[8px] font-bold text-center leading-3">{pct}%</span>
-                      </div>
-                      <span className={`font-mono text-[10px] font-bold px-1 rounded ${isMet ? 'bg-green-100 text-green-800 border border-green-300' : 'bg-amber-100 text-amber-800 border border-amber-300'}`}>
-                        {totalPcs}/{moqTargetPcs}
-                      </span>
-                    </div>
-                  );
-                })()}
-              </div>
-
-              <div className="flex items-center gap-1.5 min-w-[260px]">
-                <span className="font-bold text-blue-900">💰 Target PO:</span>
-                <span className="text-gray-500">Rp</span>
-                <input 
-                  type="text" 
-                  value={moqTargetValue.toLocaleString('id-ID')} 
-                  onChange={e => {
-                    const parsed = parseInt(e.target.value.replace(/[^0-9]/g, '')) || 0;
-                    setMoqTargetValue(parsed);
-                  }} 
-                  className="bg-white text-black w-20 border border-gray-400 font-bold text-center py-0.5 outline-none rounded"
-                />
-                {(() => {
-                  const isMet = totalBelanja >= moqTargetValue;
-                  const pct = Math.min(100, Math.round((totalBelanja / (moqTargetValue || 1)) * 100));
-                  return (
-                    <div className="flex items-center gap-1 ml-2">
-                      <div className="w-16 h-3.5 bg-gray-200 rounded border border-gray-400 relative overflow-hidden">
-                        <div className={`h-full transition-all duration-350 ${isMet ? 'bg-green-500' : 'bg-amber-500'}`} style={{ width: `${pct}%` }}></div>
-                        <span className="absolute inset-0 text-[8px] font-bold text-center leading-3">{pct}%</span>
-                      </div>
-                      <span className={`font-mono text-[10px] font-bold px-1 rounded ${isMet ? 'bg-green-100 text-green-800 border border-green-300' : 'bg-amber-100 text-amber-800 border border-amber-300'}`}>
-                        {Math.round(totalBelanja / 1000)}k/{Math.round(moqTargetValue / 1000)}k
-                      </span>
-                    </div>
-                  );
-                })()}
-              </div>
-            </div>
-
-            {/* Right section: Buffer control presets */}
-            <div className="flex items-center gap-2 w-full md:w-auto justify-end">
-              <div className="flex items-center gap-1">
-                <span className="font-bold text-gray-700">📊 Hitung Qty:</span>
-                <select 
-                  value={poQtyMode} 
-                  onChange={e => {
-                    const mode = e.target.value as 'FIXED' | 'BUFFER';
-                    setPoQtyMode(mode);
-                  }}
-                  className="bg-white border border-gray-400 font-bold text-black py-0.5 px-1 outline-none text-xs rounded cursor-pointer"
-                >
-                  <option value="FIXED">Setiap Item 12 Pcs (1 Lusin)</option>
-                  <option value="BUFFER">Auto-Buffer (Target minus Stok)</option>
-                </select>
-              </div>
-
-              {poQtyMode === 'BUFFER' && (
-                <div className="flex items-center gap-1 bg-blue-50 border border-blue-200 px-1.5 py-0.5 rounded">
-                  <span className="text-blue-900 font-bold text-[10px]">Plafon Stok:</span>
-                  <input 
-                    type="number" 
-                    value={idealBufferStock} 
-                    onChange={e => setIdealBufferStock(parseInt(e.target.value) || 0)} 
-                    className="bg-white text-black w-8 border border-gray-400 font-bold text-center py-0.5 outline-none text-xs rounded ml-1"
-                    title="Ideal Stock Buffer. Pembelian PO = Plafon - Stok Saat Ini"
-                  />
-                  <span className="text-gray-600 text-[10px] ml-0.5">pcs</span>
-                </div>
-              )}
-
-              <button 
-                type="button" 
-                onClick={() => {
-                  if (stockSupplierId) {
-                    handleAutoFillPO(poType, stockSupplierId);
-                  } else {
-                    setConfirmAction({message: 'Silakan pilih Supliyer terlebih dahulu agar dapat mengkalkulasi PO!', isAlert: true});
-                  }
-                }}
-                className="bg-blue-600 hover:bg-blue-700 text-white px-2 py-0.5 border border-blue-800 rounded font-bold shadow-sm text-xs flex items-center gap-1 cursor-pointer"
-              >
-                🔄 Refresh PO
-              </button>
-            </div>
-          </div>
-        )}
-
         {/* TOP CONTROLS */}
         <div className="flex justify-between items-end font-semibold text-blue-900 relative w-full mt-1">
           {/* Kolom Kiri */}
@@ -1352,8 +1241,7 @@ export const POS = ({ currentTime }: { currentTime: Date }) => {
                     <div className="absolute top-full right-0 mt-1 bg-[#ece9d8] border-2 border-gray-400 shadow-xl z-[999] w-64 flex flex-col text-left text-black font-normal">
                        <button onClick={() => { setShowExpenseModal(true); setShowInputMenu(false); }} className="px-3 py-2 hover:bg-blue-100 text-left border-b border-gray-300 font-bold">Input Pengeluaran</button>
                        <button onClick={() => { setIsInputStockMode(true); setIsOrderSupplierMode(false); setCart([]); setStockDiscount(100); setShowInputMenu(false); }} className="px-3 py-2 hover:bg-blue-100 text-left border-b border-gray-300 font-bold">Input Stock Baru</button>
-                       <button onClick={() => { setIsOrderSupplierMode(true); setIsInputStockMode(false); setCart([]); setShowInputMenu(false); }} className="px-3 py-2 hover:bg-blue-100 text-left border-b border-gray-300 font-bold text-green-700">Format Order Supliyer (PO)</button>
-                       <button onClick={() => { setActiveTab('masterdata'); setMasterDataTab('order'); setShowInputMenu(false); }} className="px-3 py-2 hover:bg-blue-100 text-left border-b border-gray-300 font-bold">Antrian PO / Order (Master)</button>
+                       <button onClick={() => { setIsOrderSupplierMode(true); setIsInputStockMode(false); setCart([]); setShowInputMenu(false); }} className="px-3 py-2 hover:bg-blue-100 text-left border-b border-gray-300 font-bold text-green-700">Input Order Supliyer</button>
                     </div>
                  )}
               </div>
@@ -1876,163 +1764,373 @@ export const POS = ({ currentTime }: { currentTime: Date }) => {
         </div>
 
         {/* BOTTOM SECTION */}
-        <div className="flex mt-1 justify-between items-stretch gap-3 w-full pb-3">
-          {/* Left Totals */}
-          <div className="flex flex-col justify-start gap-1 w-[280px] p-2 bg-[#8fb4d9] border border-white/50 shadow-sm shrink-0 rounded-sm">
-             {isInputStockMode && (
-               <div className="flex gap-1.5 items-center bg-[#ece9d8] p-1 rounded border border-gray-400">
-                 <button 
-                   type="button" 
-                   className="w-[110px] bg-blue-800 text-white font-extrabold text-[10px] py-1 px-1 rounded shadow cursor-default leading-tight text-center uppercase"
-                   title="Isi manual Nomor Invoice nota dari supliyer"
-                 >
-                   INVOICE
-                 </button>
-                 <input 
-                   type="text" 
-                   value={manualInvoiceNumber} 
-                   onChange={(e) => setManualInvoiceNumber(e.target.value)} 
-                   placeholder="Isi manual..." 
-                   className="border border-gray-400 bg-white px-2 py-0.5 leading-none text-left flex-1 min-w-0 outline-none font-bold text-xs shadow-inner text-black rounded-[3px] uppercase"
-                 />
-               </div>
-             )}
-             {isInputStockMode && (
-               <button 
-                 type="button" 
-                 onClick={handleRoundPrices} 
-                 className="w-full bg-[#f1c40f] hover:bg-[#d4ac0d] text-blue-950 font-black py-1 px-2 border border-yellow-600 shadow shadow-inner text-xs uppercase tracking-wider cursor-pointer animate-pulse transition-all duration-300 rounded-[3px] leading-tight"
-                 title="Klik untuk membulatkan semua Harga Jual (Level 1 & 2) ke Ribuan teratas"
-               >
-                 ▲ BULATKAN HARGA (KE RIBUAN)
-               </button>
-             )}
-             <div className="flex items-center h-[26px]">
-               <span className="w-[110px] font-semibold text-blue-900 shrink-0 text-xs tracking-wide">SUBTOTAL</span>
-               <input type="text" readOnly value={formatRp(totalBelanjaBaru)} className="border border-gray-400 bg-white px-1 leading-none text-right flex-1 min-w-0 h-full outline-none font-bold text-sm shadow-inner" />
-             </div>
-             {isInputStockMode ? (
-                 <div className="flex items-center h-[26px]">
-                   <span className="w-[110px] font-semibold text-blue-900 shrink-0 text-xs tracking-wide">DISKON %</span>
-                   <input 
-                     type="number" 
-                     readOnly 
-                     value={stockDiscount} 
-                     className="border border-gray-400 bg-gray-200 px-1 leading-none text-right flex-1 min-w-0 h-full outline-none font-bold text-sm shadow-inner text-gray-700 cursor-not-allowed" 
-                   />
-                   <button 
-                     type="button"
-                     onClick={() => setStockDiscount(100)} 
-                     className="bg-red-600 hover:bg-red-700 text-white font-bold px-1.5 h-full text-[10px] rounded shrink-0"
-                     title="Klik untuk set diskon 100%"
-                   >
-                     % 100
-                   </button>
-                 </div>
-             ) : (
-                 <>
-                 <div className="flex items-center h-[26px]">
-                   <span className="w-[110px] font-semibold text-blue-900 shrink-0 text-xs tracking-wide">RETUR</span>
-                   <input type="text" readOnly value={formatRp(totalNilaiRetur)} className="border border-gray-400 bg-white px-1 leading-none text-right flex-1 min-w-0 h-full outline-none font-bold text-sm shadow-inner" />
-                 </div>
-                 <div className="flex items-center h-[26px]">
-                   <select value={discountType} onChange={(e) => setDiscountType(e.target.value)} className="w-[110px] font-semibold text-blue-900 shrink-0 text-xs tracking-wide outline-none bg-transparent cursor-pointer uppercase text-left pl-0">
-                     <option value="Rp">DISKON</option>
-                     <option value="%">DISKON %</option>
-                   </select>
-                   <input type="text" value={discountType === 'Rp' ? formatRp(globalDiscount || 0) : (globalDiscount || '')} onChange={e => { const val = e.target.value.replace(/\D/g, ''); setGlobalDiscount(val ? parseInt(val, 10) : 0); }} className="border border-gray-400 bg-white px-1 leading-none text-right flex-1 min-w-0 h-full outline-none font-bold text-sm shadow-inner text-black" placeholder={discountType === 'Rp' ? "Rp 0" : "0"} />
-                 </div>
-                 </>
-             )}
-             
-             {!isInputStockMode && (
-                 <>
-                 <div className="flex items-center h-[26px]">
-                   <span className="w-[110px] font-semibold text-blue-900 shrink-0 text-xs tracking-wide">TUNAI</span>
-                   <input 
-                      id="tunai-input"
-                      type="text" 
-                      disabled={totalBelanja < 0} 
-                      value={amountPaid === "" ? "" : formatRp(Number(amountPaid) || 0)} 
-                      onChange={(e) => {
-                         const val = e.target.value.replace(/\D/g, '');
-                         setAmountPaid(val);
-                      }} 
-                      className="border border-gray-400 bg-white px-1 leading-none text-right flex-1 min-w-0 h-full font-bold outline-none focus:bg-yellow-50 text-sm shadow-inner disabled:bg-gray-300 text-black" 
-                      placeholder="Rp 0" 
-                   />
-                 </div>
-                 <div className="flex items-center h-[26px]">
-                   <span className="w-[110px] font-semibold text-blue-900 shrink-0 text-xs tracking-wide">KEMBALIAN</span>
-                   <input type="text" readOnly value={formatRp(kembalian > 0 ? kembalian : 0)} className="border border-gray-400 bg-white px-1 leading-none text-right flex-1 min-w-0 h-full outline-none font-bold text-sm shadow-inner" />
-                 </div>
-                 </>
-             )}
-             {isInputStockMode && (
-                 <div className="flex items-center h-[26px]">
-                   <span className="w-[110px] font-semibold text-blue-900 shrink-0 text-xs tracking-wide">TOTAL BIAYA</span>
-                   <input type="text" readOnly value={formatRp(totalBelanjaBaru - (totalBelanjaBaru * stockDiscount / 100))} className="border border-gray-400 bg-white px-1 leading-none text-right flex-1 min-w-0 h-full outline-none font-bold text-sm shadow-inner" />
-                 </div>
-              )}
-          </div>
-          
-          <div className="flex-1 relative self-stretch">
-            <div className="absolute inset-0 flex flex-col p-1.5 overflow-hidden border border-gray-400 bg-[#ece9d8]">
-              <div className="flex items-center justify-center font-bold text-blue-900 border-b border-gray-400 pb-1 mb-1 shadow-sm shrink-0">
-                  <span className="text-[10px] uppercase truncate text-center">Log Aktifitas Harian</span>
-              </div>
-              <div className="flex-1 overflow-y-auto pr-1">
-                  {appLogs.filter((l: any) => new Date(l.time).toDateString() === new Date().toDateString()).length > 0 ? (
-                      <div className="flex flex-col gap-1">
-                          {appLogs.filter((l: any) => new Date(l.time).toDateString() === new Date().toDateString()).map((log: any, idx: number) => (
-                             <div key={idx} className="bg-white border border-gray-300 p-1 flex flex-col justify-between shadow-sm hover:border-gray-400 transition-colors">
-                                 <div className="flex justify-between w-full">
-                                     <span className="text-[9px] font-bold text-blue-900 truncate" title={log.type}>{log.type}</span>
-                                     <span className="text-[8px] text-gray-500">{new Date(log.time).toLocaleTimeString('id-ID', {hour: '2-digit', minute:'2-digit'})}</span>
-                                 </div>
-                                 <span className="text-[9px] text-gray-700 leading-tight">{log.desc}</span>
-                             </div>
-                          ))}
-                      </div>
-                  ) : (
-                      <div className="text-[9px] text-gray-500 italic mt-2 text-center leading-tight">
-                          Belum ada aktifitas hari ini.
-                      </div>
-                  )}
-              </div>
-            </div>
-          </div>
+        {isOrderSupplierMode ? (
+          <div className="flex mt-1 justify-between items-stretch gap-3 w-full pb-3 font-sans h-[142px]">
+             {/* Left Column: Totals & Qty Config */}
+             <div className="flex flex-col justify-between p-2 bg-[#8fb4d9] border border-white/50 shadow-sm shrink-0 rounded-sm w-[280px]">
+                {/* Total PO (Subtotal) */}
+                <div className="flex items-center h-[26px]">
+                  <span className="w-[100px] font-bold text-blue-900 shrink-0 text-xs tracking-wide">TOTAL PO</span>
+                  <input 
+                    type="text" 
+                    readOnly 
+                    value={formatRp(totalBelanja)} 
+                    className="border border-gray-400 bg-white px-1.5 leading-none text-right flex-1 min-w-0 h-full outline-none font-bold text-xs shadow-inner text-black rounded" 
+                  />
+                </div>
 
-          {/* Right Action Buttons */}
-          <div className="flex flex-col items-end justify-start pr-0.5 pb-0.5 gap-2 shrink-0">
-            <div className="flex flex-col items-end gap-1.5">
-              <div className="flex gap-1.5">
-                <div className="flex flex-col gap-1 w-[120px]">
-                  <button onClick={handleSimpan} className="border-2 border-gray-500 bg-gray-200 px-3 py-1.5 w-full hover:bg-gray-300 text-black font-bold shadow-sm text-xs">
-                    {isOrderSupplierMode ? 'Kirim [F8]' : 'Simpan [F8]'}
-                  </button>
-                    <button onClick={handleCetakButton} disabled={isInputStockMode || isOrderSupplierMode} className={`border-2 border-gray-500 bg-gray-200 px-3 py-1.5 w-full text-black font-bold shadow-sm text-xs ${isInputStockMode || isOrderSupplierMode ? 'opacity-50 cursor-not-allowed bg-gray-300' : 'hover:bg-gray-300'}`}>Cetak [F9]</button>
-                    <button onClick={handleResetBaru} className={`border-2 border-gray-500 bg-gray-200 px-3 py-1.5 w-full text-black font-bold shadow-sm text-xs ${cart.some(c => c.isReturn) ? 'opacity-50 hover:bg-red-200' : 'hover:bg-gray-300'}`}>Baru [F5]</button>
-                    <button onClick={() => setShowHistoryModal(true)} disabled={cart.some(c => c.isReturn) || isInputStockMode || isOrderSupplierMode} className={`border-2 border-gray-500 bg-gray-200 px-3 py-1.5 w-full text-black font-bold shadow-sm text-xs ${cart.some(c => c.isReturn) || isInputStockMode || isOrderSupplierMode ? 'opacity-50 cursor-not-allowed bg-gray-300' : 'hover:bg-gray-300'}`}>Return</button>
-                    <button onClick={() => setShowBonModal(true)} disabled={cart.some(c => c.isReturn) || isInputStockMode || isOrderSupplierMode} className={`border-2 border-gray-500 bg-gray-200 px-3 py-1.5 w-full text-black font-bold text-red-700 shadow-sm text-xs ${cart.some(c => c.isReturn) || isInputStockMode || isOrderSupplierMode ? 'opacity-50 cursor-not-allowed bg-gray-300' : 'hover:bg-gray-300'}`}>Kasbon</button>
-                  </div>
-                  <div className="flex flex-col gap-1 w-[130px]">
-                    <button onClick={() => setShowPiutangModal(true)} disabled={cart.some(c => c.isReturn) || isInputStockMode || isOrderSupplierMode} className={`border-2 border-gray-500 bg-gray-200 px-3 py-1.5 w-full text-black font-bold shadow-sm text-xs relative ${cart.some(c => c.isReturn) || isInputStockMode || isOrderSupplierMode ? 'opacity-50 cursor-not-allowed bg-gray-300' : 'hover:bg-gray-300'}`}>
-                      Piutang [F2]
-                      {piutangData.length > 0 && <span className="absolute -top-1.5 -right-1.5 bg-red-600 text-white text-[10px] px-1.5 py-0.5 rounded-full shadow-lg">{piutangData.length}</span>}
-                    </button>
-                    <button onClick={handleSavePending} disabled={cart.some(c => c.isReturn) || isInputStockMode} className={`border-2 border-gray-500 bg-gray-200 px-3 py-1.5 w-full text-black font-bold shadow-sm text-xs ${cart.some(c => c.isReturn) || isInputStockMode ? 'opacity-50 cursor-not-allowed bg-gray-300' : 'hover:bg-gray-300'}`}>Pending [F3]</button>
-                    <button onClick={() => setShowPendingModal(true)} disabled={cart.some(c => c.isReturn) || isInputStockMode} className={`border-2 border-gray-500 bg-gray-200 px-3 py-1.5 w-full text-black font-bold shadow-sm text-xs relative ${cart.some(c => c.isReturn) || isInputStockMode ? 'opacity-50 cursor-not-allowed bg-gray-300' : 'hover:bg-gray-300'}`}>
-                      Daftar Pnd [F4]
-                      {pendingTransactions.length > 0 && <span className="absolute -top-1.5 -right-1.5 bg-red-600 text-white text-[10px] px-1.5 py-0.5 rounded-full shadow-lg">{pendingTransactions.length}</span>}
-                    </button>
-                    <button onClick={() => setIsBarcodeMode(!isBarcodeMode)} disabled={isInputStockMode || isOrderSupplierMode} className={`border-2 border-gray-500 px-3 py-1.5 w-full font-bold shadow-sm text-xs text-white ${isInputStockMode || isOrderSupplierMode ? 'opacity-50 cursor-not-allowed bg-gray-400' : (isBarcodeMode ? 'bg-green-600 hover:bg-green-700' : 'bg-red-600 hover:bg-red-700')}`}>Auto Scan</button>
-                    <button onClick={handlePromoToggle} disabled={cart.some(c => c.isReturn) || isInputStockMode || isOrderSupplierMode} className={`border-2 border-gray-500 px-3 py-1.5 w-full font-bold shadow-sm text-xs text-white ${cart.some(c => c.isReturn) || isInputStockMode || isOrderSupplierMode ? 'opacity-50 cursor-not-allowed bg-gray-400' : (isPromoActive ? 'bg-green-600 hover:bg-green-700' : 'bg-red-600 hover:bg-red-700')}`}>Promo</button>
+                {/* Hitung Qty Dropdown */}
+                <div className="flex flex-col gap-0.5 mt-1">
+                  <span className="font-bold text-blue-900 text-[10px] uppercase tracking-wide">Metode Hitung Qty:</span>
+                  <select 
+                    value={poQtyMode} 
+                    onChange={e => {
+                      const mode = e.target.value as 'FIXED' | 'BUFFER';
+                      setPoQtyMode(mode);
+                    }}
+                    className="bg-white border border-gray-400 font-bold text-black py-0.5 px-1.5 outline-none text-[11px] rounded cursor-pointer shadow-sm w-full h-[24px]"
+                  >
+                    <option value="FIXED">Setiap Item 12 Pcs (1 Lusin)</option>
+                    <option value="BUFFER">Auto-Buffer (Target - Stok)</option>
+                  </select>
+                </div>
+
+                {/* Plafon Stok (if BUFFER) */}
+                {poQtyMode === 'BUFFER' ? (
+                   <div className="bg-[#e6f2ff] border border-[#a3c2e0] p-1 px-1.5 rounded flex items-center justify-between text-xs text-black font-semibold h-[28px] mt-1">
+                      <span className="text-[#004080] font-bold text-[10px] uppercase">Plafon Buffer:</span>
+                      <div className="flex items-center gap-1">
+                         <input 
+                            type="number" 
+                            value={idealBufferStock} 
+                            onChange={e => setIdealBufferStock(parseInt(e.target.value) || 0)} 
+                            className="bg-white text-black w-10 border border-gray-400 font-bold text-center py-0.5 outline-none text-[11px] rounded h-[18px] shadow-sm"
+                         />
+                         <span className="text-gray-600 text-[10px] font-bold uppercase">pcs</span>
+                      </div>
+                   </div>
+                ) : (
+                   <div className="bg-[#f0f0f0] border border-gray-300 p-1 px-1.5 rounded flex items-center justify-center text-gray-500 font-bold text-[9px] h-[28px] mt-1 select-none">
+                     MODE FIXED 12 PCS AKTIF
+                   </div>
+                )}
+             </div>
+
+             {/* Middle Column: MOQ Status + Live Logs */}
+             <div className="flex-1 flex gap-3 items-stretch">
+                {/* MOQ and Target Indicators Panel */}
+                <div className="w-[330px] p-2 bg-[#ece9d8] border border-gray-400 flex flex-col justify-between shadow-sm shrink-0 rounded-sm font-sans">
+                   {/* Header */}
+                   <div className="flex items-center justify-center font-bold text-blue-900 border-b border-gray-400 pb-1 mb-1 shadow-sm shrink-0">
+                       <span className="text-[10px] uppercase truncate text-center">Status & Target Pembelian</span>
+                   </div>
+
+                   <div className="flex flex-col gap-1.5 flex-1 justify-center py-0.5">
+                       {/* Min Qty MOQ */}
+                       <div className="flex items-center justify-between text-[11px] select-none gap-1">
+                          <span className="font-semibold text-blue-900 flex items-center gap-1 shrink-0 w-[95px]">
+                             📦 MOQ Qty:
+                          </span>
+                          <div className="flex items-center gap-1 flex-1 justify-end">
+                            <input 
+                               type="number" 
+                               value={moqTargetPcs} 
+                               onChange={e => setMoqTargetPcs(parseInt(e.target.value) || 0)} 
+                               className="bg-white text-black w-10 border border-gray-400 font-bold text-center py-0.5 text-xs outline-none rounded shadow-inner"
+                            />
+                            <span className="text-gray-600 text-[10px] font-bold uppercase w-[20px] text-left">pcs</span>
+
+                            {(() => {
+                              const totalPcs = cart.reduce((sum, item) => sum + (parseInt(item.qty) || 0), 0);
+                              const isMet = totalPcs >= moqTargetPcs;
+                              const pct = Math.min(100, Math.round((totalPcs / (moqTargetPcs || 1)) * 100));
+                              return (
+                                <div className="flex items-center gap-1 shrink-0">
+                                  <div className="w-16 h-3 bg-gray-300 rounded border border-gray-400 relative overflow-hidden shadow-inner">
+                                    <div className={`h-full transition-all duration-350 ${isMet ? 'bg-green-500' : 'bg-amber-500'}`} style={{ width: `${pct}%` }}></div>
+                                    <span className="absolute inset-0 text-[8px] font-bold text-center leading-3 text-black">{pct}%</span>
+                                  </div>
+                                  <span className={`font-mono text-[9px] font-bold px-1.5 py-0.5 rounded leading-none w-[42px] text-center bg-[#fcf8e3] text-[#8a6d3b] border border-[#faebcc]`}>
+                                    {totalPcs}/{moqTargetPcs}
+                                  </span>
+                                </div>
+                              );
+                            })()}
+                          </div>
+                       </div>
+
+                       {/* Target PO Value */}
+                       <div className="flex items-center justify-between text-[11px] select-none gap-1">
+                          <span className="font-semibold text-blue-900 flex items-center gap-1 shrink-0 w-[95px]">
+                             💰 Target PO:
+                          </span>
+                          <div className="flex items-center gap-1 flex-1 justify-end">
+                            <span className="text-gray-500 text-[10px] font-bold shrink-0">Rp</span>
+                            <input 
+                               type="text" 
+                               value={moqTargetValue.toLocaleString('id-ID')} 
+                               onChange={e => {
+                                 const parsed = parseInt(e.target.value.replace(/\D/g, '')) || 0;
+                                 setMoqTargetValue(parsed);
+                               }} 
+                               className="bg-white text-black w-18 border border-gray-400 font-bold text-center py-0.5 text-xs outline-none rounded shadow-inner"
+                            />
+                            {(() => {
+                              const isMet = totalBelanja >= moqTargetValue;
+                              const pct = Math.min(100, Math.round((totalBelanja / (moqTargetValue || 1)) * 100));
+                              return (
+                                <div className="flex items-center gap-1 shrink-0">
+                                  <div className="w-16 h-3 bg-gray-300 rounded border border-gray-400 relative overflow-hidden shadow-inner">
+                                    <div className={`h-full transition-all duration-350 ${isMet ? 'bg-green-500' : 'bg-amber-500'}`} style={{ width: `${pct}%` }}></div>
+                                    <span className="absolute inset-0 text-[8px] font-bold text-center leading-3 text-black">{pct}%</span>
+                                  </div>
+                                  <span className={`font-mono text-[9px] font-bold px-1.5 py-0.5 rounded leading-none w-[42px] text-center bg-[#fcf8e3] text-[#8a6d3b] border border-[#faebcc]`}>
+                                    {Math.round(totalBelanja / 1000)}k/{Math.round(moqTargetValue / 1000)}k
+                                  </span>
+                                </div>
+                              );
+                            })()}
+                          </div>
+                       </div>
+                   </div>
+
+                   {/* Refresh PO button */}
+                   <button 
+                     type="button" 
+                     onClick={() => {
+                       if (stockSupplierId) {
+                         handleAutoFillPO(poType, stockSupplierId);
+                       } else {
+                         setConfirmAction({message: 'Silakan pilih Supliyer terlebih dahulu agar dapat mengkalkulasi PO!', isAlert: true});
+                       }
+                     }}
+                     className="w-full bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white py-1 px-2 border border-blue-800 rounded font-bold shadow hover:scale-[1.01] text-[10px] flex items-center justify-center gap-1 cursor-pointer select-none leading-none h-[22px] uppercase transition-all"
+                   >
+                     🔄 REFRESH AUTOMATIC PO
+                   </button>
+                </div>
+
+                {/* Log Aktifitas Harian Box */}
+                <div className="flex-1 relative self-stretch">
+                  <div className="absolute inset-0 flex flex-col p-1.5 overflow-hidden border border-gray-400 bg-[#ece9d8] rounded-sm">
+                    <div className="flex items-center justify-center font-bold text-blue-900 border-b border-gray-400 pb-1 mb-1 shadow-sm shrink-0">
+                        <span className="text-[10px] uppercase truncate text-center">Log Aktifitas Harian</span>
+                    </div>
+                    <div className="flex-1 overflow-y-auto pr-1">
+                        {appLogs.filter((l: any) => new Date(l.time).toDateString() === new Date().toDateString()).length > 0 ? (
+                            <div className="flex flex-col gap-1">
+                                {appLogs.filter((l: any) => new Date(l.time).toDateString() === new Date().toDateString()).map((log: any, idx: number) => (
+                                   <div key={idx} className="bg-white border border-gray-300 p-1 flex flex-col justify-between shadow-sm hover:border-gray-400 transition-colors">
+                                       <div className="flex justify-between w-full">
+                                           <span className="text-[9px] font-bold text-blue-900 truncate" title={log.type}>{log.type}</span>
+                                           <span className="text-[8px] text-gray-500">{new Date(log.time).toLocaleTimeString('id-ID', {hour: '2-digit', minute:'2-digit'})}</span>
+                                       </div>
+                                       <span className="text-[9px] text-gray-700 leading-tight">{log.desc}</span>
+                                   </div>
+                                ))}
+                            </div>
+                        ) : (
+                            <div className="text-[9px] text-gray-500 italic mt-2 text-center leading-tight">
+                                Belum ada aktifitas hari ini.
+                            </div>
+                        )}
+                    </div>
                   </div>
                 </div>
-              </div>
+             </div>
+
+             {/* Rightmost area: Kirim-Baru-Pending-Daftar Pending stacked vertically */}
+             <div className="flex flex-col gap-1 w-[130px] shrink-0 font-sans justify-stretch">
+                <button 
+                  onClick={handleSimpan} 
+                  className="border-2 border-gray-600 bg-blue-750 hover:bg-blue-800 text-white py-1 font-bold shadow text-xs h-[30px] w-full text-center flex items-center justify-center cursor-pointer rounded leading-none transition-all active:scale-95"
+                >
+                  Kirim [F8]
+                </button>
+                <button 
+                  onClick={handleResetBaru} 
+                  className="border-2 border-gray-500 bg-gray-250 hover:bg-gray-300 text-black py-1 font-bold shadow text-xs h-[30px] w-full text-center flex items-center justify-center cursor-pointer rounded leading-none transition-all active:scale-95"
+                >
+                  Baru [F5]
+                </button>
+                <button 
+                  onClick={handleSavePending} 
+                  className="border-2 border-gray-500 bg-gray-250 hover:bg-gray-300 text-black py-1 font-bold shadow text-xs h-[30px] w-full text-center flex items-center justify-center cursor-pointer rounded leading-none transition-all active:scale-95"
+                >
+                  Pending [F3]
+                </button>
+                <button 
+                  onClick={() => setShowPendingModal(true)} 
+                  className="border-2 border-gray-500 bg-gray-250 hover:bg-gray-300 text-black py-1 font-bold shadow text-xs h-[30px] w-full text-center flex items-center justify-center cursor-pointer relative rounded leading-none transition-all active:scale-95"
+                >
+                  Daftar Pnd [F4]
+                  {pendingTransactions.length > 0 && (
+                    <span className="absolute -top-1 -right-1 bg-red-600 text-white font-bold text-[9px] min-w-[16px] h-[16px] flex items-center justify-center rounded-full shadow-md leading-none border border-white">
+                      {pendingTransactions.length}
+                    </span>
+                  )}
+                </button>
+             </div>
           </div>
-        </div>
+        ) : (
+          <div className="flex mt-1 justify-between items-stretch gap-3 w-full pb-3">
+            {/* Left Totals */}
+            <div className="flex flex-col justify-start gap-1 w-[280px] p-2 bg-[#8fb4d9] border border-white/50 shadow-sm shrink-0 rounded-sm">
+               {isInputStockMode && (
+                 <div className="flex gap-1.5 items-center bg-[#ece9d8] p-1 rounded border border-gray-400">
+                   <button 
+                     type="button" 
+                     className="w-[110px] bg-blue-800 text-white font-extrabold text-[10px] py-1 px-1 rounded shadow cursor-default leading-tight text-center uppercase"
+                     title="Isi manual Nomor Invoice nota dari supliyer"
+                   >
+                     INVOICE
+                   </button>
+                   <input 
+                     type="text" 
+                     value={manualInvoiceNumber} 
+                     onChange={(e) => setManualInvoiceNumber(e.target.value)} 
+                     placeholder="Isi manual..." 
+                     className="border border-gray-400 bg-white px-2 py-0.5 leading-none text-left flex-1 min-w-0 outline-none font-bold text-xs shadow-inner text-black rounded-[3px] uppercase"
+                   />
+                 </div>
+               )}
+               {isInputStockMode && (
+                 <button 
+                   type="button" 
+                   onClick={handleRoundPrices} 
+                   className="w-full bg-[#f1c40f] hover:bg-[#d4ac0d] text-blue-950 font-black py-1 px-2 border border-yellow-600 shadow shadow-inner text-xs uppercase tracking-wider cursor-pointer animate-pulse transition-all duration-300 rounded-[3px] leading-tight"
+                   title="Klik untuk membulatkan semua Harga Jual (Level 1 & 2) ke Ribuan teratas"
+                 >
+                   ▲ BULATKAN HARGA (KE RIBUAN)
+                 </button>
+               )}
+               <div className="flex items-center h-[26px]">
+                 <span className="w-[110px] font-semibold text-blue-900 shrink-0 text-xs tracking-wide">SUBTOTAL</span>
+                 <input type="text" readOnly value={formatRp(totalBelanjaBaru)} className="border border-gray-400 bg-white px-1 leading-none text-right flex-1 min-w-0 h-full outline-none font-bold text-sm shadow-inner" />
+               </div>
+               {isInputStockMode ? (
+                   <div className="flex items-center h-[26px]">
+                     <span className="w-[110px] font-semibold text-blue-900 shrink-0 text-xs tracking-wide">DISKON %</span>
+                     <input 
+                       type="number" 
+                       readOnly 
+                       value={stockDiscount} 
+                       className="border border-gray-400 bg-gray-200 px-1 leading-none text-right flex-1 min-w-0 h-full outline-none font-bold text-sm shadow-inner text-gray-700 cursor-not-allowed" 
+                     />
+                     <button 
+                       type="button"
+                       onClick={() => setStockDiscount(100)} 
+                       className="bg-red-600 hover:bg-red-700 text-white font-bold px-1.5 h-full text-[10px] rounded shrink-0"
+                       title="Klik untuk set diskon 100%"
+                     >
+                       % 100
+                     </button>
+                   </div>
+               ) : (
+                   <>
+                   <div className="flex items-center h-[26px]">
+                     <span className="w-[110px] font-semibold text-blue-900 shrink-0 text-xs tracking-wide">RETUR</span>
+                     <input type="text" readOnly value={formatRp(totalNilaiRetur)} className="border border-gray-400 bg-white px-1 leading-none text-right flex-1 min-w-0 h-full outline-none font-bold text-sm shadow-inner" />
+                   </div>
+                   <div className="flex items-center h-[26px]">
+                     <select value={discountType} onChange={(e) => setDiscountType(e.target.value)} className="w-[110px] font-semibold text-blue-900 shrink-0 text-xs tracking-wide outline-none bg-transparent cursor-pointer uppercase text-left pl-0">
+                       <option value="Rp">DISKON</option>
+                       <option value="%">DISKON %</option>
+                     </select>
+                     <input type="text" value={discountType === 'Rp' ? formatRp(globalDiscount || 0) : (globalDiscount || '')} onChange={e => { const val = e.target.value.replace(/\D/g, ''); setGlobalDiscount(val ? parseInt(val, 10) : 0); }} className="border border-gray-400 bg-white px-1 leading-none text-right flex-1 min-w-0 h-full outline-none font-bold text-sm shadow-inner text-black" placeholder={discountType === 'Rp' ? "Rp 0" : "0"} />
+                   </div>
+                   </>
+               )}
+               
+               {!isInputStockMode && (
+                   <>
+                   <div className="flex items-center h-[26px]">
+                     <span className="w-[110px] font-semibold text-blue-900 shrink-0 text-xs tracking-wide">TUNAI</span>
+                     <input 
+                        id="tunai-input"
+                        type="text" 
+                        disabled={totalBelanja < 0} 
+                        value={amountPaid === "" ? "" : formatRp(Number(amountPaid) || 0)} 
+                        onChange={(e) => {
+                           const val = e.target.value.replace(/\D/g, '');
+                           setAmountPaid(val);
+                        }} 
+                        className="border border-gray-400 bg-white px-1 leading-none text-right flex-1 min-w-0 h-full font-bold outline-none focus:bg-yellow-50 text-sm shadow-inner disabled:bg-gray-300 text-black" 
+                        placeholder="Rp 0" 
+                     />
+                   </div>
+                   <div className="flex items-center h-[26px]">
+                     <span className="w-[110px] font-semibold text-blue-900 shrink-0 text-xs tracking-wide">KEMBALIAN</span>
+                     <input type="text" readOnly value={formatRp(kembalian > 0 ? kembalian : 0)} className="border border-gray-400 bg-white px-1 leading-none text-right flex-1 min-w-0 h-full outline-none font-bold text-sm shadow-inner" />
+                   </div>
+                   </>
+               )}
+               {isInputStockMode && (
+                   <div className="flex items-center h-[26px]">
+                     <span className="w-[110px] font-semibold text-blue-900 shrink-0 text-xs tracking-wide">TOTAL BIAYA</span>
+                     <input type="text" readOnly value={formatRp(totalBelanjaBaru - (totalBelanjaBaru * stockDiscount / 100))} className="border border-gray-400 bg-white px-1 leading-none text-right flex-1 min-w-0 h-full outline-none font-bold text-sm shadow-inner" />
+                   </div>
+                )}
+            </div>
+            
+            <div className="flex-1 relative self-stretch">
+              <div className="absolute inset-0 flex flex-col p-1.5 overflow-hidden border border-gray-400 bg-[#ece9d8]">
+                <div className="flex items-center justify-center font-bold text-blue-900 border-b border-gray-400 pb-1 mb-1 shadow-sm shrink-0">
+                    <span className="text-[10px] uppercase truncate text-center">Log Aktifitas Harian</span>
+                </div>
+                <div className="flex-1 overflow-y-auto pr-1">
+                    {appLogs.filter((l: any) => new Date(l.time).toDateString() === new Date().toDateString()).length > 0 ? (
+                        <div className="flex flex-col gap-1">
+                            {appLogs.filter((l: any) => new Date(l.time).toDateString() === new Date().toDateString()).map((log: any, idx: number) => (
+                               <div key={idx} className="bg-white border border-gray-300 p-1 flex flex-col justify-between shadow-sm hover:border-gray-400 transition-colors">
+                                   <div className="flex justify-between w-full">
+                                       <span className="text-[9px] font-bold text-blue-900 truncate" title={log.type}>{log.type}</span>
+                                       <span className="text-[8px] text-gray-500">{new Date(log.time).toLocaleTimeString('id-ID', {hour: '2-digit', minute:'2-digit'})}</span>
+                                   </div>
+                                   <span className="text-[9px] text-gray-700 leading-tight">{log.desc}</span>
+                               </div>
+                            ))}
+                        </div>
+                    ) : (
+                        <div className="text-[9px] text-gray-500 italic mt-2 text-center leading-tight">
+                            Belum ada aktifitas hari ini.
+                        </div>
+                    )}
+                </div>
+              </div>
+            </div>
+
+            {/* Right Action Buttons */}
+            <div className="flex flex-col items-end justify-start pr-0.5 pb-0.5 gap-2 shrink-0">
+              <div className="flex flex-col items-end gap-1.5">
+                <div className="flex gap-1.5">
+                  <div className="flex flex-col gap-1 w-[120px]">
+                    <button onClick={handleSimpan} className="border-2 border-gray-500 bg-gray-200 px-3 py-1.5 w-full hover:bg-gray-300 text-black font-bold shadow-sm text-xs">
+                      {isOrderSupplierMode ? 'Kirim [F8]' : 'Simpan [F8]'}
+                    </button>
+                      <button onClick={handleCetakButton} disabled={isInputStockMode || isOrderSupplierMode} className={`border-2 border-gray-500 bg-gray-200 px-3 py-1.5 w-full text-black font-bold shadow-sm text-xs ${isInputStockMode || isOrderSupplierMode ? 'opacity-50 cursor-not-allowed bg-gray-300' : 'hover:bg-gray-300'}`}>Cetak [F9]</button>
+                      <button onClick={handleResetBaru} className={`border-2 border-gray-500 bg-gray-200 px-3 py-1.5 w-full text-black font-bold shadow-sm text-xs ${cart.some(c => c.isReturn) ? 'opacity-50 hover:bg-red-200' : 'hover:bg-gray-300'}`}>Baru [F5]</button>
+                      <button onClick={() => setShowHistoryModal(true)} disabled={cart.some(c => c.isReturn) || isInputStockMode || isOrderSupplierMode} className={`border-2 border-gray-500 bg-gray-200 px-3 py-1.5 w-full text-black font-bold shadow-sm text-xs ${cart.some(c => c.isReturn) || isInputStockMode || isOrderSupplierMode ? 'opacity-50 cursor-not-allowed bg-gray-300' : 'hover:bg-gray-300'}`}>Return</button>
+                      <button onClick={() => setShowBonModal(true)} disabled={cart.some(c => c.isReturn) || isInputStockMode || isOrderSupplierMode} className={`border-2 border-gray-500 bg-gray-200 px-3 py-1.5 w-full text-black font-bold text-red-700 shadow-sm text-xs ${cart.some(c => c.isReturn) || isInputStockMode || isOrderSupplierMode ? 'opacity-50 cursor-not-allowed bg-gray-300' : 'hover:bg-gray-300'}`}>Kasbon</button>
+                    </div>
+                    <div className="flex flex-col gap-1 w-[130px]">
+                      <button onClick={() => setShowPiutangModal(true)} disabled={cart.some(c => c.isReturn) || isInputStockMode || isOrderSupplierMode} className={`border-2 border-gray-500 bg-gray-200 px-3 py-1.5 w-full text-black font-bold shadow-sm text-xs relative ${cart.some(c => c.isReturn) || isInputStockMode || isOrderSupplierMode ? 'opacity-50 cursor-not-allowed bg-gray-300' : 'hover:bg-gray-300'}`}>
+                        Piutang [F2]
+                        {piutangData.length > 0 && <span className="absolute -top-1.5 -right-1.5 bg-red-600 text-white text-[10px] px-1.5 py-0.5 rounded-full shadow-lg">{piutangData.length}</span>}
+                      </button>
+                      <button onClick={handleSavePending} disabled={cart.some(c => c.isReturn) || isInputStockMode} className={`border-2 border-gray-500 bg-gray-200 px-3 py-1.5 w-full text-black font-bold shadow-sm text-xs ${cart.some(c => c.isReturn) || isInputStockMode ? 'opacity-50 cursor-not-allowed bg-gray-300' : 'hover:bg-gray-300'}`}>Pending [F3]</button>
+                      <button onClick={() => setShowPendingModal(true)} disabled={cart.some(c => c.isReturn) || isInputStockMode} className={`border-2 border-gray-500 bg-gray-200 px-3 py-1.5 w-full text-black font-bold shadow-sm text-xs relative ${cart.some(c => c.isReturn) || isInputStockMode ? 'opacity-50 cursor-not-allowed bg-gray-300' : 'hover:bg-gray-300'}`}>
+                        Daftar Pnd [F4]
+                        {pendingTransactions.length > 0 && <span className="absolute -top-1.5 -right-1.5 bg-red-600 text-white text-[10px] px-1.5 py-0.5 rounded-full shadow-lg">{pendingTransactions.length}</span>}
+                      </button>
+                      <button onClick={() => setIsBarcodeMode(!isBarcodeMode)} disabled={isInputStockMode || isOrderSupplierMode} className={`border-2 border-gray-500 px-3 py-1.5 w-full font-bold shadow-sm text-xs text-white ${isInputStockMode || isOrderSupplierMode ? 'opacity-50 cursor-not-allowed bg-gray-400' : (isBarcodeMode ? 'bg-green-600 hover:bg-green-700' : 'bg-red-600 hover:bg-red-700')}`}>Auto Scan</button>
+                      <button onClick={handlePromoToggle} disabled={cart.some(c => c.isReturn) || isInputStockMode || isOrderSupplierMode} className={`border-2 border-gray-500 px-3 py-1.5 w-full font-bold shadow-sm text-xs text-white ${cart.some(c => c.isReturn) || isInputStockMode || isOrderSupplierMode ? 'opacity-50 cursor-not-allowed bg-gray-400' : (isPromoActive ? 'bg-green-600 hover:bg-green-700' : 'bg-red-600 hover:bg-red-700')}`}>Promo</button>
+                    </div>
+                  </div>
+                </div>
+            </div>
+         </div>
+        )}
       </div>
       
       {/* HISTORY MODAL FOR RETUR */}
